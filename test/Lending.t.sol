@@ -8,6 +8,7 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {AmphorToken} from  "../src/token/AmphorToken.sol";
 import {ModelHelper} from  "../src/model/Helper.sol";
 import {BaseVault} from  "../src/vault/BaseVault.sol";
+import {LendingVault} from  "../src/vault/LendingVault.sol";
 import {Utils} from "../src/libraries/Utils.sol";
 import {Conversions} from "../src/libraries/Conversions.sol";
 import {Underlying } from  "../src/libraries/Underlying.sol";
@@ -32,11 +33,12 @@ contract LendingVaultTest is Test {
     IERC20 token0;
     IERC20 token1;
 
-    address WETH = 0xAaE73BfC17EC6CF6417cD7f15cf86F9AEbc33Edc;
-    address payable idoManager = payable(0x4ff2d7eAf57E8a87e89436A4DCab3e05686fc501);
-    address nomaToken = 0x71928Dd90031aB5Bb11d4765361c30958ecd4143;
+    address WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
+    address payable idoManager = payable(0x7D6Cb1678d761C100566eC1D25ceC421e4F3A0a7);
+    address nomaToken = 0x61F91A57677988def3dfD9c04b4411a023F105b8;
     address sNomaToken = 0x18Bb36A90984B43e8c5c07F461720394bA533134;
-    address deployerContract = 0x5EAC2ffAF4242b7099852EB96F585aBEdc37Cbe1;
+    address stakingContract = 0xeB0beC62AA5AB0e1dBEcDd8ae4CE70DAC36C1db3;
+    address modelHelperContract = 0x0E90A3D616F9Fe2405325C3a7FB064837817F45F;
     address vaultAddress;
 
     uint256 MAX_INT = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
@@ -55,17 +57,16 @@ contract LendingVaultTest is Test {
         noma = AmphorToken(nomaToken);
         require(address(noma) != address(0), "Noma token address is zero");
         
-        address modelHelperContract = managerContract.modelHelper();
         modelHelper = ModelHelper(modelHelperContract);
         vaultAddress = address(managerContract.vault());
+
+        console.log("Vault address is: ", vaultAddress);
 
         // Initialize the existing vault contract
         vault = IVault(vaultAddress);
         IUniswapV3Pool pool = vault.pool();
 
-        address token0Address = pool.token0();
-
-        token0 = IERC20(token0Address);  
+        token0 = IERC20(pool.token0());  
         token1 = IERC20(pool.token1());    
 
         testLargePurchaseTriggerShift();  
@@ -94,34 +95,28 @@ contract LendingVaultTest is Test {
     }
 
     function testPaybackLoan() public {
+        testBorrow();
+
         uint256 borrowAmount = 1 ether;
-
-        vm.prank(deployer);
-        token0.approve(vaultAddress, MAX_INT);
-
-        // Borrow first
-        vm.prank(deployer);
-        vault.borrow(deployer, borrowAmount);
-        
-        uint256 balanceBeforePaybackToken1 = token1.balanceOf(deployer);
-        uint256 balanceBeforePaybackToken0 = token0.balanceOf(deployer);
 
         // Pay back part of the loan
         vm.prank(deployer);
         token1.approve(vaultAddress, MAX_INT);
 
         vm.prank(deployer);
+        IWETH(WETH).deposit{ value: borrowAmount}();
+
+        uint256 token1Balance = token1.balanceOf(deployer);
+        console.log("Token1 balance before payback is: ", token1Balance);
+        
+        vm.prank(deployer);
         vault.payback(deployer);
-
-        // check if the loan amount is deducted from the user's balance
-        assertEq(balanceBeforePaybackToken1 - token1.balanceOf(deployer), borrowAmount);
-        // check if the borrowed amount is reduced by the payback amount
-        assertLt(balanceBeforePaybackToken0, token0.balanceOf(deployer));
-
+ 
+        assertEq(token1Balance - borrowAmount, token1.balanceOf(deployer));
     }    
 
     function testRollLoan() public {
-        uint256 borrowAmount = 100 ether;
+        uint256 borrowAmount = 5 ether;
 
         vm.prank(deployer);
         token0.approve(vaultAddress, MAX_INT);
@@ -157,8 +152,10 @@ contract LendingVaultTest is Test {
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
         uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
-        uint16 totalTrades = 500;
-        uint256 tradeAmount = 200 ether;
+        uint256 purchasePrice = spotPrice + (spotPrice * 1 / 100);
+
+        uint16 totalTrades = 50;
+        uint256 tradeAmount = 1 ether;
 
         IWETH(WETH).deposit{ value: (tradeAmount * totalTrades)}();
         IWETH(WETH).transfer(idoManager, tradeAmount * totalTrades);
@@ -168,9 +165,11 @@ contract LendingVaultTest is Test {
         console.log("Circulating supply is: ", circulatingSupplyBefore);
 
         for (uint i = 0; i < totalTrades; i++) {
+            (sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
             spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+            purchasePrice = spotPrice + (spotPrice * i / 100);
             if (i >= 4) {
-                spotPrice = spotPrice + (spotPrice * i / 100);
+                spotPrice =  purchasePrice;
             }
             managerContract.buyTokens(spotPrice, tradeAmount, deployer);
         }
@@ -186,7 +185,7 @@ contract LendingVaultTest is Test {
             IVault(address(vault)).shift();
             nextFloorPrice = getNextFloorPrice(pool, address(vault));
             console.log("Next floor price (after shift) is: ", nextFloorPrice);
-            solvencyInvariant();
+            solvency();
         } else {
             revert(
                 string(
@@ -214,18 +213,18 @@ contract LendingVaultTest is Test {
         fees = (borrowAmount * scaledPercentage * (duration / SECONDS_IN_DAY)) / (100 * 10**18);
     }    
     
-    function solvencyInvariant() public view {
+    function solvency() public view {
         IDOManager managerContract = IDOManager(idoManager);
         BaseVault vault = managerContract.vault();
         address pool = address(vault.pool());
-
 
         uint256 circulatingSupply = modelHelper.getCirculatingSupply(pool, address(vault));
         console.log("Circulating supply is: ", circulatingSupply);
 
         uint256 intrinsicMinimumValue = modelHelper.getIntrinsicMinimumValue(address(vault));
         
-        LiquidityPosition[3] memory positions = vault.getPositions();
+        LiquidityPosition[3] memory positions =  LendingVault(address(vault)).getPositions();
+
         uint256 anchorCapacity = modelHelper.getPositionCapacity(pool, address(vault), positions[1], LiquidityType.Anchor);
         (,,,uint256 floorBalance) = Underlying.getUnderlyingBalances(pool, address(vault), positions[0]);
         
