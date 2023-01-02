@@ -87,7 +87,7 @@ contract StakingVault is BaseVault {
         require(_v.stakingContract != address(0), "StakeVault: staking contract not set");
         
         IERC20(_v.tokenInfo.token0).approve(_v.stakingContract, toMintConverted);
-        mintTokens(_v.stakingContract, toMintConverted);
+        // mintTokens(_v.stakingContract, toMintConverted);
 
         // Update total minted (NOMA)
         _v.totalMinted += toMintConverted;
@@ -250,6 +250,15 @@ contract StakingVault is BaseVault {
         }
     }
 
+    function setFees(
+        uint256 _feesAccumulatedToken0, 
+        uint256 _feesAccumulatedToken1
+    ) public onlyInternalCalls {
+
+        _v.feesAccumulatorToken0 += _feesAccumulatedToken0;
+        _v.feesAccumulatorToken1 += _feesAccumulatedToken1;
+    }
+
     function liquidityStructureParameters() public view returns 
     (LiquidityStructureParameters memory ) {
         return _v.liquidityStructureParameters;
@@ -260,10 +269,11 @@ contract StakingVault is BaseVault {
     }
 
     function getFunctionSelectors() external pure  override returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](3);
+        bytes4[] memory selectors = new bytes4[](4);
         selectors[0] = bytes4(keccak256(bytes("mintAndDistributeRewards((address,address,address,address,address))"))); 
         selectors[1] = bytes4(keccak256(bytes("liquidityStructureParameters()")));  
         selectors[2] = bytes4(keccak256(bytes("setStakingContract(address)")));
+        selectors[3] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));
         return selectors;
     }
 }
