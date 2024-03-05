@@ -8,13 +8,30 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 
 import {Owned} from "solmate/auth/Owned.sol";
 
-contract Positions is Owned {
+contract Amphor is Owned {
+
+    // Protocol liquidity position
+    struct LiquidityPosition {
+        uint tokenId;
+        address pool;
+        uint128 liquidity;
+        int24 lowerTick;
+        int24 upperTick;
+        // uint32 secondsInsideSince;
+        bool burned;
+    }
+
+    enum PositionType {
+        FLOOR,
+        ANCHOR,
+        DISCOVERY
+    }
 
     IUniswapV3Pool public pool;
     address public token0;
 
     bool public initialized;
-    uint24 private poolFee = 10_000;
+    uint24 private poolFee;
 
     // base
     address public weth = 0x4200000000000000000000000000000000000006;
@@ -23,8 +40,14 @@ contract Positions is Owned {
     // base
     address public factoryAddress = 0x33128a8fC17869897dcE68Ed026d694621f6FDfD;
 
-    constructor() Owned(msg.sender) {
+    mapping(PositionType => LiquidityPosition) public positions;
 
+    /**
+     * @dev Initializes the contract
+     * @param _poolFee The fee of the pool (e.g. 10_000)
+     */
+    constructor(uint24 _poolFee) Owned(msg.sender) {
+        poolFee = _poolFee;
     }
 
     function initialize(address amphorToken) external  {
@@ -39,6 +62,45 @@ contract Positions is Owned {
             token0 = pool.token0();
             initialized = true;
         }
+    }
+
+
+    function initialLaunch(uint24 _lowerTick, uint24 _upperTick) external onlyOwner onlyInitialized {
+
+        // Create a new position
+        positions[PositionType.FLOOR] = LiquidityPosition({
+            tokenId: 0,
+            pool: address(pool),
+            liquidity: 0,
+            lowerTick: -887220,
+            upperTick: -887200,
+            // secondsInsideSince: 0,
+            burned: false
+        });
+
+        // Create a new position
+        positions[PositionType.ANCHOR] = LiquidityPosition({
+            tokenId: 0,
+            pool: address(pool),
+            liquidity: 0,
+            lowerTick: -887200,
+            upperTick: -887180,
+            // secondsInsideSince: 0,
+            burned: false
+        });
+
+        // Create a new position
+        positions[PositionType.DISCOVERY] = LiquidityPosition({
+            tokenId: 0,
+            pool: address(pool),
+            liquidity: 0,
+            lowerTick: -887180,
+            upperTick: -887160,
+            // secondsInsideSince: 0,
+            burned: false
+        });
+
+
     }
 
 
