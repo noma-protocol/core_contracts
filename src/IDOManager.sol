@@ -15,9 +15,10 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 import {Owned} from "solmate/auth/Owned.sol";
 
 import 'abdk/ABDKMath64x64.sol';
+import '@uniswap/v3-core/libraries/TickMath.sol';
 
-import "../src/libraries/Conversions.sol";
-import "../src/libraries/Utils.sol";
+import {Conversions} from "./libraries/Conversions.sol";
+import {Utils} from "./libraries/Utils.sol";
 
 interface IWETH {
     function deposit() external payable;
