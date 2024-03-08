@@ -17,7 +17,12 @@ import {Owned} from "solmate/auth/Owned.sol";
 import 'abdk/ABDKMath64x64.sol';
 
 import "../src/libraries/Conversions.sol";
+import "../src/libraries/Utils.sol";
 
+interface IWETH {
+    function deposit() external payable;
+    function transfer(address to, uint value) external returns (bool);
+}
 
 contract IDOManager is Owned {
 
@@ -34,18 +39,25 @@ contract IDOManager is Owned {
     address public token1;
     address public uniswapFactory;
 
-    uint32 IDOPrice;
+    uint256 IDOPrice;
 
     uint24 feeTier = 3000;
+    int24 tickSpacing = 60;
 
-    constructor(address _uniswapFactory, address _token0) Owned(msg.sender) { 
+    int24 IDOLowerTick;
+    int24 IDOUpperTick;
+
+    int24 FloorLowerTick;
+    int24 FloorUpperTick;
+
+    constructor(address _uniswapFactory, address _token1) Owned(msg.sender) { 
         amphorToken = new AmphorToken(address(this), totalSupplyAmphor);
-        token0 = _token0;
         uniswapFactory = _uniswapFactory;
-        token1 = address(amphorToken);
+        token0 = address(amphorToken);
+        token1 = _token1;
     }
 
-    function init(uint160 _IDOPriceX96, uint32 _IDOPrice) public onlyOwner {
+    function initialize(uint160 _IDOPriceX96, uint256 _IDOPrice) public onlyOwner {
         require(!initialized, "already initialized");
 
         IUniswapV3Factory factory = IUniswapV3Factory(uniswapFactory);
@@ -59,14 +71,16 @@ contract IDOManager is Owned {
             );
             IUniswapV3Pool(pool)
             .initialize(
-                // IDO price (1500000 Amphor/WETH) 97034285709077923348982791886170
                 _IDOPriceX96
             );
         } 
 
-        IDOPrice = _IDOPrice;
-        minter = new Minter(address(pool));
+        minter = new Minter(address(pool), address(this));
 
+        // transfter WETH to buy IDO
+        IWETH(token1).transfer(address(minter), 100 ether);
+
+        IDOPrice = _IDOPrice;
         initialized = true;
     }
 
@@ -75,12 +89,11 @@ contract IDOManager is Owned {
 
         amphorToken.transfer(address(minter), launchSupply);
 
-        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
+        (uint160 sqrtRatioX96,,,,,,) = pool.slot0();
+        (int24 lowerTick, int24 upperTick) = Conversions.computeSingleTick(IDOPrice, tickSpacing);
 
-        (int24 lowerTick, int24 upperTick) = Conversions.computeSingleTick(750000e18, 60);
-
-        uint256 amount0Max = 0;
-        uint256 amount1Max = launchSupply;
+        uint256 amount0Max = launchSupply;
+        uint256 amount1Max = 0;
 
         uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
             sqrtRatioX96,
@@ -92,9 +105,139 @@ contract IDOManager is Owned {
 
         if (liquidity > 0) {
             minter.mint(lowerTick, upperTick, liquidity);
-        } 
+            IDOLowerTick = lowerTick;
+            IDOUpperTick = upperTick;
+        } else {
+            revert("createIDO: liquidity is 0");
+        }
     }
 
+    function buyIDO(uint256 price) public {
+        minter.swap(
+            Conversions.priceToSqrtPriceX96(int256(price), tickSpacing),
+            100e18,
+            false,
+            false
+        );        
+    }
 
+    function collectWETH() public {
+
+        uint256 balanceBeforeSwap = ERC20(token1).balanceOf(address(this));
+
+        bytes32 IDOPositionId = keccak256(
+            abi.encodePacked(
+                address(minter), 
+                IDOLowerTick, 
+                IDOUpperTick
+            )
+        );
+
+        (uint128 liquidity,,,,) = pool.positions(IDOPositionId);
+
+        if (liquidity > 0) {
+            minter.burn(
+                IDOLowerTick,
+                IDOUpperTick,
+                liquidity
+            );
+        } else {
+            revert("collectWETH: liquidity is 0");
+        }
+
+        uint256 balanceAfterSwap = ERC20(token1).balanceOf(address(this));
+        require(balanceAfterSwap > balanceBeforeSwap, "no tokens exchanged");
+    }
+
+    function buildFloor(uint256 floorPrice) public {
+
+        uint256 balanceToken1 = ERC20(token1).balanceOf(address(this));
+
+        IWETH(token1).transfer(address(minter), balanceToken1);
+        
+        (uint160 sqrtRatioX96,,,,,,) = pool.slot0();
+        (int24 lowerTick, int24 upperTick) = Conversions.computeSingleTick(floorPrice, tickSpacing);
+
+        uint256 amount0Max = 0;
+        uint256 amount1Max = balanceToken1;
+
+        uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
+            sqrtRatioX96,
+            TickMath.getSqrtRatioAtTick(lowerTick),
+            TickMath.getSqrtRatioAtTick(upperTick),
+            amount0Max,
+            amount1Max
+        );
+
+        if (liquidity > 0) {
+            minter.mint(lowerTick, upperTick, liquidity);
+            FloorLowerTick = lowerTick;
+            FloorUpperTick = upperTick;
+        } else {
+            revert(string(abi.encodePacked("buildFloor: liquidity is 0  ", Utils._uint2str(uint256(sqrtRatioX96))))); 
+        }
+
+    }
+
+    function sellToFloor(uint256 price, uint256 amount) public {
+        ERC20(token0).transfer(address(minter), amount);
+
+        minter.swap(
+            Conversions.priceToSqrtPriceX96(int256(price), tickSpacing),
+            amount,
+            true,
+            false
+        );        
+    }
+
+    function shiftFloor(uint256 newFloorPrice) public onlyOwner {
+        int24 newFloorLowerTick = Conversions.priceToTick(int256(newFloorPrice), tickSpacing);
+
+        require(newFloorLowerTick > FloorLowerTick, "invalid floor");
+
+        bytes32 floorPositionId = keccak256(abi.encodePacked(address(minter), FloorLowerTick, FloorUpperTick));
+
+        (uint128 liquidity,,,,) = pool.positions(floorPositionId);
+
+        if (liquidity > 0) {
+            minter.burn(
+                FloorLowerTick,
+                FloorUpperTick,
+                liquidity
+            );
+        } else {
+            revert("shiftFloor: liquidity is 0");
+        }
+
+        uint256 balanceAfterShiftFloorToken1 = ERC20(token1).balanceOf(address(this));
+
+        IWETH(token1).transfer(address(minter), balanceAfterShiftFloorToken1);
+        
+        (uint160 sqrtRatioX96,,,,,,) = pool.slot0();
+        (, int24 newFloorUpperTick) = Conversions.computeSingleTick(newFloorPrice, tickSpacing);
+
+        uint256 amount0Max = 0;
+        uint256 amount1Max = balanceAfterShiftFloorToken1;
+
+        uint128 newLiquidity = LiquidityAmounts.getLiquidityForAmounts(
+            sqrtRatioX96,
+            TickMath.getSqrtRatioAtTick(newFloorLowerTick),
+            TickMath.getSqrtRatioAtTick(newFloorUpperTick),
+            amount0Max,
+            amount1Max
+        );
+
+        if (newLiquidity > 0) {
+            minter.mint(newFloorLowerTick, newFloorUpperTick, liquidity);
+            FloorLowerTick = newFloorLowerTick;
+            FloorUpperTick = newFloorUpperTick;
+        } else {
+            revert(string(abi.encodePacked("shiftFloor: liquidity is 0  ", Utils._uint2str(uint256(sqrtRatioX96))))); 
+        }
+    }
+ 
+    receive() external payable {
+        IWETH(token1).deposit{value: msg.value}();
+    }
 
 }

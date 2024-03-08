@@ -67,21 +67,9 @@ library Conversions {
         }
     }
 
-    function priceToSqrtPriceX96(
-        uint256 price,
-        uint8 decimalsToken0
-    ) internal pure returns (uint160) {
-        uint256 sqrtPrice = sqrt(price);
-        uint256 scaledSqrtPrice = sqrtPrice * (1 << 96);
-        uint256 divisor = 10 ** (decimalsToken0 / 2);
-        
-        require(divisor > 0, "Divisor cannot be zero");
-        uint256 result = scaledSqrtPrice / divisor;
-        
-        require(result <= type(uint160).max, "Result exceeds uint160 limits");
-        
-        return uint160(result);
-    }    
+    function priceToSqrtPriceX96(int256 price, int24 tickSpacing) internal pure returns(uint160) {
+        return tickToSqrtPriceX96(priceToTick(price, tickSpacing));
+    }
 
     function sqrt(uint256 x) internal pure returns (uint256) {
         uint256 z = (x + 1) / 2;
