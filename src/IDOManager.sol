@@ -51,6 +51,14 @@ contract IDOManager is Owned {
     int24 FloorLowerTick;
     int24 FloorUpperTick;
 
+    struct LiquidityPosition {
+        int24 lowerTick;
+        int24 upperTick;
+        uint128 liquidity;
+    }
+    
+    LiquidityPosition[] public discoveryPositions;
+    
     constructor(address _uniswapFactory, address _token1) Owned(msg.sender) { 
         amphorToken = new AmphorToken(address(this), totalSupplyAmphor);
         uniswapFactory = _uniswapFactory;
@@ -197,7 +205,6 @@ contract IDOManager is Owned {
         require(newFloorLowerTick > FloorLowerTick, "invalid floor");
 
         bytes32 floorPositionId = keccak256(abi.encodePacked(address(minter), FloorLowerTick, FloorUpperTick));
-
         (uint128 liquidity,,,,) = pool.positions(floorPositionId);
 
         if (liquidity > 0) {
@@ -237,6 +244,7 @@ contract IDOManager is Owned {
         }
     }
  
+    
     receive() external payable {
         IWETH(token1).deposit{value: msg.value}();
     }
