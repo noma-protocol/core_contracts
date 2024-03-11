@@ -3,6 +3,8 @@
 pragma solidity ^0.8.0;
 
 import {Logarithm} from "./Logarithm.sol";
+import {IUniswapV3Pool} from '@uniswap/v3-core/interfaces/IUniswapV3Pool.sol';
+import {FullMath} from '@uniswap/v3-core/libraries/FullMath.sol';
 
 import '@uniswap/v3-core/libraries/TickMath.sol';
 import 'abdk/ABDKMath64x64.sol';
@@ -14,10 +16,18 @@ library Conversions {
         pure 
         returns 
     (int24 lowerTick, int24 upperTick) {
-        lowerTick = nearestUsableTick(priceToTick(int256(price), 60), tickSpacing);
+        lowerTick = priceToTick(int256(price), tickSpacing) ;
         upperTick = (lowerTick / tickSpacing + 1) * tickSpacing;
     }
     
+    function computeRangeTicks(uint256 priceLower, uint256 priceUpper, int24 tickSpacing) 
+        internal 
+        pure 
+        returns
+    (int24 lowerTick, int24 upperTick) {
+        lowerTick = priceToTick(int256(priceLower), tickSpacing);
+        upperTick = priceToTick(int256(priceUpper), tickSpacing);
+    }
 
     function tickToSqrtPriceX96(int24 _tick) internal pure returns(uint160) {
         return TickMath.getSqrtRatioAtTick(_tick);
@@ -32,43 +42,18 @@ library Conversions {
         ) * tickSpacing;
     }
 
-
     function round(int256 _a, int256 _b) internal pure returns(int24) {
         return int24(10000 * _a / _b % 10000 > 10000 / 2 ? _a / _b + 1 : _a / _b);
     }
 
-
-    function nearestUsableTick(int24 tick_, int24 tickSpacing)
-        internal
-        pure
-        returns (int24 result)
-    {
-        result =
-            int24(divRound(int128(tick_), int128(int24(tickSpacing)))) *
-            int24(tickSpacing);
-
-        if (result < TickMath.MIN_TICK) {
-            result += int24(tickSpacing);
-        } else if (result > TickMath.MAX_TICK) {
-            result -= int24(tickSpacing);
-        }
-    }
-    
-    function divRound(int128 x, int128 y)
-        internal
-        pure
-        returns (int128 result)
-    {
-        int128 quot = ABDKMath64x64.div(x, y);
-        result = quot >> 64;
-
-        if (quot % 2**64 >= 0x8000000000000000) {
-            result += 1;
-        }
-    }
-
     function priceToSqrtPriceX96(int256 price, int24 tickSpacing) internal pure returns(uint160) {
         return tickToSqrtPriceX96(priceToTick(price, tickSpacing));
+    }
+
+    function sqrtPriceX96ToPrice(uint160 sqrtPriceX96, uint8 decimals) public pure returns (uint256) {
+        uint256 numerator1 = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
+        uint256 numerator2 = 10 ** decimals;
+        return FullMath.mulDiv(numerator1, numerator2, 1 << 192);
     }
 
     function sqrt(uint256 x) internal pure returns (uint256) {

@@ -3,10 +3,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "forge-std/Script.sol";
-import {Minter} from "../src/Minter.sol";
-import {AmphorToken} from "../src/token/AmphorToken.sol";
-
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {IUniswapV3Factory} from "@uniswap/v3-core/interfaces/IUniswapV3Factory.sol";
 import {LiquidityAmounts} from "@uniswap/v3-periphery/libraries/LiquidityAmounts.sol";
@@ -14,27 +10,28 @@ import {LiquidityAmounts} from "@uniswap/v3-periphery/libraries/LiquidityAmounts
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {Owned} from "solmate/auth/Owned.sol";
 
-import 'abdk/ABDKMath64x64.sol';
-import '@uniswap/v3-core/libraries/TickMath.sol';
+import {TickMath} from '@uniswap/v3-core/libraries/TickMath.sol';
 
+import {Vault} from "./Vault.sol";
+
+import {IWETH} from "./interfaces/IWETH.sol";
+import {AmphorToken} from "./token/AmphorToken.sol";
 import {Conversions} from "./libraries/Conversions.sol";
 import {Utils} from "./libraries/Utils.sol";
-
-interface IWETH {
-    function deposit() external payable;
-    function transfer(address to, uint value) external returns (bool);
-}
+import {feeTier, tickSpacing, LiquidityPosition, LiquidityType} from "./Types.sol";
+import {Uniswap} from "./libraries/Uniswap.sol";
 
 contract IDOManager is Owned {
 
     bool public initialized;
-    
-    AmphorToken public amphorToken;
-    Minter public minter;
+
     IUniswapV3Pool public pool;
 
-    uint256 totalSupplyAmphor = 1_000_000e18;
-    uint256 launchSupply = (totalSupplyAmphor * 40) / 100;
+    AmphorToken public amphorToken;
+    Vault public vault;
+
+    uint256 totalSupply;
+    uint256 launchSupply;
 
     address public token0;
     address public token1;
@@ -42,31 +39,28 @@ contract IDOManager is Owned {
 
     uint256 IDOPrice;
 
-    uint24 feeTier = 3000;
-    int24 tickSpacing = 60;
+    LiquidityPosition public IDOPosition;
 
-    int24 IDOLowerTick;
-    int24 IDOUpperTick;
+    constructor(address _uniswapFactory, address _token1, uint256 _totalSupply, uint16 _percentageForSale) Owned(msg.sender) { 
+        require(_percentageForSale > 0 && _percentageForSale < 50, "invalid percentage");
 
-    int24 FloorLowerTick;
-    int24 FloorUpperTick;
+        totalSupply = _totalSupply;
+        launchSupply = totalSupply * _percentageForSale / 100;   
 
-    struct LiquidityPosition {
-        int24 lowerTick;
-        int24 upperTick;
-        uint128 liquidity;
-    }
-    
-    LiquidityPosition[] public discoveryPositions;
-    
-    constructor(address _uniswapFactory, address _token1) Owned(msg.sender) { 
-        amphorToken = new AmphorToken(address(this), totalSupplyAmphor);
+        // Force desired token order on Uniswap V3
+        uint256 nonce = 0;
+        do {
+            amphorToken = new AmphorToken{salt: bytes32(nonce)}(address(this), launchSupply);
+            nonce++;
+        } while (address(amphorToken) >= _token1);
+
         uniswapFactory = _uniswapFactory;
+     
         token0 = address(amphorToken);
         token1 = _token1;
     }
 
-    function initialize(uint160 _IDOPriceX96, uint256 _IDOPrice) public onlyOwner {
+    function initialize(uint256 _initPrice, uint256 _IDOPrice) public onlyOwner {
         require(!initialized, "already initialized");
 
         IUniswapV3Factory factory = IUniswapV3Factory(uniswapFactory);
@@ -80,14 +74,12 @@ contract IDOManager is Owned {
             );
             IUniswapV3Pool(pool)
             .initialize(
-                _IDOPriceX96
+                Conversions.priceToSqrtPriceX96(int256(_initPrice), tickSpacing)
             );
         } 
 
-        minter = new Minter(address(pool), address(this));
-
-        // transfter WETH to buy IDO
-        IWETH(token1).transfer(address(minter), 100 ether);
+        vault = new Vault(address(pool), address(this));
+        amphorToken.mintTo(address(vault), totalSupply - launchSupply);
 
         IDOPrice = _IDOPrice;
         initialized = true;
@@ -96,15 +88,16 @@ contract IDOManager is Owned {
     function createIDO() public onlyOwner {
         require(initialized, "not initialized");
 
-        amphorToken.transfer(address(minter), launchSupply);
-
         (uint160 sqrtRatioX96,,,,,,) = pool.slot0();
-        (int24 lowerTick, int24 upperTick) = Conversions.computeSingleTick(IDOPrice, tickSpacing);
+
+        (int24 lowerTick, int24 upperTick) = Conversions
+        .computeSingleTick(IDOPrice, tickSpacing);
 
         uint256 amount0Max = launchSupply;
         uint256 amount1Max = 0;
 
-        uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
+        uint128 liquidity = LiquidityAmounts
+        .getLiquidityForAmounts(
             sqrtRatioX96,
             TickMath.getSqrtRatioAtTick(lowerTick),
             TickMath.getSqrtRatioAtTick(upperTick),
@@ -113,41 +106,46 @@ contract IDOManager is Owned {
         );
 
         if (liquidity > 0) {
-            minter.mint(lowerTick, upperTick, liquidity);
-            IDOLowerTick = lowerTick;
-            IDOUpperTick = upperTick;
+            Uniswap.mint(pool, lowerTick, upperTick, liquidity, LiquidityType.Floor, false);
         } else {
             revert("createIDO: liquidity is 0");
         }
+
+        IDOPosition = LiquidityPosition(lowerTick, upperTick, liquidity, IDOPrice, 0, 0, 0);
     }
 
-    function buyIDO(uint256 price) public {
-        minter.swap(
+    // Test function
+    function buyIDO(uint256 price, uint256 amountToken1) public {
+        Uniswap.swap(
+            pool,
+            token0,
+            token1,
             Conversions.priceToSqrtPriceX96(int256(price), tickSpacing),
-            100e18,
+            amountToken1,
             false,
             false
         );        
     }
 
-    function collectWETH() public {
+    function collectIDOFunds() public {
 
         uint256 balanceBeforeSwap = ERC20(token1).balanceOf(address(this));
 
         bytes32 IDOPositionId = keccak256(
             abi.encodePacked(
-                address(minter), 
-                IDOLowerTick, 
-                IDOUpperTick
+                address(this), 
+                IDOPosition.lowerTick, 
+                IDOPosition.upperTick
             )
         );
 
         (uint128 liquidity,,,,) = pool.positions(IDOPositionId);
 
         if (liquidity > 0) {
-            minter.burn(
-                IDOLowerTick,
-                IDOUpperTick,
+            Uniswap.burn(
+                pool, 
+                IDOPosition.lowerTick, 
+                IDOPosition.upperTick,
                 liquidity
             );
         } else {
@@ -156,42 +154,17 @@ contract IDOManager is Owned {
 
         uint256 balanceAfterSwap = ERC20(token1).balanceOf(address(this));
         require(balanceAfterSwap > balanceBeforeSwap, "no tokens exchanged");
+
+        ERC20(token0).transfer(address(vault), ERC20(token0).balanceOf(address(this)));
+        ERC20(token1).transfer(address(vault), ERC20(token1).balanceOf(address(this)));
     }
 
-    function buildFloor(uint256 floorPrice) public {
-
-        uint256 balanceToken1 = ERC20(token1).balanceOf(address(this));
-
-        IWETH(token1).transfer(address(minter), balanceToken1);
-        
-        (uint160 sqrtRatioX96,,,,,,) = pool.slot0();
-        (int24 lowerTick, int24 upperTick) = Conversions.computeSingleTick(floorPrice, tickSpacing);
-
-        uint256 amount0Max = 0;
-        uint256 amount1Max = balanceToken1;
-
-        uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
-            sqrtRatioX96,
-            TickMath.getSqrtRatioAtTick(lowerTick),
-            TickMath.getSqrtRatioAtTick(upperTick),
-            amount0Max,
-            amount1Max
-        );
-
-        if (liquidity > 0) {
-            minter.mint(lowerTick, upperTick, liquidity);
-            FloorLowerTick = lowerTick;
-            FloorUpperTick = upperTick;
-        } else {
-            revert(string(abi.encodePacked("buildFloor: liquidity is 0  ", Utils._uint2str(uint256(sqrtRatioX96))))); 
-        }
-
-    }
-
+    // Test function
     function sellToFloor(uint256 price, uint256 amount) public {
-        ERC20(token0).transfer(address(minter), amount);
-
-        minter.swap(
+        Uniswap.swap(
+            pool,
+            token0,
+            token1,
             Conversions.priceToSqrtPriceX96(int256(price), tickSpacing),
             amount,
             true,
@@ -199,54 +172,83 @@ contract IDOManager is Owned {
         );        
     }
 
-    function shiftFloor(uint256 newFloorPrice) public onlyOwner {
-        int24 newFloorLowerTick = Conversions.priceToTick(int256(newFloorPrice), tickSpacing);
+    // Test function
+    function buyTokens(uint256 price, uint256 amount) public {
+        Uniswap.swap(
+            pool,
+            token0,
+            token1,
+            Conversions.priceToSqrtPriceX96(int256(price), tickSpacing),
+            amount,
+            false,
+            false
+        );        
+    }
 
-        require(newFloorLowerTick > FloorLowerTick, "invalid floor");
+    /**
+     * @notice Uniswap V3 callback function, called back on pool.mint
+     */
+    function uniswapV3MintCallback(uint256 amount0Owed, uint256 amount1Owed, bytes calldata _data)
+        external
+    {
+        require(msg.sender == address(pool), "callback caller");
 
-        bytes32 floorPositionId = keccak256(abi.encodePacked(address(minter), FloorLowerTick, FloorUpperTick));
-        (uint128 liquidity,,,,) = pool.positions(floorPositionId);
+        uint256 token0Balance = ERC20(token0).balanceOf(address(this));
+        uint256 token1Balance = ERC20(token1).balanceOf(address(this));
 
-        if (liquidity > 0) {
-            minter.burn(
-                FloorLowerTick,
-                FloorUpperTick,
-                liquidity
-            );
+        if (token0Balance >= amount0Owed) {
+            if (amount0Owed > 0) ERC20(token0).transfer(msg.sender, amount0Owed);
         } else {
-            revert("shiftFloor: liquidity is 0");
+            revert(
+                string(
+                    abi.encodePacked(
+                        "insufficient token0 balance, owed: ", 
+                        Utils._uint2str(amount0Owed)
+                        )
+                    )
+                );
         }
 
-        uint256 balanceAfterShiftFloorToken1 = ERC20(token1).balanceOf(address(this));
-
-        IWETH(token1).transfer(address(minter), balanceAfterShiftFloorToken1);
-        
-        (uint160 sqrtRatioX96,,,,,,) = pool.slot0();
-        (, int24 newFloorUpperTick) = Conversions.computeSingleTick(newFloorPrice, tickSpacing);
-
-        uint256 amount0Max = 0;
-        uint256 amount1Max = balanceAfterShiftFloorToken1;
-
-        uint128 newLiquidity = LiquidityAmounts.getLiquidityForAmounts(
-            sqrtRatioX96,
-            TickMath.getSqrtRatioAtTick(newFloorLowerTick),
-            TickMath.getSqrtRatioAtTick(newFloorUpperTick),
-            amount0Max,
-            amount1Max
-        );
-
-        if (newLiquidity > 0) {
-            minter.mint(newFloorLowerTick, newFloorUpperTick, liquidity);
-            FloorLowerTick = newFloorLowerTick;
-            FloorUpperTick = newFloorUpperTick;
+        if (token1Balance >= amount1Owed) {
+            if (amount1Owed > 0) ERC20(token1).transfer(msg.sender, amount1Owed);
         } else {
-            revert(string(abi.encodePacked("shiftFloor: liquidity is 0  ", Utils._uint2str(uint256(sqrtRatioX96))))); 
+            revert(
+                string(
+                    abi.encodePacked("insufficient token1 balance, owed: ", 
+                    Utils._uint2str(amount1Owed)
+                    )
+                )
+            );
         }
     }
- 
-    
+
+    /**
+     * @notice Uniswap v3 callback function, called back on pool.swap
+     */
+    function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data )
+        external
+    {
+        require(msg.sender == address(pool), "callback caller");
+
+        if (amount0Delta > 0) {
+           ERC20(token0).transfer(msg.sender, uint256(amount0Delta));
+        } else if (amount1Delta > 0) {
+            ERC20(token1).transfer(msg.sender, uint256(amount1Delta));
+        }
+    }
+
+
+
     receive() external payable {
+
+        uint256 balanceBefore = ERC20(token1).balanceOf(address(this));
+
         IWETH(token1).deposit{value: msg.value}();
+
+        uint256 balanceAfter = ERC20(token1).balanceOf(address(this));
+        uint256 excessAmount = balanceAfter - balanceBefore;
+
+        ERC20(token1).transfer(owner, excessAmount);
     }
 
 }
