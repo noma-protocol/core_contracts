@@ -55,15 +55,15 @@ library LiquidityHelper {
                 false
             );
         } else {
-            // revert(
-            //     string(
-            //         abi.encodePacked(
-            //                 "deployFloor: liquidity is 0, spot price: ", 
-            //                 Utils._uint2str(uint256(sqrtRatioX96)
-            //             )
-            //         )
-            //     )
-            // );             
+            revert(
+                string(
+                    abi.encodePacked(
+                            "deployFloor: liquidity is 0, spot price: ", 
+                            Utils._uint2str(uint256(sqrtRatioX96)
+                        )
+                    )
+                )
+            );             
         }
 
         newPosition = LiquidityPosition({
@@ -139,15 +139,15 @@ library LiquidityHelper {
         if (liquidity > 0) {
             Uniswap.mint(pool, receiver, lowerTick, upperTick, liquidity, LiquidityType.Anchor, false);
         } else {
-            // revert(
-            //     string(
-            //         abi.encodePacked(
-            //                 "deployAnchor: liquidity is 0, spot price:  ", 
-            //                 Utils._uint2str(uint256(sqrtRatioX96)
-            //             )
-            //         )
-            //     )
-            // ); 
+            revert(
+                string(
+                    abi.encodePacked(
+                            "deployAnchor: liquidity is 0, spot price:  ", 
+                            Utils._uint2str(uint256(sqrtRatioX96)
+                        )
+                    )
+                )
+            ); 
         }
 
         newPosition = LiquidityPosition({
@@ -209,15 +209,15 @@ library LiquidityHelper {
         if (liquidity > 0) {
             Uniswap.mint(pool, receiver, lowerTick, upperTick, liquidity, LiquidityType.Discovery, false);
         } else {
-            // revert(
-            //     string(
-            //         abi.encodePacked(
-            //                 "deployDiscovery: liquidity is 0, spot price:  ", 
-            //                 Utils._uint2str(uint256(sqrtRatioX96)
-            //             )
-            //         )
-            //     )
-            // ); 
+            revert(
+                string(
+                    abi.encodePacked(
+                            "deployDiscovery: liquidity is 0, spot price:  ", 
+                            Utils._uint2str(uint256(sqrtRatioX96)
+                        )
+                    )
+                )
+            ); 
         }  
 
         newPosition = LiquidityPosition({
@@ -264,6 +264,7 @@ library LiquidityHelper {
         if (liquidity > 0) {
             Uniswap.burn(
                 pool,
+                receiver,
                 floorPosition.lowerTick,
                 floorPosition.upperTick,
                 liquidity
@@ -304,15 +305,15 @@ library LiquidityHelper {
             //     0
             // );
         } else {
-            // revert(
-            //     string(
-            //         abi.encodePacked(
-            //                 "shiftFloor: liquidity is 0  ", 
-            //                 Utils._uint2str(uint256(sqrtRatioX96)
-            //             )
-            //         )
-            //     )
-            // ); 
+            revert(
+                string(
+                    abi.encodePacked(
+                            "shiftFloor: liquidity is 0  ", 
+                            Utils._uint2str(uint256(sqrtRatioX96)
+                        )
+                    )
+                )
+            ); 
         }
     }
 
@@ -343,10 +344,11 @@ library LiquidityHelper {
 
     function collect(
         IUniswapV3Pool pool,
+        address receiver,
         LiquidityPosition memory position
     ) internal {
 
-        bytes32 anchorPositionId = keccak256(
+        bytes32 positionId = keccak256(
             abi.encodePacked(
                 address(this), 
                 position.lowerTick, 
@@ -354,28 +356,43 @@ library LiquidityHelper {
             )
         );
 
-        (uint128 liquidity,,,,) = pool.positions(anchorPositionId);
+        (uint128 liquidity,,,,) = pool.positions(positionId);
 
         if (liquidity > 0) {
             Uniswap.burn(
                 pool,
+                receiver,
                 position.lowerTick, 
                 position.upperTick,
                 liquidity
             );
         } else {
-        //     revert(
-        //         string(
-        //             abi.encodePacked(
-        //                     "collect: liquidity is 0, liquidity: ", 
-        //                     Utils._uint2str(uint256(liquidity)
-        //                 )
-        //             )
-        //         )                
-        //     );
+            revert(
+                string(
+                    abi.encodePacked(
+                            "collect: liquidity is 0, liquidity: ", 
+                            Utils._uint2str(uint256(liquidity)
+                        )
+                    )
+                )                
+            );
         }
     }
 
+    function getLiquidityRatio(
+        IUniswapV3Pool pool,
+        LiquidityPosition memory anchorPosition
+    ) internal view returns (uint256 liquidityRatio) {
+            
+        (uint160 sqrtRatioX96,,,,,,) = pool.slot0();
+
+        uint256 anchorUpperPrice = Conversions.sqrtPriceX96ToPrice(
+                Conversions.tickToSqrtPriceX96(anchorPosition.upperTick),
+            18);
+
+        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, 18);
+        liquidityRatio = DecimalMath.divideDecimal(anchorUpperPrice, spotPrice);
+    }
 
     function getAmount1ForLiquidityInFloor(LiquidityPosition memory floorPosition) internal view returns (uint256) {
         
@@ -395,55 +412,6 @@ library LiquidityHelper {
         );
 
         return amount1;
-    }
-
-    function getAmount1ForLiquidityInPosition(
-        IUniswapV3Pool pool,
-        LiquidityPosition memory position
-        ) internal view returns (uint256) {
-        
-        // (uint160 sqrtRatioX96,,,,,,) = pool.slot0();
-
-        bytes32 positionId = keccak256(
-            abi.encodePacked(
-                address(this), 
-                position.lowerTick, 
-                position.upperTick
-                )
-            );
-
-        (uint128 liquidity,,,,) = pool.positions(positionId);
-
-        uint256 amount1 = LiquidityAmounts
-        .getAmount1ForLiquidity(
-            TickMath.getSqrtRatioAtTick(position.lowerTick),
-            TickMath.getSqrtRatioAtTick(position.upperTick),
-            liquidity
-        );
-        // (, uint256 amount1) = LiquidityAmounts
-        // .getAmountsForLiquidity(
-        //     TickMath.getSqrtRatioAtTick(position.upperTick), 
-        //     TickMath.getSqrtRatioAtTick(position.lowerTick), 
-        //     TickMath.getSqrtRatioAtTick(position.upperTick), 
-        //     liquidity
-        // );
-
-        return amount1;
-    }
-
-    function getLiquidityRatio(
-        IUniswapV3Pool pool,
-        LiquidityPosition memory anchorPosition
-    ) internal view returns (uint256 liquidityRatio) {
-            
-        (uint160 sqrtRatioX96,,,,,,) = pool.slot0();
-
-        uint256 anchorUpperPrice = Conversions.sqrtPriceX96ToPrice(
-                Conversions.tickToSqrtPriceX96(anchorPosition.upperTick),
-            18);
-
-        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, 18);
-        liquidityRatio = DecimalMath.divideDecimal(anchorUpperPrice, spotPrice);
     }
 
     function getFloorCapacity(LiquidityPosition memory floorPosition) internal view returns (uint256) {

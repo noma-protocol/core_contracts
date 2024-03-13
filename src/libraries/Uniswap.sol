@@ -41,6 +41,7 @@ library Uniswap {
 
     function burn(
         IUniswapV3Pool pool,
+        address receiver,
         int24 lowerTick,
         int24 upperTick,
         uint128 liquidity        
@@ -50,7 +51,7 @@ library Uniswap {
             pool.burn(lowerTick, upperTick, liquidity);
 
         pool.collect(
-            address(this), 
+            receiver, 
             lowerTick, 
             upperTick, 
             type(uint128).max, 

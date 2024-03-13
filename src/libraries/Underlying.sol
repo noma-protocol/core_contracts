@@ -61,6 +61,7 @@ library Underlying {
         returns (uint256 amount0Current, uint256 amount1Current)
     {
         (uint160 sqrtRatioX96, int24 tick,,,,,) = pool.slot0();
+        require(position.liquidity > 0, "0 liquidity position");
 
         bytes32 positionId = keccak256(
             abi.encodePacked(
@@ -78,37 +79,40 @@ library Underlying {
             uint128 tokensOwed1
         ) = pool.positions(positionId);
 
-        // compute current holdings from liquidity
-        (amount0Current, amount1Current) = LiquidityAmounts
-        .getAmountsForLiquidity(
-            sqrtRatioX96,
-            TickMath.getSqrtRatioAtTick(position.lowerTick),
-            TickMath.getSqrtRatioAtTick(position.upperTick),
-            liquidity
-        );
+        if (liquidity > 0) {
+            // compute current holdings from liquidity
+            (amount0Current, amount1Current) = LiquidityAmounts
+            .getAmountsForLiquidity(
+                sqrtRatioX96,
+                TickMath.getSqrtRatioAtTick(position.lowerTick),
+                TickMath.getSqrtRatioAtTick(position.upperTick),
+                liquidity
+            );
 
-        // compute current fees earned, 3000 = Manager fee
-        uint256 fee0 = computeFeesEarned(
-            pool, 
-            position, 
-            true, 
-            feeGrowthInside0Last, 
-            tick, 
-            liquidity
-        ) + uint256(tokensOwed0);
+            // compute current fees earned, 3000 = Manager fee
+            uint256 fee0 = computeFeesEarned(
+                pool, 
+                position, 
+                true, 
+                feeGrowthInside0Last, 
+                tick, 
+                liquidity
+            ) + uint256(tokensOwed0);
 
-        fee0 = fee0 - (fee0 * (250 + 3000)) / 10000;
+            fee0 = fee0 - (fee0 * (250 + 3000)) / 10000;
 
-        uint256 fee1 = computeFeesEarned(
-            pool, 
-            position, 
-            false, 
-            feeGrowthInside1Last, 
-            tick, 
-            liquidity
-        ) + uint256(tokensOwed1);
+            uint256 fee1 = computeFeesEarned(
+                pool, 
+                position, 
+                false, 
+                feeGrowthInside1Last, 
+                tick, 
+                liquidity
+            ) + uint256(tokensOwed1);
 
-        fee1 = fee1 - (fee1 * (250 + 3000)) / 10000;
-
+            fee1 = fee1 - (fee1 * (250 + 3000)) / 10000;
+        } else {
+            revert("0 liquidity");
+        }
     }    
 }

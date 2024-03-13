@@ -18,28 +18,38 @@ import {
     DeployLiquidityParameters
 } from "./Types.sol";
 
+interface IVault {
+    function initialize(
+        LiquidityPosition memory _floorPosition,
+        LiquidityPosition memory _anchorPosition,
+        LiquidityPosition memory _discoveryPosition
+    ) external;
+}
+
 contract Deployer is Owned {
 
     LiquidityPosition public floorPosition;
     LiquidityPosition public anchorPosition;
     LiquidityPosition public discoveryPosition;
 
+    address vault;
     address public token0;
     address public token1;
+
     IUniswapV3Pool public pool;
 
-    bool initialized; 
-    address vault;
+    event FloorDeployed(LiquidityPosition position);
+    event AnchorDeployed(LiquidityPosition position);
+    event DiscoveryDeployed(LiquidityPosition position);
 
     constructor(
         address _vault, 
         address _pool
     ) Owned(msg.sender) {
         pool = IUniswapV3Pool(_pool);
+        vault = _vault;
         token0 = pool.token0();
         token1 = pool.token1();
-        vault = _vault;
-        initialized = false;
     }
 
     /**
@@ -101,11 +111,11 @@ contract Deployer is Owned {
         }
     }
 
-    function deployFloor(uint256 _floorPrice) public /*onlyOwner*/ {
-        // require(!initialized, "already initialized");  
+    function deployFloor(uint256 _floorPrice) public initialized /*onlyOwner*/ {
         
         (LiquidityPosition memory newPosition,) = 
-        LiquidityHelper.deployFloor(
+        LiquidityHelper
+        .deployFloor(
             pool, 
             vault, 
             _floorPrice, 
@@ -113,10 +123,10 @@ contract Deployer is Owned {
         );
 
         floorPosition = newPosition;
+        emit FloorDeployed(newPosition);
     }
 
-    function deployAnchor(uint256 bips, uint256 bipsBelowSpot) public /*onlyOwner*/ {
-        // require(initialized, "not initialized");
+    function deployAnchor(uint256 bips, uint256 bipsBelowSpot) public initialized /*onlyOwner*/ {
 
         (LiquidityPosition memory newPosition,) = LiquidityHelper
         .deployAnchor(
@@ -131,11 +141,10 @@ contract Deployer is Owned {
         );
 
         anchorPosition = newPosition;
-
+        emit AnchorDeployed(newPosition);
     }
 
-    function deployDiscovery(uint256 bips) public /*onlyOwner*/{
-        // require(initialized, "not initialized");
+    function deployDiscovery(uint256 bips) public initialized /*onlyOwner*/{
 
         (LiquidityPosition memory newPosition,) = LiquidityHelper
         .deployDiscovery(
@@ -147,25 +156,26 @@ contract Deployer is Owned {
         );
 
         discoveryPosition = newPosition;
+        emit DiscoveryDeployed(newPosition);
     }
-
-    function collect(LiquidityType liquidityType) public {
-        // require(initialized, "not initialized");
-        LiquidityPosition memory position;
-
-        if (liquidityType == LiquidityType.Floor) {
-            position = floorPosition;
-        } else if (liquidityType == LiquidityType.Anchor) {
-            position = anchorPosition;
-        } else if (liquidityType == LiquidityType.Discovery) {
-            position = discoveryPosition;
-        }
-    
-        LiquidityHelper.collect(
-            pool, 
-            position
+ 
+    function finalize() public initialized /*onlyOwner*/ {
+        require(
+            floorPosition.upperTick != 0 &&
+            anchorPosition.upperTick != 0 &&
+            discoveryPosition.upperTick != 0, 
+            "not deployed"
         );
+
+        IVault(vault).initialize(floorPosition, anchorPosition, discoveryPosition);
     }
 
-
+    modifier initialized() {
+        require(
+                address(vault) != address(0) && 
+                address(pool) != address(0), 
+                "not initialized"
+        );
+        _;
+    }
 }

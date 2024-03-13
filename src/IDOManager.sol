@@ -41,13 +41,22 @@ contract IDOManager is Owned {
 
     LiquidityPosition public IDOPosition;
 
-    constructor(address _uniswapFactory, address _token1, uint256 _totalSupply, uint16 _percentageForSale) Owned(msg.sender) { 
-        require(_percentageForSale > 0 && _percentageForSale < 50, "invalid percentage");
+    constructor(
+        address _uniswapFactory, 
+        address _token1,
+            uint256 _totalSupply, 
+            uint16 _percentageForSale
+    ) Owned(msg.sender) { 
+        require(
+            _percentageForSale > 0 && 
+            _percentageForSale < 50, 
+            "invalid percentage"
+        );
 
         totalSupply = _totalSupply;
         launchSupply = totalSupply * _percentageForSale / 100;   
 
-        // Force desired token order on Uniswap V3
+        // Dev: force desired token order on Uniswap V3
         uint256 nonce = 0;
         do {
             amphorToken = new AmphorToken{salt: bytes32(nonce)}(address(this), totalSupply);
@@ -79,14 +88,12 @@ contract IDOManager is Owned {
         } 
 
         vault = new Vault(address(pool));
-        // amphorToken.mintTo(address(vault), totalSupply - launchSupply);
-        ERC20(token0).transfer(address(vault), totalSupply - launchSupply);
-
+        
         IDOPrice = _IDOPrice;
         initialized = true;
     }
 
-    function createIDO() public onlyOwner {
+    function createIDO(address receiver) public onlyOwner {
         require(initialized, "not initialized");
 
         (uint160 sqrtRatioX96,,,,,,) = pool.slot0();
@@ -112,6 +119,7 @@ contract IDOManager is Owned {
             revert("createIDO: liquidity is 0");
         }
 
+        ERC20(token0).transfer(receiver, totalSupply - launchSupply);
         IDOPosition = LiquidityPosition(lowerTick, upperTick, liquidity, IDOPrice, 0, 0, 0);
     }
 
@@ -128,7 +136,7 @@ contract IDOManager is Owned {
         );        
     }
 
-    function collectIDOFunds() public {
+    function collectIDOFunds(address receiver) public {
 
         uint256 balanceBeforeSwap = ERC20(token1).balanceOf(address(this));
 
@@ -144,7 +152,8 @@ contract IDOManager is Owned {
 
         if (liquidity > 0) {
             Uniswap.burn(
-                pool, 
+                pool,
+                address(this),
                 IDOPosition.lowerTick, 
                 IDOPosition.upperTick,
                 liquidity
@@ -156,8 +165,10 @@ contract IDOManager is Owned {
         uint256 balanceAfterSwap = ERC20(token1).balanceOf(address(this));
         require(balanceAfterSwap > balanceBeforeSwap, "no tokens exchanged");
         
+        // Send left over token0 to contract owner
         ERC20(token0).transfer(owner, ERC20(token0).balanceOf(address(this)));
-        ERC20(token1).transfer(address(vault), ERC20(token1).balanceOf(address(this)));
+        // Send token1 to receiver (Deployer contract)
+        ERC20(token1).transfer(receiver, ERC20(token1).balanceOf(address(this)));
     }
 
     // Test function

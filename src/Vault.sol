@@ -9,6 +9,7 @@ import {Owned} from "solmate/auth/Owned.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
 import {LiquidityHelper} from "./libraries/LiquidityHelper.sol";
+import {Underlying} from "./libraries/Underlying.sol";
 
 import {
     feeTier, 
@@ -26,6 +27,7 @@ contract Vault is Owned {
 
     address public token0;
     address public token1;
+    address public deployerContract;
     IUniswapV3Pool public pool;
 
     bool initialized; 
@@ -37,6 +39,30 @@ contract Vault is Owned {
         token1 = pool.token1();
         initialized = false;
         lastLiquidityRatio = 0;
+    }
+
+    function initialize(
+        LiquidityPosition memory _floorPosition,
+        LiquidityPosition memory _anchorPosition,
+        LiquidityPosition memory _discoveryPosition
+    ) public {
+        require(!initialized, "already initialized");
+        require(msg.sender == deployerContract, "invalid caller");
+
+        floorPosition = _floorPosition;
+        anchorPosition = _anchorPosition;
+        discoveryPosition = _discoveryPosition;
+
+        initialized = true;
+    }
+
+    function setDeployer(address _deployerContract) public /*onlyOwner*/ {
+        require(!initialized, "already initialized");
+        require(_deployerContract != address(0), "invalid address");
+        require(_deployerContract != address(this), "invalid address");
+        require(_deployerContract != owner, "invalid address");
+
+        deployerContract = _deployerContract;
     }
 
     /**
@@ -65,6 +91,7 @@ contract Vault is Owned {
             }
         
         } 
+
         if (token1Balance >= amount1Owed) {
 
             if (amount1Owed > 0) ERC20(token1).transfer(msg.sender, amount1Owed);
@@ -79,7 +106,6 @@ contract Vault is Owned {
 
         } 
     }
-
 
     function _shiftFloor(uint256 bips) internal {
         // require(initialized, "not initialized");
@@ -104,6 +130,8 @@ contract Vault is Owned {
             anchorPosition,
             lastLiquidityRatio
         );
+
+
     }    
 
     function collect(LiquidityType liquidityType) public {
@@ -120,10 +148,27 @@ contract Vault is Owned {
     
         LiquidityHelper.collect(
             pool, 
+            address(this),
             position
         );
     }
 
+    function getUnderlyingBalances(LiquidityType liquidityType) public 
+    view 
+    returns (uint256, uint256) {
+        
+        LiquidityPosition memory position;
+
+        if (liquidityType == LiquidityType.Floor) {
+            position = floorPosition;
+        } else if (liquidityType == LiquidityType.Anchor) {
+            position = anchorPosition;
+        } else if (liquidityType == LiquidityType.Discovery) {
+            position = discoveryPosition;
+        }
+
+        return Underlying.getUnderlyingBalances(pool, position);
+    }
 
     function getLiquidityRatio() public view returns (uint256) {
         return LiquidityHelper.getLiquidityRatio(pool, anchorPosition);
