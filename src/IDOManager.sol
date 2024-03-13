@@ -50,7 +50,7 @@ contract IDOManager is Owned {
         // Force desired token order on Uniswap V3
         uint256 nonce = 0;
         do {
-            amphorToken = new AmphorToken{salt: bytes32(nonce)}(address(this), launchSupply);
+            amphorToken = new AmphorToken{salt: bytes32(nonce)}(address(this), totalSupply);
             nonce++;
         } while (address(amphorToken) >= _token1);
 
@@ -78,8 +78,9 @@ contract IDOManager is Owned {
             );
         } 
 
-        vault = new Vault(address(pool), address(this));
-        amphorToken.mintTo(address(vault), totalSupply - launchSupply);
+        vault = new Vault(address(pool));
+        // amphorToken.mintTo(address(vault), totalSupply - launchSupply);
+        ERC20(token0).transfer(address(vault), totalSupply - launchSupply);
 
         IDOPrice = _IDOPrice;
         initialized = true;
@@ -106,7 +107,7 @@ contract IDOManager is Owned {
         );
 
         if (liquidity > 0) {
-            Uniswap.mint(pool, lowerTick, upperTick, liquidity, LiquidityType.Floor, false);
+            Uniswap.mint(pool, address(this), lowerTick, upperTick, liquidity, LiquidityType.Floor, false);
         } else {
             revert("createIDO: liquidity is 0");
         }
@@ -154,8 +155,8 @@ contract IDOManager is Owned {
 
         uint256 balanceAfterSwap = ERC20(token1).balanceOf(address(this));
         require(balanceAfterSwap > balanceBeforeSwap, "no tokens exchanged");
-
-        ERC20(token0).transfer(address(vault), ERC20(token0).balanceOf(address(this)));
+        
+        ERC20(token0).transfer(owner, ERC20(token0).balanceOf(address(this)));
         ERC20(token1).transfer(address(vault), ERC20(token1).balanceOf(address(this)));
     }
 
