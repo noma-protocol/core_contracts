@@ -76,6 +76,11 @@ library Utils {
         return string(bstr);
     }
 
+    function int24ToUint256(int24 _value) public pure returns (uint256) {
+        require(_value >= 0, "Value is negative");
+        return uint256(uint24(_value));
+    }
+
     function toHexChar(uint8 byteValue) private pure returns (bytes memory) {
         bytes memory alphabet = "0123456789abcdef";
         bytes memory result = new bytes(1);

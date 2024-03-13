@@ -13,7 +13,7 @@ contract AmphorToken is ERC20, Owned {
     _mint(deployer, supply);
   }
 
-  function mintTo(address to, uint256 amount) external onlyOwner {
+  function mintTo(address to, uint256 amount) external {
     _mint(to, amount);
   }
 

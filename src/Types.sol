@@ -20,3 +20,9 @@ enum LiquidityType {
     Anchor,
     Discovery
 }
+
+struct DeployLiquidityParameters {
+    uint256 bips;
+    uint256 bipsBelowSpot;
+    int24 tickSpacing;
+}

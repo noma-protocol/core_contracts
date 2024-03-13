@@ -11,6 +11,7 @@ library Uniswap {
 
     function mint(
         IUniswapV3Pool pool,
+        address receiver,
         int24 lowerTick,
         int24 upperTick,
         uint128 liquidity,
@@ -35,7 +36,7 @@ library Uniswap {
             }
         }
 
-       pool.mint(address(this), lowerTick, upperTick, liquidity, data);
+       pool.mint(receiver, lowerTick, upperTick, liquidity, data);
     }
 
     function burn(

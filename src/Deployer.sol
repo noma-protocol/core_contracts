@@ -18,7 +18,7 @@ import {
     DeployLiquidityParameters
 } from "./Types.sol";
 
-contract Vault is Owned {
+contract Deployer is Owned {
 
     LiquidityPosition public floorPosition;
     LiquidityPosition public anchorPosition;
@@ -29,14 +29,17 @@ contract Vault is Owned {
     IUniswapV3Pool public pool;
 
     bool initialized; 
-    uint256 lastLiquidityRatio;
+    address vault;
 
-    constructor(address _pool) Owned(msg.sender) {
+    constructor(
+        address _vault, 
+        address _pool
+    ) Owned(msg.sender) {
         pool = IUniswapV3Pool(_pool);
         token0 = pool.token0();
         token1 = pool.token1();
+        vault = _vault;
         initialized = false;
-        lastLiquidityRatio = 0;
     }
 
     /**
@@ -64,7 +67,17 @@ contract Vault is Owned {
                 discoveryPosition.amount0LowerBound = amount0Owed;
             }
         
-        } 
+        } else {
+            revert(
+                string(
+                    abi.encodePacked(
+                        "insufficient token0 balance, owed: ", 
+                        Utils._uint2str(amount0Owed)
+                        )
+                    )
+                );
+        }
+
         if (token1Balance >= amount1Owed) {
 
             if (amount1Owed > 0) ERC20(token1).transfer(msg.sender, amount1Owed);
@@ -77,34 +90,64 @@ contract Vault is Owned {
                 discoveryPosition.amount1UpperBound = amount1Owed;
             }      
 
-        } 
+        } else {
+            revert(
+                string(
+                    abi.encodePacked("insufficient token1 balance, owed: ", 
+                    Utils._uint2str(amount1Owed)
+                    )
+                )
+            );
+        }
     }
 
+    function deployFloor(uint256 _floorPrice) public /*onlyOwner*/ {
+        // require(!initialized, "already initialized");  
+        
+        (LiquidityPosition memory newPosition,) = 
+        LiquidityHelper.deployFloor(
+            pool, 
+            vault, 
+            _floorPrice, 
+            tickSpacing
+        );
 
-    function _shiftFloor(uint256 bips) internal {
+        floorPosition = newPosition;
+    }
+
+    function deployAnchor(uint256 bips, uint256 bipsBelowSpot) public /*onlyOwner*/ {
         // require(initialized, "not initialized");
 
-        LiquidityHelper
-        .shiftFloor(
-            pool, 
-            address(this),
+        (LiquidityPosition memory newPosition,) = LiquidityHelper
+        .deployAnchor(
+            pool,
+            vault,
             floorPosition,
-            token1, 
+            DeployLiquidityParameters({
+                bips: bips,
+                bipsBelowSpot: bipsBelowSpot,
+                tickSpacing: tickSpacing
+            })
+        );
+
+        anchorPosition = newPosition;
+
+    }
+
+    function deployDiscovery(uint256 bips) public /*onlyOwner*/{
+        // require(initialized, "not initialized");
+
+        (LiquidityPosition memory newPosition,) = LiquidityHelper
+        .deployDiscovery(
+            pool, 
+            vault,
+            floorPosition, 
             bips, 
             tickSpacing
         );
+
+        discoveryPosition = newPosition;
     }
-
-    function shift() public {
-        // require(initialized, "not initialized");
-
-        lastLiquidityRatio = LiquidityHelper
-        .shift(
-            pool,
-            anchorPosition,
-            lastLiquidityRatio
-        );
-    }    
 
     function collect(LiquidityType liquidityType) public {
         // require(initialized, "not initialized");
@@ -124,21 +167,5 @@ contract Vault is Owned {
         );
     }
 
-
-    function getLiquidityRatio() public view returns (uint256) {
-        return LiquidityHelper.getLiquidityRatio(pool, anchorPosition);
-    }
-
-    function getToken0Balance() public view returns (uint256) {
-        return ERC20(token0).balanceOf(address(this));
-    }
-
-    function getToken1Balance() public view returns (uint256) {
-        return ERC20(token1).balanceOf(address(this));
-    }
-    
-    function getFloorPrice() public view returns (uint256) {
-        return floorPosition.price;
-    }
 
 }
