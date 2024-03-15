@@ -9,6 +9,7 @@ import {Owned} from "solmate/auth/Owned.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
 import {LiquidityHelper} from "./libraries/LiquidityHelper.sol";
+import {DeployHelper} from "./libraries/DeployHelper.sol";
 
 import {
     feeTier, 
@@ -114,7 +115,7 @@ contract Deployer is Owned {
     function deployFloor(uint256 _floorPrice) public initialized /*onlyOwner*/ {
         
         (LiquidityPosition memory newPosition,) = 
-        LiquidityHelper
+        DeployHelper
         .deployFloor(
             pool, 
             vault, 
@@ -130,14 +131,17 @@ contract Deployer is Owned {
 
         (LiquidityPosition memory newPosition,) = LiquidityHelper
         .deployAnchor(
-            pool,
+            address(pool),
             vault,
             floorPosition,
             DeployLiquidityParameters({
                 bips: bips,
                 bipsBelowSpot: bipsBelowSpot,
-                tickSpacing: tickSpacing
-            })
+                tickSpacing: tickSpacing,
+                lowerTick: 0,
+                upperTick: 0
+            }),
+            false
         );
 
         anchorPosition = newPosition;
@@ -148,9 +152,9 @@ contract Deployer is Owned {
 
         (LiquidityPosition memory newPosition,) = LiquidityHelper
         .deployDiscovery(
-            pool, 
+            address(pool), 
             vault,
-            floorPosition, 
+            anchorPosition, 
             bips, 
             tickSpacing
         );
@@ -166,6 +170,9 @@ contract Deployer is Owned {
             discoveryPosition.upperTick != 0, 
             "not deployed"
         );
+
+        ERC20(token0).transfer(vault, ERC20(token0).balanceOf(address(this)));
+        ERC20(token1).transfer(vault, ERC20(token1).balanceOf(address(this)));
 
         IVault(vault).initialize(floorPosition, anchorPosition, discoveryPosition);
     }

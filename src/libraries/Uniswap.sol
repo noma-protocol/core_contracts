@@ -10,7 +10,7 @@ import {LiquidityType} from "../Types.sol";
 library Uniswap {
 
     function mint(
-        IUniswapV3Pool pool,
+        address pool,
         address receiver,
         int24 lowerTick,
         int24 upperTick,
@@ -36,11 +36,11 @@ library Uniswap {
             }
         }
 
-       pool.mint(receiver, lowerTick, upperTick, liquidity, data);
+       IUniswapV3Pool(pool).mint(receiver, lowerTick, upperTick, liquidity, data);
     }
 
     function burn(
-        IUniswapV3Pool pool,
+        address pool,
         address receiver,
         int24 lowerTick,
         int24 upperTick,
@@ -48,9 +48,9 @@ library Uniswap {
     ) internal {
 
         (uint256 burn0, uint256 burn1) =
-            pool.burn(lowerTick, upperTick, liquidity);
+            IUniswapV3Pool(pool).burn(lowerTick, upperTick, liquidity);
 
-        pool.collect(
+        IUniswapV3Pool(pool).collect(
             receiver, 
             lowerTick, 
             upperTick, 
@@ -60,7 +60,8 @@ library Uniswap {
     }
 
     function swap(
-        IUniswapV3Pool pool,
+        address pool,
+        address receiver,
         address token0,
         address token1,
         uint160 basePrice, 
@@ -69,20 +70,20 @@ library Uniswap {
         bool isLimitOrder
     ) internal {
         
-        uint256 balanceBeforeSwap = ERC20(zeroForOne ? token1 : token0).balanceOf(address(this));
+        // uint256 balanceBeforeSwap = ERC20(zeroForOne ? token1 : token0).balanceOf(address(this));
         uint160 slippagePrice = zeroForOne ? basePrice - (basePrice / 25) : basePrice + (basePrice / 25);
 
-        try pool.swap(
-            address(this), 
+        try IUniswapV3Pool(pool).swap(
+            receiver, 
             zeroForOne, 
             int256(amountToSwap), 
             isLimitOrder ? basePrice : slippagePrice,
             ""
         ) {
-            uint256 balanceAfterSwap = ERC20(zeroForOne ? token1 : token0).balanceOf(address(this));
-            if (balanceBeforeSwap == balanceAfterSwap) {
-                revert("no tokens exchanged");
-            }
+            // uint256 balanceAfterSwap = ERC20(zeroForOne ? token1 : token0).balanceOf(address(this));
+            // if (balanceBeforeSwap == balanceAfterSwap) {
+            //     revert("no tokens exchanged");
+            // }
         } catch {
             revert("Error swapping tokens");
         }

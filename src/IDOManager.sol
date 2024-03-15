@@ -114,7 +114,7 @@ contract IDOManager is Owned {
         );
 
         if (liquidity > 0) {
-            Uniswap.mint(pool, address(this), lowerTick, upperTick, liquidity, LiquidityType.Floor, false);
+            Uniswap.mint(address(pool), address(this), lowerTick, upperTick, liquidity, LiquidityType.Floor, false);
         } else {
             revert("createIDO: liquidity is 0");
         }
@@ -124,9 +124,10 @@ contract IDOManager is Owned {
     }
 
     // Test function
-    function buyIDO(uint256 price, uint256 amountToken1) public {
+    function buyIDO(uint256 price, uint256 amountToken1, address receiver) public {
         Uniswap.swap(
-            pool,
+            address(pool),
+            receiver,
             token0,
             token1,
             Conversions.priceToSqrtPriceX96(int256(price), tickSpacing),
@@ -152,7 +153,7 @@ contract IDOManager is Owned {
 
         if (liquidity > 0) {
             Uniswap.burn(
-                pool,
+                address(pool),
                 address(this),
                 IDOPosition.lowerTick, 
                 IDOPosition.upperTick,
@@ -172,9 +173,10 @@ contract IDOManager is Owned {
     }
 
     // Test function
-    function sellToFloor(uint256 price, uint256 amount) public {
+    function sellTokens(uint256 price, uint256 amount, address receiver) public {
         Uniswap.swap(
-            pool,
+            address(pool),
+            receiver,
             token0,
             token1,
             Conversions.priceToSqrtPriceX96(int256(price), tickSpacing),
@@ -185,9 +187,10 @@ contract IDOManager is Owned {
     }
 
     // Test function
-    function buyTokens(uint256 price, uint256 amount) public {
+    function buyTokens(uint256 price, uint256 amount, address receiver) public {
         Uniswap.swap(
-            pool,
+            address(pool),
+            receiver,
             token0,
             token1,
             Conversions.priceToSqrtPriceX96(int256(price), tickSpacing),

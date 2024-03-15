@@ -25,4 +25,11 @@ struct DeployLiquidityParameters {
     uint256 bips;
     uint256 bipsBelowSpot;
     int24 tickSpacing;
+    int24 lowerTick;
+    int24 upperTick;
+}
+
+struct AmountsToMint {
+    uint256 amount0;
+    uint256 amount1;
 }

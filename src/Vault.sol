@@ -11,12 +11,13 @@ import {IWETH} from "./interfaces/IWETH.sol";
 import {LiquidityHelper} from "./libraries/LiquidityHelper.sol";
 import {Underlying} from "./libraries/Underlying.sol";
 
+import {Conversions} from "./libraries/Conversions.sol";
+import {ModelHelper} from "./libraries/ModelHelper.sol";
+
 import {
-    feeTier, 
     tickSpacing, 
     LiquidityPosition, 
-    LiquidityType, 
-    DeployLiquidityParameters
+    LiquidityType
 } from "./Types.sol";
 
 contract Vault is Owned {
@@ -28,6 +29,7 @@ contract Vault is Owned {
     address public token0;
     address public token1;
     address public deployerContract;
+
     IUniswapV3Pool public pool;
 
     bool initialized; 
@@ -58,9 +60,6 @@ contract Vault is Owned {
 
     function setDeployer(address _deployerContract) public /*onlyOwner*/ {
         require(!initialized, "already initialized");
-        require(_deployerContract != address(0), "invalid address");
-        require(_deployerContract != address(this), "invalid address");
-        require(_deployerContract != owner, "invalid address");
 
         deployerContract = _deployerContract;
     }
@@ -68,7 +67,11 @@ contract Vault is Owned {
     /**
      * @notice Uniswap V3 callback function, called back on pool.mint
      */
-    function uniswapV3MintCallback(uint256 amount0Owed, uint256 amount1Owed, bytes calldata data)
+    function uniswapV3MintCallback(
+        uint256 amount0Owed, 
+        uint256 amount1Owed, 
+        bytes calldata data
+    )
         external
     {
         require(msg.sender == address(pool), "cc");
@@ -76,19 +79,19 @@ contract Vault is Owned {
         uint256 token0Balance = ERC20(token0).balanceOf(address(this));
         uint256 token1Balance = ERC20(token1).balanceOf(address(this));
 
-        (uint256 code, string memory message) = abi.decode(data, (uint256, string));
+        // (uint256 code, string memory message) = abi.decode(data, (uint256, string));
 
         if (token0Balance >= amount0Owed) {
 
             if (amount0Owed > 0) ERC20(token0).transfer(msg.sender, amount0Owed);
             
-            if (code == 0 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
-                floorPosition.amount0LowerBound = amount0Owed;
-            } else if (code == 1 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
-                anchorPosition.amount0LowerBound = amount0Owed;
-            } else if (code == 2 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
-                discoveryPosition.amount0LowerBound = amount0Owed;
-            }
+            // if (code == 0 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
+            //     floorPosition.amount0LowerBound = amount0Owed;
+            // } else if (code == 1 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
+            //     anchorPosition.amount0LowerBound = amount0Owed;
+            // } else if (code == 2 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
+            //     discoveryPosition.amount0LowerBound = amount0Owed;
+            // }
         
         } 
 
@@ -96,67 +99,41 @@ contract Vault is Owned {
 
             if (amount1Owed > 0) ERC20(token1).transfer(msg.sender, amount1Owed);
 
-            if (code == 0 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
-                floorPosition.amount1UpperBound = amount1Owed;
-            } else if (code == 1 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
-                anchorPosition.amount1UpperBound = amount1Owed;
-            } else if (code == 2 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
-                discoveryPosition.amount1UpperBound = amount1Owed;
-            }      
+            // if (code == 0 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
+            //     floorPosition.amount1UpperBound = amount1Owed;
+            // } else if (code == 1 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
+            //     anchorPosition.amount1UpperBound = amount1Owed;
+            // } else if (code == 2 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
+            //     discoveryPosition.amount1UpperBound = amount1Owed;
+            // }      
 
         } 
-    }
-
-    function _shiftFloor(uint256 bips) internal {
-        // require(initialized, "not initialized");
-
-        LiquidityHelper
-        .shiftFloor(
-            pool, 
-            address(this),
-            floorPosition,
-            token1, 
-            bips, 
-            tickSpacing
-        );
     }
 
     function shift() public {
         // require(initialized, "not initialized");
 
-        lastLiquidityRatio = LiquidityHelper
+        (
+            uint256 currentLiquidityRatio, 
+            LiquidityPosition memory newPosition
+        ) = LiquidityHelper
         .shift(
-            pool,
+            address(pool),
+            floorPosition,
             anchorPosition,
-            lastLiquidityRatio
+            LiquidityType.Anchor
         );
 
+        lastLiquidityRatio = currentLiquidityRatio;
+        anchorPosition = newPosition;
 
+        // Emit event
     }    
-
-    function collect(LiquidityType liquidityType) public {
-        // require(initialized, "not initialized");
-        LiquidityPosition memory position;
-
-        if (liquidityType == LiquidityType.Floor) {
-            position = floorPosition;
-        } else if (liquidityType == LiquidityType.Anchor) {
-            position = anchorPosition;
-        } else if (liquidityType == LiquidityType.Discovery) {
-            position = discoveryPosition;
-        }
-    
-        LiquidityHelper.collect(
-            pool, 
-            address(this),
-            position
-        );
-    }
 
     function getUnderlyingBalances(LiquidityType liquidityType) public 
     view 
-    returns (uint256, uint256) {
-        
+    returns (int24, int24, uint256, uint256) {
+
         LiquidityPosition memory position;
 
         if (liquidityType == LiquidityType.Floor) {
@@ -167,23 +144,19 @@ contract Vault is Owned {
             position = discoveryPosition;
         }
 
-        return Underlying.getUnderlyingBalances(pool, position);
+        return Underlying.getUnderlyingBalances(address(pool), position);
     }
 
-    function getLiquidityRatio() public view returns (uint256) {
-        return LiquidityHelper.getLiquidityRatio(pool, anchorPosition);
-    }
+    function getVaultInfo() public view returns (uint256, uint256, uint256, uint256, uint256) {
+        (uint160 sqrtPriceX96,,,,,,) = pool.slot0();
 
-    function getToken0Balance() public view returns (uint256) {
-        return ERC20(token0).balanceOf(address(this));
-    }
-
-    function getToken1Balance() public view returns (uint256) {
-        return ERC20(token1).balanceOf(address(this));
+        return (
+            ModelHelper.getLiquidityRatio(address(pool), anchorPosition),
+            ModelHelper.getCirculatingSupply(address(pool), anchorPosition, discoveryPosition),
+            Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18),
+            ModelHelper.getPositionCapacity(address(pool), anchorPosition),
+            ModelHelper.getPositionCapacity(address(pool), floorPosition)
+        );
     }
     
-    function getFloorPrice() public view returns (uint256) {
-        return floorPosition.price;
-    }
-
 }

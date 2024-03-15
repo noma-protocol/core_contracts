@@ -13,162 +13,86 @@ import {Utils} from "./Utils.sol";
 import {Conversions} from "./Conversions.sol";
 import {DecimalMath} from "./DecimalMath.sol";
 
+import {Underlying} from "./Underlying.sol";
+import {ModelHelper} from "./ModelHelper.sol";
+
 import {
     LiquidityPosition, 
     LiquidityType, 
-    DeployLiquidityParameters
+    DeployLiquidityParameters,
+    AmountsToMint
 } from "../Types.sol";
 
 library LiquidityHelper {
 
-    function deployFloor(
-        IUniswapV3Pool pool,
-        address receiver, 
-        uint256 _floorPrice, 
-        int24 tickSpacing
-        ) internal returns (
-            LiquidityPosition memory newPosition,
-            LiquidityType liquidityType
-        ) {
-    
-        uint256 balanceToken1 = ERC20(pool.token1()).balanceOf(address(this));
-        
-        (uint160 sqrtRatioX96,,,,,,) = pool.slot0();
-        (int24 lowerTick, int24 upperTick) = Conversions.computeSingleTick(_floorPrice, tickSpacing);
-
-        uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
-            sqrtRatioX96,
-            TickMath.getSqrtRatioAtTick(lowerTick),
-            TickMath.getSqrtRatioAtTick(upperTick),
-            0,
-            (balanceToken1 * 80) / 100 // 80% of WETH
-        );
-
-        if (liquidity > 0) {
-            Uniswap.mint(
-                pool, 
-                receiver,
-                lowerTick, 
-                upperTick, 
-                liquidity, 
-                LiquidityType.Floor, 
-                false
-            );
-        } else {
-            revert(
-                string(
-                    abi.encodePacked(
-                            "deployFloor: liquidity is 0, spot price: ", 
-                            Utils._uint2str(uint256(sqrtRatioX96)
-                        )
-                    )
-                )
-            );             
-        }
-
-        newPosition = LiquidityPosition({
-            lowerTick: lowerTick, 
-            upperTick: upperTick, 
-            liquidity: liquidity, 
-            price: _floorPrice,
-            amount0LowerBound: 0,
-            amount1UpperBound: 0,
-            amount1UpperBoundVirtual: 0
-        });
-
-        return (
-            newPosition, 
-            LiquidityType.Floor
-        );
-    }
-
     function deployAnchor(
-        IUniswapV3Pool pool,
+        address pool,
         address receiver,
         LiquidityPosition memory floorPosition,
-        DeployLiquidityParameters memory deployParams
+        DeployLiquidityParameters memory deployParams,
+        bool redeploy
     ) internal returns (
         LiquidityPosition memory newPosition,
         LiquidityType liquidityType
     ) {       
         require(floorPosition.lowerTick != 0, "deployAnchor: invalid floor position");
 
-        (uint160 sqrtRatioX96,,,,,,) = pool.slot0();
+        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
 
         uint256 lowerAnchorPrice = 
-        Utils.addBips(
+        !redeploy ? Utils.addBips(
             Conversions.sqrtPriceX96ToPrice(
                 sqrtRatioX96, 
                 18
             ), 
             (int256(deployParams.bipsBelowSpot) * -1)
-        ); 
-
-        uint256 upperAnchorPrice = Utils.addBips(lowerAnchorPrice, int256(deployParams.bips));
-        int24 lowerAnchorTick = Conversions.priceToTick(int256(lowerAnchorPrice), deployParams.tickSpacing);
-
-        require(
-            lowerAnchorTick >= floorPosition.upperTick, 
-            string(
-                abi.encodePacked(
-                    "deployAnchor: invalid anchor, spot price: ", 
-                    Utils._uint2str(floorPosition.price)
+        ) : Conversions.sqrtPriceX96ToPrice(Conversions.tickToSqrtPriceX96(deployParams.lowerTick), 18); 
+        
+        if (!redeploy) {
+            require(
+                floorPosition.upperTick <= Conversions.priceToTick(int256(lowerAnchorPrice), deployParams.tickSpacing), 
+                string(
+                    abi.encodePacked(
+                        "deployAnchor: invalid anchor, spot price: ", 
+                        Utils._uint2str(floorPosition.price)
+                    )
                 )
-            )
-        );
+            );
+        }
 
         (int24 lowerTick, int24 upperTick) =  
         Conversions
         .computeRangeTicks(
             lowerAnchorPrice, 
-            upperAnchorPrice, 
+            !redeploy ? Utils.addBips(lowerAnchorPrice, int256(deployParams.bips)) :
+            Conversions.sqrtPriceX96ToPrice(Conversions.tickToSqrtPriceX96(deployParams.upperTick), 18), 
             deployParams.tickSpacing
         );
 
-        uint256 amount0Max = (ERC20(pool.token0()).balanceOf(address(this)) * 15) / 100;
-        uint256 amount1Max = ERC20(pool.token1()).balanceOf(address(this));
+        uint256 balanceToken0 = ERC20(IUniswapV3Pool(pool).token0()).balanceOf(address(this));
+        uint256 balanceToken1 = ERC20(IUniswapV3Pool(pool).token1()).balanceOf(address(this));
 
-        uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
-            sqrtRatioX96,
-            TickMath.getSqrtRatioAtTick(lowerTick),
-            TickMath.getSqrtRatioAtTick(upperTick),
-            amount0Max,
-            amount1Max
+        (newPosition) = doDeployPosition(
+            pool, 
+            receiver, 
+            sqrtRatioX96, 
+            lowerTick, 
+            upperTick, 
+            LiquidityType.Anchor, 
+            AmountsToMint({
+                amount0: balanceToken0 * 20 / 100,
+                amount1: balanceToken1
+            })
         );
-
-        if (liquidity > 0) {
-            Uniswap.mint(pool, receiver, lowerTick, upperTick, liquidity, LiquidityType.Anchor, false);
-        } else {
-            revert(
-                string(
-                    abi.encodePacked(
-                            "deployAnchor: liquidity is 0, spot price:  ", 
-                            Utils._uint2str(uint256(sqrtRatioX96)
-                        )
-                    )
-                )
-            ); 
-        }
-
-        newPosition = LiquidityPosition({
-            lowerTick: lowerTick, 
-            upperTick: upperTick, 
-            liquidity: liquidity, 
-            price: upperAnchorPrice,
-            amount0LowerBound: 0,
-            amount1UpperBound: 0,
-            amount1UpperBoundVirtual: 0
-        });
 
         return (
             newPosition, 
             LiquidityType.Anchor
         );
     }
-
     
     function deployDiscovery(
-        IUniswapV3Pool pool,
+        address pool,
         address receiver,
         LiquidityPosition memory anchorPosition,
         uint256 bips,
@@ -178,14 +102,13 @@ library LiquidityHelper {
         LiquidityType liquidityType
     ) {    
 
-        (uint160 sqrtRatioX96,,,,,,) = pool.slot0();
-
+        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
         uint256 lowerDiscoveryPrice = Conversions.sqrtPriceX96ToPrice(
             Conversions.tickToSqrtPriceX96(anchorPosition.upperTick), 
             18 // decimals hardcoded for now
         );
         
-        lowerDiscoveryPrice = Utils.addBips(lowerDiscoveryPrice, 100);
+        lowerDiscoveryPrice = Utils.addBips(lowerDiscoveryPrice, 50);
         uint256 upperDiscoveryPrice = Utils.addBips(lowerDiscoveryPrice, int256(bips));
 
         (int24 lowerTick, int24 upperTick) = Conversions
@@ -195,40 +118,32 @@ library LiquidityHelper {
             tickSpacing
         );
 
-        uint256 balanceToken0 = ERC20(pool.token0()).balanceOf(address(this));
-        uint256 balanceToken1 = ERC20(pool.token1()).balanceOf(address(this));
+        require(
+            lowerTick >= anchorPosition.upperTick, 
+            string(
+                abi.encodePacked(
+                    "deployDiscovery: invalid anchor, spot price: ", 
+                    Utils._uint2str(sqrtRatioX96)
+                )
+            )
+        );        
 
-        uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
-            sqrtRatioX96,
-            TickMath.getSqrtRatioAtTick(lowerTick),
-            TickMath.getSqrtRatioAtTick(upperTick),
-            (balanceToken0 * 30) / 100, // 30% of token0 in Discovery
-            balanceToken1
+        uint256 balanceToken0 = ERC20(IUniswapV3Pool(pool).token0()).balanceOf(address(this));
+
+        newPosition = doDeployPosition(
+            pool, 
+            receiver, 
+            sqrtRatioX96, 
+            lowerTick, 
+            upperTick,
+            LiquidityType.Discovery,
+            AmountsToMint({
+                amount0: balanceToken0,
+                amount1: 0
+            })
         );
 
-        if (liquidity > 0) {
-            Uniswap.mint(pool, receiver, lowerTick, upperTick, liquidity, LiquidityType.Discovery, false);
-        } else {
-            revert(
-                string(
-                    abi.encodePacked(
-                            "deployDiscovery: liquidity is 0, spot price:  ", 
-                            Utils._uint2str(uint256(sqrtRatioX96)
-                        )
-                    )
-                )
-            ); 
-        }  
-
-        newPosition = LiquidityPosition({
-            lowerTick: lowerTick, 
-            upperTick: upperTick, 
-            liquidity: liquidity, 
-            price: upperDiscoveryPrice,
-            amount0LowerBound: 0,
-            amount1UpperBound: 0,
-            amount1UpperBoundVirtual: 0
-        });
+        newPosition.price = upperDiscoveryPrice;
 
         return (
             newPosition, 
@@ -237,7 +152,7 @@ library LiquidityHelper {
     }
 
     function shiftFloor(
-        IUniswapV3Pool pool,
+        address pool,
         address receiver,
         LiquidityPosition memory floorPosition,
         address token1,
@@ -259,7 +174,7 @@ library LiquidityHelper {
                 )
             );
 
-        (uint128 liquidity,,,,) = pool.positions(floorPositionId);
+        (uint128 liquidity,,,,) = IUniswapV3Pool(pool).positions(floorPositionId);
 
         if (liquidity > 0) {
             Uniswap.burn(
@@ -275,13 +190,14 @@ library LiquidityHelper {
 
         uint256 balanceAfterShiftFloorToken1 = ERC20(token1).balanceOf(address(this));
         
-        (uint160 sqrtRatioX96,,,,,,) = pool.slot0();
+        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
         (, int24 newFloorUpperTick) = Conversions.computeSingleTick(newFloorPrice, tickSpacing);
 
         uint256 amount0Max = 0;
         uint256 amount1Max = balanceAfterShiftFloorToken1;
 
-        uint128 newLiquidity = LiquidityAmounts.getLiquidityForAmounts(
+        uint128 newLiquidity = LiquidityAmounts
+        .getLiquidityForAmounts(
             sqrtRatioX96,
             TickMath.getSqrtRatioAtTick(newFloorLowerTick),
             TickMath.getSqrtRatioAtTick(newFloorUpperTick),
@@ -318,32 +234,174 @@ library LiquidityHelper {
     }
 
     function shift(
-        IUniswapV3Pool pool,
+        address pool,
+        LiquidityPosition memory floorPosition,
         LiquidityPosition memory anchorPosition,
-        uint256 lastLiquidityRatio
-    ) internal returns (uint256 currentLiquidityRatio) {
+        LiquidityType liquidityType
+    ) internal 
+    returns (
+        uint256 currentLiquidityRatio, 
+        LiquidityPosition memory newPosition
+    ) {
 
-        uint256 THRESHOLD = 200000000 gwei; // 0.2 
+        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
+        currentLiquidityRatio = ModelHelper.getLiquidityRatio(pool, anchorPosition);
         
-        currentLiquidityRatio = getLiquidityRatio(pool, anchorPosition);
+        (,,, uint256 balanceToken1BeforeCollect) = Underlying.getUnderlyingBalances(pool, anchorPosition);
 
-        int256 deltaLiquidityRatio = int256(currentLiquidityRatio) - int256(lastLiquidityRatio);
+        if (currentLiquidityRatio < 1e18) {
+            // Shift
+            // ETH after skim at floor = ETH before skim at anchor - (liquidity ratio * ETH before skim at anchor)
+            collect(pool, address(this), anchorPosition);
 
-        if (deltaLiquidityRatio > 0) {
-            // shift
-            if (deltaLiquidityRatio >= int256(THRESHOLD)) {
-                // do something
-            }
-        } else if (deltaLiquidityRatio < 0) {
-            // slide
-            if (deltaLiquidityRatio <= -int256(THRESHOLD)) {
-                // do something
-            }
+            uint256 toSkim = balanceToken1BeforeCollect - (DecimalMath.multiplyDecimal(currentLiquidityRatio, balanceToken1BeforeCollect));
+
+            // addToFloor(pool, floorPosition, toSkim);
+
+            newPosition = reDeployAnchor(pool, sqrtRatioX96, floorPosition, liquidityType);
+
         }
     }
 
+    function reDeployAnchor(
+        address pool,
+        uint160 sqrtRatioX96,
+        LiquidityPosition memory floorPosition,
+        LiquidityType liquidityType
+    ) internal returns (LiquidityPosition memory newPosition) {
+            newPosition = doDeployPosition(
+                pool, 
+                address(this), 
+                sqrtRatioX96, 
+                Conversions.priceToTick(
+                    int256(
+                        Utils.addBips(
+                            Conversions
+                            .sqrtPriceX96ToPrice(
+                                Conversions.tickToSqrtPriceX96(floorPosition.lowerTick), 
+                            18), 
+                            500
+                        )
+                    ), 
+                60), 
+                Conversions.priceToTick(
+                    int256(
+                        Utils.addBips(
+                            Conversions
+                            .sqrtPriceX96ToPrice(
+                                Conversions.tickToSqrtPriceX96(floorPosition.upperTick), 
+                            18),
+                            500
+                        )
+                    ), 
+                60), 
+                liquidityType, 
+                AmountsToMint({
+                    amount0: ERC20(IUniswapV3Pool(pool).token0()).balanceOf(address(this)),
+                    amount1: liquidityType == LiquidityType.Anchor ? ERC20(IUniswapV3Pool(pool).token1()).balanceOf(address(this)) : 0
+                })
+            );     
+    }
+        
+
+    function doDeployPosition(
+        address pool,
+        address receiver,
+        uint160 sqrtRatioX96,
+        int24 lowerTick,
+        int24 upperTick,
+        LiquidityType liquidityType,
+        AmountsToMint memory amounts
+    ) internal returns (LiquidityPosition memory newPosition) {
+ 
+        uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
+            sqrtRatioX96,
+            TickMath.getSqrtRatioAtTick(lowerTick),
+            TickMath.getSqrtRatioAtTick(upperTick),
+            amounts.amount0, 
+            amounts.amount1
+        );
+
+        if (liquidity > 0) {
+            Uniswap.mint(
+                pool, 
+                receiver, 
+                lowerTick, 
+                upperTick, 
+                liquidity, 
+                liquidityType, 
+                false
+            );
+        } else {
+            revert(
+                string(
+                    abi.encodePacked(
+                            "dodDeployPosition: liquidity is 0, spot price:  ", 
+                            Utils._uint2str(uint256(amounts.amount0)
+                        )
+                    )
+                )
+            ); 
+        }  
+
+        newPosition = LiquidityPosition({
+            lowerTick: lowerTick, 
+            upperTick: upperTick, 
+            liquidity: liquidity, 
+            price: 0,
+            amount0LowerBound: 0,
+            amount1UpperBound: 0,
+            amount1UpperBoundVirtual: 0
+        });    
+    }
+
+    // function addToFloor(
+    //     address pool,
+    //     LiquidityPosition memory floorPosition,
+    //     uint256 amountToken1
+    // ) internal {
+
+    //     (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
+
+    //     (
+    //         uint128 liquidity,,,,
+    //     ) = IUniswapV3Pool(pool).positions(
+    //         keccak256(
+    //         abi.encodePacked(
+    //             address(this), 
+    //             floorPosition.lowerTick, 
+    //             floorPosition.upperTick
+    //             )
+    //         )            
+    //     );
+
+    //     if (liquidity > 0) {
+            
+    //         uint128 newLiquidity = LiquidityAmounts.getLiquidityForAmounts(
+    //             sqrtRatioX96,
+    //             TickMath.getSqrtRatioAtTick(floorPosition.lowerTick),
+    //             TickMath.getSqrtRatioAtTick(floorPosition.upperTick),
+    //             0,
+    //             amountToken1
+    //         );
+
+    //         if (newLiquidity > 0) {
+    //             Uniswap.mint(
+    //                 pool, 
+    //                 address(this), 
+    //                 floorPosition.lowerTick, 
+    //                 floorPosition.upperTick, 
+    //                 newLiquidity, 
+    //                 LiquidityType.Floor, 
+    //                 false
+    //             );
+    //         }
+
+    //     }        
+    // }
+
     function collect(
-        IUniswapV3Pool pool,
+        address pool,
         address receiver,
         LiquidityPosition memory position
     ) internal {
@@ -356,7 +414,7 @@ library LiquidityHelper {
             )
         );
 
-        (uint128 liquidity,,,,) = pool.positions(positionId);
+        (uint128 liquidity,,,,) = IUniswapV3Pool(pool).positions(positionId);
 
         if (liquidity > 0) {
             Uniswap.burn(
@@ -379,46 +437,6 @@ library LiquidityHelper {
         }
     }
 
-    function getLiquidityRatio(
-        IUniswapV3Pool pool,
-        LiquidityPosition memory anchorPosition
-    ) internal view returns (uint256 liquidityRatio) {
-            
-        (uint160 sqrtRatioX96,,,,,,) = pool.slot0();
 
-        uint256 anchorUpperPrice = Conversions.sqrtPriceX96ToPrice(
-                Conversions.tickToSqrtPriceX96(anchorPosition.upperTick),
-            18);
-
-        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, 18);
-        liquidityRatio = DecimalMath.divideDecimal(anchorUpperPrice, spotPrice);
-    }
-
-    function getAmount1ForLiquidityInFloor(LiquidityPosition memory floorPosition) internal view returns (uint256) {
-        
-        bytes32 floorPositionId = keccak256(
-            abi.encodePacked(
-                address(this), 
-                floorPosition.lowerTick, 
-                floorPosition.upperTick
-                )
-            );
-
-        uint256 amount1 = LiquidityAmounts
-        .getAmount1ForLiquidity(
-            TickMath.getSqrtRatioAtTick(floorPosition.lowerTick),
-            TickMath.getSqrtRatioAtTick(floorPosition.upperTick),
-            floorPosition.liquidity
-        );
-
-        return amount1;
-    }
-
-    function getFloorCapacity(LiquidityPosition memory floorPosition) internal view returns (uint256) {
     
-        uint256 token1InFloor = getAmount1ForLiquidityInFloor(floorPosition);
-        uint256 capacity = token1InFloor / floorPosition.price;
-        
-        return capacity;
-    }    
 }

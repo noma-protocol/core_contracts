@@ -10,7 +10,7 @@ import {TickMath} from '@uniswap/v3-core/libraries/TickMath.sol';
 library Underlying {
 
     function computeFeesEarned(
-        IUniswapV3Pool pool,
+        address pool,
         LiquidityPosition memory position,
         bool isToken0,
         uint256 feeGrowthInsideLast,
@@ -21,13 +21,13 @@ library Underlying {
         uint256 feeGrowthOutsideUpper;
         uint256 feeGrowthGlobal;
         if (isToken0) {
-            feeGrowthGlobal = pool.feeGrowthGlobal0X128();
-            (,, feeGrowthOutsideLower,,,,,) = pool.ticks(position.lowerTick);
-            (,, feeGrowthOutsideUpper,,,,,) = pool.ticks(position.upperTick);
+            feeGrowthGlobal = IUniswapV3Pool(pool).feeGrowthGlobal0X128();
+            (,, feeGrowthOutsideLower,,,,,) = IUniswapV3Pool(pool).ticks(position.lowerTick);
+            (,, feeGrowthOutsideUpper,,,,,) = IUniswapV3Pool(pool).ticks(position.upperTick);
         } else {
-            feeGrowthGlobal = pool.feeGrowthGlobal1X128();
-            (,,, feeGrowthOutsideLower,,,,) = pool.ticks(position.lowerTick);
-            (,,, feeGrowthOutsideUpper,,,,) = pool.ticks(position.upperTick);
+            feeGrowthGlobal = IUniswapV3Pool(pool).feeGrowthGlobal1X128();
+            (,,, feeGrowthOutsideLower,,,,) = IUniswapV3Pool(pool).ticks(position.lowerTick);
+            (,,, feeGrowthOutsideUpper,,,,) = IUniswapV3Pool(pool).ticks(position.upperTick);
         }
 
         unchecked {
@@ -53,23 +53,21 @@ library Underlying {
     }
 
     function getUnderlyingBalances(
-        IUniswapV3Pool pool,
+        address pool,
         LiquidityPosition memory position
     )
         internal
         view
-        returns (uint256 amount0Current, uint256 amount1Current)
+        returns (
+            int24 lowerTick, 
+            int24 upperTick, 
+            uint256 amount0Current, 
+            uint256 amount1Current
+        )
     {
-        (uint160 sqrtRatioX96, int24 tick,,,,,) = pool.slot0();
         require(position.liquidity > 0, "0 liquidity position");
 
-        bytes32 positionId = keccak256(
-            abi.encodePacked(
-                address(this), 
-                position.lowerTick, 
-                position.upperTick
-                )
-            );
+        (uint160 sqrtRatioX96, int24 tick,,,,,) = IUniswapV3Pool(pool).slot0();
 
         (
             uint128 liquidity,
@@ -77,7 +75,15 @@ library Underlying {
             uint256 feeGrowthInside1Last,
             uint128 tokensOwed0,
             uint128 tokensOwed1
-        ) = pool.positions(positionId);
+        ) = IUniswapV3Pool(pool).positions(
+            keccak256(
+            abi.encodePacked(
+                address(this), 
+                position.lowerTick, 
+                position.upperTick
+                )
+            )            
+        );
 
         if (liquidity > 0) {
             // compute current holdings from liquidity
@@ -89,28 +95,31 @@ library Underlying {
                 liquidity
             );
 
+            lowerTick = position.lowerTick;
+            upperTick = position.upperTick;
+
             // compute current fees earned, 3000 = Manager fee
-            uint256 fee0 = computeFeesEarned(
-                pool, 
-                position, 
-                true, 
-                feeGrowthInside0Last, 
-                tick, 
-                liquidity
-            ) + uint256(tokensOwed0);
+            // uint256 fee0 = computeFeesEarned(
+            //     pool, 
+            //     position, 
+            //     true, 
+            //     feeGrowthInside0Last, 
+            //     tick, 
+            //     liquidity
+            // ) + uint256(tokensOwed0);
 
-            fee0 = fee0 - (fee0 * (250 + 3000)) / 10000;
+            // fee0 = fee0 - (fee0 * (250 + 3000)) / 10000;
 
-            uint256 fee1 = computeFeesEarned(
-                pool, 
-                position, 
-                false, 
-                feeGrowthInside1Last, 
-                tick, 
-                liquidity
-            ) + uint256(tokensOwed1);
+            // uint256 fee1 = computeFeesEarned(
+            //     pool, 
+            //     position, 
+            //     false, 
+            //     feeGrowthInside1Last, 
+            //     tick, 
+            //     liquidity
+            // ) + uint256(tokensOwed1);
 
-            fee1 = fee1 - (fee1 * (250 + 3000)) / 10000;
+            // fee1 = fee1 - (fee1 * (250 + 3000)) / 10000;
         } else {
             revert("0 liquidity");
         }
