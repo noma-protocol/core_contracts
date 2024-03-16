@@ -22,9 +22,9 @@ import {
 
 contract Vault is Owned {
 
-    LiquidityPosition public floorPosition;
-    LiquidityPosition public anchorPosition;
-    LiquidityPosition public discoveryPosition;
+    LiquidityPosition private floorPosition;
+    LiquidityPosition private anchorPosition;
+    LiquidityPosition private discoveryPosition;
 
     address public token0;
     address public token1;
@@ -79,36 +79,22 @@ contract Vault is Owned {
         uint256 token0Balance = ERC20(token0).balanceOf(address(this));
         uint256 token1Balance = ERC20(token1).balanceOf(address(this));
 
-        // (uint256 code, string memory message) = abi.decode(data, (uint256, string));
-        // bool isMint = Utils.compareStrings(message, "mint");
-
         if (token0Balance >= amount0Owed) {
             if (amount0Owed > 0) ERC20(token0).transfer(msg.sender, amount0Owed);
-            
-            // if (code == 0 && isMint) {
-            //     floorPosition.amount0LowerBound = amount0Owed;
-            // } else if (code == 1 && isMint) {
-            //     anchorPosition.amount0LowerBound = amount0Owed;
-            // } else if (code == 2 && isMint) {
-            //     discoveryPosition.amount0LowerBound = amount0Owed;
-            // }
         } 
 
         if (token1Balance >= amount1Owed) {
-            if (amount1Owed > 0) ERC20(token1).transfer(msg.sender, amount1Owed);
-
-            // if (code == 0 && isMint) {
-            //     floorPosition.amount1UpperBound = amount1Owed;
-            // } else if (code == 1 && isMint) {
-            //     anchorPosition.amount1UpperBound = amount1Owed;
-            // } else if (code == 2 && isMint) {
-            //     discoveryPosition.amount1UpperBound = amount1Owed;
-            // }      
+            if (amount1Owed > 0) ERC20(token1).transfer(msg.sender, amount1Owed); 
         } 
     }
 
     function shift() public {
         // require(initialized, "not initialized");
+        
+        LiquidityPosition[] memory positions = new LiquidityPosition[](3);
+        positions[0] = floorPosition;
+        positions[1] = anchorPosition;
+        positions[2] = discoveryPosition;
 
         (
             uint256 currentLiquidityRatio, 
@@ -116,8 +102,7 @@ contract Vault is Owned {
         ) = LiquidityHelper
         .shift(
             address(pool),
-            floorPosition,
-            anchorPosition,
+            positions,
             LiquidityType.Anchor
         );
 

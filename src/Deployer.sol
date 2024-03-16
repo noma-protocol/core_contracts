@@ -9,6 +9,8 @@ import {Owned} from "solmate/auth/Owned.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
 import {LiquidityHelper} from "./libraries/LiquidityHelper.sol";
+import {LiquidityDeployer} from "./libraries/LiquidityDeployer.sol";
+
 import {DeployHelper} from "./libraries/DeployHelper.sol";
 
 import {
@@ -129,7 +131,7 @@ contract Deployer is Owned {
 
     function deployAnchor(uint256 bips, uint256 bipsBelowSpot) public initialized /*onlyOwner*/ {
 
-        (LiquidityPosition memory newPosition,) = LiquidityHelper
+        (LiquidityPosition memory newPosition,) = LiquidityDeployer
         .deployAnchor(
             address(pool),
             vault,
@@ -150,7 +152,7 @@ contract Deployer is Owned {
 
     function deployDiscovery(uint256 bips) public initialized /*onlyOwner*/{
 
-        (LiquidityPosition memory newPosition,) = LiquidityHelper
+        (LiquidityPosition memory newPosition,) = LiquidityDeployer
         .deployDiscovery(
             address(pool), 
             vault,
