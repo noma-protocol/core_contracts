@@ -46,28 +46,34 @@ library LiquidityHelper {
                 18
             ), 
             (int256(deployParams.bipsBelowSpot) * -1)
-        ) : Conversions.sqrtPriceX96ToPrice(Conversions.tickToSqrtPriceX96(deployParams.lowerTick), 18); 
-        
-        if (!redeploy) {
-            require(
-                floorPosition.upperTick <= Conversions.priceToTick(int256(lowerAnchorPrice), deployParams.tickSpacing), 
-                string(
-                    abi.encodePacked(
-                        "deployAnchor: invalid anchor, spot price: ", 
-                        Utils._uint2str(floorPosition.price)
-                    )
+        ) : deployParams.lowerTick != 0 ? Conversions.sqrtPriceX96ToPrice(Conversions.tickToSqrtPriceX96(deployParams.lowerTick), 18) :
+        Utils.addBips(
+            Conversions.sqrtPriceX96ToPrice(Conversions.tickToSqrtPriceX96(floorPosition.upperTick), 18), 
+            (int256(deployParams.bipsBelowSpot) * -1)
+        ); 
+
+        uint256 upperAnchorPrice = Utils.addBips(lowerAnchorPrice, int256(deployParams.bips));
+        int24 lowerAnchorTick = Conversions.priceToTick(int256(lowerAnchorPrice), deployParams.tickSpacing);
+
+        require(
+            floorPosition.upperTick < lowerAnchorTick, 
+            string(
+                abi.encodePacked(
+                    "deployAnchor: invalid anchor, spot price: ", 
+                    Utils._uint2str(floorPosition.price)
                 )
-            );
-        }
+            )
+        );
 
         (int24 lowerTick, int24 upperTick) =  
         Conversions
         .computeRangeTicks(
             lowerAnchorPrice, 
-            !redeploy ? Utils.addBips(lowerAnchorPrice, int256(deployParams.bips)) :
-            Conversions.sqrtPriceX96ToPrice(Conversions.tickToSqrtPriceX96(deployParams.upperTick), 18), 
+            upperAnchorPrice, 
             deployParams.tickSpacing
         );
+
+        require(upperTick > lowerTick, "deployAnchor: invalid ticks");
 
         uint256 balanceToken0 = ERC20(IUniswapV3Pool(pool).token0()).balanceOf(address(this));
         uint256 balanceToken1 = ERC20(IUniswapV3Pool(pool).token1()).balanceOf(address(this));
@@ -206,7 +212,15 @@ library LiquidityHelper {
         );
 
         if (newLiquidity > 0) {
-            Uniswap.mint(pool, receiver, newFloorLowerTick, newFloorUpperTick, liquidity, LiquidityType.Floor, true);
+            Uniswap.mint(
+                pool, 
+                receiver,
+                newFloorLowerTick, 
+                newFloorUpperTick, 
+                liquidity, 
+                LiquidityType.Floor, 
+                true
+            );
             // IVault(vault).updatePosition(
             //     LiquidityPosition(
             //         newFloorLowerTick, 
@@ -221,15 +235,15 @@ library LiquidityHelper {
             //     0
             // );
         } else {
-            revert(
-                string(
-                    abi.encodePacked(
-                            "shiftFloor: liquidity is 0  ", 
-                            Utils._uint2str(uint256(sqrtRatioX96)
-                        )
-                    )
-                )
-            ); 
+            // revert(
+            //     string(
+            //         abi.encodePacked(
+            //                 "shiftFloor: liquidity is 0  ", 
+            //                 Utils._uint2str(uint256(sqrtRatioX96)
+            //             )
+            //         )
+            //     )
+            // ); 
         }
     }
 
@@ -243,64 +257,62 @@ library LiquidityHelper {
         uint256 currentLiquidityRatio, 
         LiquidityPosition memory newPosition
     ) {
-
-        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
+        // LiquidityRatio = anchorUpperPrice / spotPrice 
         currentLiquidityRatio = ModelHelper.getLiquidityRatio(pool, anchorPosition);
-        
         (,,, uint256 balanceToken1BeforeCollect) = Underlying.getUnderlyingBalances(pool, anchorPosition);
+        
+        Uniswap.collect(pool, address(this), anchorPosition.lowerTick, anchorPosition.upperTick);
 
         if (currentLiquidityRatio < 1e18) {
-            // Shift
-            // ETH after skim at floor = ETH before skim at anchor - (liquidity ratio * ETH before skim at anchor)
-            collect(pool, address(this), anchorPosition);
+            
+            // Shift --> ETH after skim at floor = ETH before skim at anchor - (liquidity ratio * ETH before skim at anchor)
+            uint256 toSkim = balanceToken1BeforeCollect - (
+                DecimalMath.multiplyDecimal(currentLiquidityRatio, balanceToken1BeforeCollect)
+            );
 
-            uint256 toSkim = balanceToken1BeforeCollect - (DecimalMath.multiplyDecimal(currentLiquidityRatio, balanceToken1BeforeCollect));
+            if (toSkim > 0) {
+                addToFloor(pool, floorPosition, toSkim);
+                
+                (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
 
-            // addToFloor(pool, floorPosition, toSkim);
+                uint256 priceLower = Utils.addBips(Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, 18), -250);
 
-            newPosition = reDeployAnchor(pool, sqrtRatioX96, floorPosition, liquidityType);
+                int24 tickLower = Conversions.priceToTick(int256(priceLower), 60);
+                int24 tickUpper = Conversions.priceToTick(int256(Utils.addBips(priceLower, 500)), 60);
 
+                newPosition = reDeploy(pool, sqrtRatioX96, tickLower, tickUpper, LiquidityType.Anchor);
+
+            } else {
+                revert("Nothing to skim");
+            }
+
+        }  else {
+            revert("liqRatio >= 1");
         }
     }
 
-    function reDeployAnchor(
+    function reDeploy(
         address pool,
         uint160 sqrtRatioX96,
-        LiquidityPosition memory floorPosition,
+        int24 lowerTick,
+        int24 upperTick,
         LiquidityType liquidityType
     ) internal returns (LiquidityPosition memory newPosition) {
-            newPosition = doDeployPosition(
-                pool, 
-                address(this), 
-                sqrtRatioX96, 
-                Conversions.priceToTick(
-                    int256(
-                        Utils.addBips(
-                            Conversions
-                            .sqrtPriceX96ToPrice(
-                                Conversions.tickToSqrtPriceX96(floorPosition.lowerTick), 
-                            18), 
-                            500
-                        )
-                    ), 
-                60), 
-                Conversions.priceToTick(
-                    int256(
-                        Utils.addBips(
-                            Conversions
-                            .sqrtPriceX96ToPrice(
-                                Conversions.tickToSqrtPriceX96(floorPosition.upperTick), 
-                            18),
-                            500
-                        )
-                    ), 
-                60), 
-                liquidityType, 
-                AmountsToMint({
-                    amount0: ERC20(IUniswapV3Pool(pool).token0()).balanceOf(address(this)),
-                    amount1: liquidityType == LiquidityType.Anchor ? ERC20(IUniswapV3Pool(pool).token1()).balanceOf(address(this)) : 0
-                })
-            );     
+        require(upperTick > lowerTick, "invalid ticks");
+        
+        newPosition = doDeployPosition(
+            pool, 
+            address(this), 
+            sqrtRatioX96, 
+            lowerTick,
+            upperTick,
+            liquidityType, 
+            AmountsToMint({
+                amount0: ERC20(IUniswapV3Pool(pool).token0()).balanceOf(address(this)),
+                amount1: liquidityType == LiquidityType.Anchor ? 
+                ERC20(IUniswapV3Pool(pool).token1()).balanceOf(address(this)) : 0
+            })
+        );     
     }
         
 
@@ -333,15 +345,16 @@ library LiquidityHelper {
                 false
             );
         } else {
-            revert(
-                string(
-                    abi.encodePacked(
-                            "dodDeployPosition: liquidity is 0, spot price:  ", 
-                            Utils._uint2str(uint256(amounts.amount0)
-                        )
-                    )
-                )
-            ); 
+            revert("doDeployPosition: liquidity is 0");
+            // revert(
+            //     string(
+            //         abi.encodePacked(
+            //                 "dodDeployPosition: liquidity is 0, spot price:  ", 
+            //                 Utils._uint2str(uint256(amounts.amount0)
+            //             )
+            //         )
+            //     )
+            // ); 
         }  
 
         newPosition = LiquidityPosition({
@@ -355,86 +368,49 @@ library LiquidityHelper {
         });    
     }
 
-    // function addToFloor(
-    //     address pool,
-    //     LiquidityPosition memory floorPosition,
-    //     uint256 amountToken1
-    // ) internal {
-
-    //     (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
-
-    //     (
-    //         uint128 liquidity,,,,
-    //     ) = IUniswapV3Pool(pool).positions(
-    //         keccak256(
-    //         abi.encodePacked(
-    //             address(this), 
-    //             floorPosition.lowerTick, 
-    //             floorPosition.upperTick
-    //             )
-    //         )            
-    //     );
-
-    //     if (liquidity > 0) {
-            
-    //         uint128 newLiquidity = LiquidityAmounts.getLiquidityForAmounts(
-    //             sqrtRatioX96,
-    //             TickMath.getSqrtRatioAtTick(floorPosition.lowerTick),
-    //             TickMath.getSqrtRatioAtTick(floorPosition.upperTick),
-    //             0,
-    //             amountToken1
-    //         );
-
-    //         if (newLiquidity > 0) {
-    //             Uniswap.mint(
-    //                 pool, 
-    //                 address(this), 
-    //                 floorPosition.lowerTick, 
-    //                 floorPosition.upperTick, 
-    //                 newLiquidity, 
-    //                 LiquidityType.Floor, 
-    //                 false
-    //             );
-    //         }
-
-    //     }        
-    // }
-
-    function collect(
+    function addToFloor(
         address pool,
-        address receiver,
-        LiquidityPosition memory position
+        LiquidityPosition memory floorPosition,
+        uint256 amountToken1
     ) internal {
 
-        bytes32 positionId = keccak256(
+        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
+
+        (
+            uint128 liquidity,,,,
+        ) = IUniswapV3Pool(pool).positions(
+            keccak256(
             abi.encodePacked(
                 address(this), 
-                position.lowerTick, 
-                position.upperTick
-            )
+                floorPosition.lowerTick, 
+                floorPosition.upperTick
+                )
+            )            
         );
 
-        (uint128 liquidity,,,,) = IUniswapV3Pool(pool).positions(positionId);
-
         if (liquidity > 0) {
-            Uniswap.burn(
-                pool,
-                receiver,
-                position.lowerTick, 
-                position.upperTick,
-                liquidity
+            
+            uint128 newLiquidity = LiquidityAmounts.getLiquidityForAmounts(
+                sqrtRatioX96,
+                TickMath.getSqrtRatioAtTick(floorPosition.lowerTick),
+                TickMath.getSqrtRatioAtTick(floorPosition.upperTick),
+                0,
+                amountToken1
             );
-        } else {
-            revert(
-                string(
-                    abi.encodePacked(
-                            "collect: liquidity is 0, liquidity: ", 
-                            Utils._uint2str(uint256(liquidity)
-                        )
-                    )
-                )                
-            );
-        }
+
+            if (newLiquidity > 0) {
+                Uniswap.mint(
+                    pool, 
+                    address(this), 
+                    floorPosition.lowerTick, 
+                    floorPosition.upperTick, 
+                    newLiquidity, 
+                    LiquidityType.Floor, 
+                    false
+                );
+            }
+
+        }        
     }
 
 

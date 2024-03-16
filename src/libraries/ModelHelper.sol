@@ -30,8 +30,12 @@ library ModelHelper {
                 Conversions.tickToSqrtPriceX96(anchorPosition.lowerTick),
             18);
 
+        uint256 anchorUpperPrice = Conversions.sqrtPriceX96ToPrice(
+                Conversions.tickToSqrtPriceX96(anchorPosition.upperTick),
+            18);
+            
         uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, 18);
-        liquidityRatio = DecimalMath.divideDecimal(anchorLowerPrice, spotPrice);
+        liquidityRatio = DecimalMath.divideDecimal(anchorUpperPrice, spotPrice);
     }
 
     function getPositionCapacity(
@@ -39,7 +43,7 @@ library ModelHelper {
         LiquidityPosition memory position
     ) internal view returns (uint256 amount0Current) {
     
-        require(position.liquidity > 0, "0 liquidity floorPosition");
+        // require(position.liquidity > 0, "0 liquidity floorPosition");
 
         (
             uint128 liquidity,,,,

@@ -65,7 +65,7 @@ library Underlying {
             uint256 amount1Current
         )
     {
-        require(position.liquidity > 0, "0 liquidity position");
+        // require(position.liquidity > 0, "0 liquidity position");
 
         (uint160 sqrtRatioX96, int24 tick,,,,,) = IUniswapV3Pool(pool).slot0();
 
@@ -120,8 +120,9 @@ library Underlying {
             // ) + uint256(tokensOwed1);
 
             // fee1 = fee1 - (fee1 * (250 + 3000)) / 10000;
-        } else {
-            revert("0 liquidity");
         }
+        // else {
+        //     revert("0 liquidity");
+        // }
     }    
 }

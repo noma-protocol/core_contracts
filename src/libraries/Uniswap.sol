@@ -6,6 +6,7 @@ pragma solidity ^0.8.0;
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {LiquidityType} from "../Types.sol";
+// import {Utils} from "./Utils.sol";
 
 library Uniswap {
 
@@ -57,6 +58,44 @@ library Uniswap {
             type(uint128).max, 
             type(uint128).max
         );
+    }
+
+    function collect(
+        address pool,
+        address receiver,
+        int24 lowerTick,
+        int24 upperTick
+    ) internal {
+
+        bytes32 positionId = keccak256(
+            abi.encodePacked(
+                address(this), 
+                lowerTick, 
+                upperTick
+            )
+        );
+
+        (uint128 liquidity,,,,) = IUniswapV3Pool(pool).positions(positionId);
+
+        if (liquidity > 0) {
+            burn(
+                pool,
+                receiver,
+                lowerTick, 
+                upperTick,
+                liquidity
+            );
+        } else {
+            // revert(
+            //     string(
+            //         abi.encodePacked(
+            //                 "collect: liquidity is 0, liquidity: ", 
+            //                 Utils._uint2str(uint256(liquidity)
+            //             )
+            //         )
+            //     )                
+            // );
+        }
     }
 
     function swap(
