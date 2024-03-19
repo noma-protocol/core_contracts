@@ -7,13 +7,10 @@ library Utils {
     
     function addBips(uint256 _price, int256 bips) public pure returns (uint256) {
         if (bips >= 0) {
-            // Increase the price
             uint256 increase = (_price * uint256(bips)) / 10_000;
             return _price + increase;
         } else {
-            // Decrease the price
             uint256 decrease = (_price * uint256(-bips)) / 10_000;
-            // Ensure that the decrease does not go below zero
             if (decrease > _price) {
                 return 0;
             } else {

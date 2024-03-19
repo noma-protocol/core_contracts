@@ -150,14 +150,14 @@ contract Deployer is Owned {
         emit AnchorDeployed(newPosition);
     }
 
-    function deployDiscovery(uint256 bips) public initialized /*onlyOwner*/{
+    function deployDiscovery(uint256 upperDiscoveryPrice) public initialized /*onlyOwner*/{
 
         (LiquidityPosition memory newPosition,) = LiquidityDeployer
         .deployDiscovery(
             address(pool), 
             vault,
             anchorPosition, 
-            bips, 
+            upperDiscoveryPrice, 
             tickSpacing
         );
 

@@ -84,8 +84,8 @@ library LiquidityDeployer {
             upperTick, 
             LiquidityType.Anchor, 
             AmountsToMint({
-                amount0: balanceToken0 * 20 / 100,
-                amount1: balanceToken1
+                amount0: balanceToken0 * 99 / 100,
+                amount1: balanceToken1 
             })
         );
 
@@ -99,7 +99,7 @@ library LiquidityDeployer {
         address pool,
         address receiver,
         LiquidityPosition memory anchorPosition,
-        uint256 bips,
+        uint256 upperDiscoveryPrice,
         int24 tickSpacing
     ) internal returns (
         LiquidityPosition memory newPosition,
@@ -113,7 +113,6 @@ library LiquidityDeployer {
         );
         
         lowerDiscoveryPrice = Utils.addBips(lowerDiscoveryPrice, 50);
-        uint256 upperDiscoveryPrice = Utils.addBips(lowerDiscoveryPrice, int256(bips));
 
         (int24 lowerTick, int24 upperTick) = Conversions
         .computeRangeTicks(

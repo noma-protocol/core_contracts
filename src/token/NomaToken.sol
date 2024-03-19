@@ -5,10 +5,10 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 import {Owned} from "solmate/auth/Owned.sol";
 
 
-contract AmphorToken is ERC20, Owned {
+contract NomaToken is ERC20, Owned {
     
   constructor(address deployer, uint256 supply) 
-  ERC20("Amphor", "AMPHR", 18) 
+  ERC20("Noma", "AMPHR", 18) 
   Owned(msg.sender) {
     _mint(deployer, supply);
   }

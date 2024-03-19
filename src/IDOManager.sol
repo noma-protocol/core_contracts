@@ -15,7 +15,7 @@ import {TickMath} from '@uniswap/v3-core/libraries/TickMath.sol';
 import {Vault} from "./Vault.sol";
 
 import {IWETH} from "./interfaces/IWETH.sol";
-import {AmphorToken} from "./token/AmphorToken.sol";
+import {NomaToken} from "./token/NomaToken.sol";
 import {Conversions} from "./libraries/Conversions.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {feeTier, tickSpacing, LiquidityPosition, LiquidityType} from "./Types.sol";
@@ -27,7 +27,7 @@ contract IDOManager is Owned {
 
     IUniswapV3Pool public pool;
 
-    AmphorToken public amphorToken;
+    NomaToken public amphorToken;
     Vault public vault;
 
     uint256 totalSupply;
@@ -59,7 +59,7 @@ contract IDOManager is Owned {
         // Dev: force desired token order on Uniswap V3
         uint256 nonce = 0;
         do {
-            amphorToken = new AmphorToken{salt: bytes32(nonce)}(address(this), totalSupply);
+            amphorToken = new NomaToken{salt: bytes32(nonce)}(address(this), totalSupply);
             nonce++;
         } while (address(amphorToken) >= _token1);
 

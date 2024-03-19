@@ -33,8 +33,10 @@ library LiquidityHelper {
         uint256 currentLiquidityRatio, 
         LiquidityPosition memory newPosition
     ) {
+
         // Ratio of the anchor's price to market price
         currentLiquidityRatio = ModelHelper.getLiquidityRatio(pool, positions[1]);
+        
         (,,, uint256 balanceToken1BeforeCollect) = Underlying.getUnderlyingBalances(pool, positions[1]);
         
         Uniswap.collect(pool, address(this), positions[1].lowerTick, positions[1].upperTick);
@@ -44,10 +46,15 @@ library LiquidityHelper {
             
             // Shift --> ETH after skim at floor = ETH before skim at anchor - (liquidity ratio * ETH before skim at anchor)
             uint256 toSkim = balanceToken1BeforeCollect - (
-                DecimalMath.multiplyDecimal(currentLiquidityRatio, balanceToken1BeforeCollect)
+                DecimalMath
+                .multiplyDecimal(
+                    currentLiquidityRatio, 
+                    balanceToken1BeforeCollect
+                )
             );
 
             if (toSkim > 0) {
+                
                 addToFloor(pool, positions[0], toSkim);
 
                 (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();

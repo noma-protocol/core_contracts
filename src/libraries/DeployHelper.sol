@@ -41,7 +41,7 @@ library DeployHelper {
             TickMath.getSqrtRatioAtTick(lowerTick),
             TickMath.getSqrtRatioAtTick(upperTick),
             0,
-            (balanceToken1 * 80) / 100 // 80% of WETH
+            (balanceToken1 * 95) / 100 // % of WETH
         );
 
         if (liquidity > 0) {
