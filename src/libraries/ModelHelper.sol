@@ -12,6 +12,7 @@ import {Conversions} from "./Conversions.sol";
 import {DecimalMath} from "./DecimalMath.sol";
 
 import {Underlying} from "./Underlying.sol";
+import {Utils} from "./Utils.sol";
 
 import {
     LiquidityPosition
@@ -35,7 +36,7 @@ library ModelHelper {
             18);
             
         uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, 18);
-        liquidityRatio = DecimalMath.divideDecimal(anchorUpperPrice, spotPrice);
+        liquidityRatio = DecimalMath.divideDecimal(anchorLowerPrice, spotPrice);
     }
 
     function getPositionCapacity(
@@ -85,5 +86,6 @@ library ModelHelper {
         ) = Underlying.getUnderlyingBalances(pool, discoveryPosition);
     
         return totalSupply - (amount0CurrentAnchor + amount0CurrentDiscovery) - protocolLockedBalanceToken0;
-    }    
+    } 
+   
 }

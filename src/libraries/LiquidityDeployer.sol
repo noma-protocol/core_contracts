@@ -16,7 +16,7 @@ import {DecimalMath} from "./DecimalMath.sol";
 
 import {Underlying} from "./Underlying.sol";
 import {ModelHelper} from "./ModelHelper.sol";
-import {LiquidityHelper} from "./LiquidityHelper.sol";
+import {LiquidityOps} from "./LiquidityOps.sol";
 
 import {
     LiquidityPosition, 
@@ -75,7 +75,7 @@ library LiquidityDeployer {
         uint256 balanceToken0 = ERC20(IUniswapV3Pool(pool).token0()).balanceOf(address(this));
         uint256 balanceToken1 = ERC20(IUniswapV3Pool(pool).token1()).balanceOf(address(this));
 
-        (newPosition) = LiquidityHelper
+        (newPosition) = LiquidityOps
         .doDeployPosition(
             pool, 
             receiver, 
@@ -84,7 +84,7 @@ library LiquidityDeployer {
             upperTick, 
             LiquidityType.Anchor, 
             AmountsToMint({
-                amount0: balanceToken0 * 99 / 100,
+                amount0: balanceToken0 * 20 / 100,
                 amount1: balanceToken1 
             })
         );
@@ -128,7 +128,7 @@ library LiquidityDeployer {
 
         uint256 balanceToken0 = ERC20(IUniswapV3Pool(pool).token0()).balanceOf(address(this));
 
-        newPosition = LiquidityHelper
+        newPosition = LiquidityOps
         .doDeployPosition(
             pool, 
             receiver, 

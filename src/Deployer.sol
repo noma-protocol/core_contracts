@@ -8,7 +8,7 @@ import {Owned} from "solmate/auth/Owned.sol";
 
 import {Utils} from "./libraries/Utils.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
-import {LiquidityHelper} from "./libraries/LiquidityHelper.sol";
+import {LiquidityOps} from "./libraries/LiquidityOps.sol";
 import {LiquidityDeployer} from "./libraries/LiquidityDeployer.sol";
 
 import {DeployHelper} from "./libraries/DeployHelper.sol";
@@ -66,19 +66,19 @@ contract Deployer is Owned {
         uint256 token0Balance = ERC20(token0).balanceOf(address(this));
         uint256 token1Balance = ERC20(token1).balanceOf(address(this));
 
-        (uint256 code, string memory message) = abi.decode(data, (uint256, string));
+        // (uint256 code, string memory message) = abi.decode(data, (uint256, string));
 
         if (token0Balance >= amount0Owed) {
 
             if (amount0Owed > 0) ERC20(token0).transfer(msg.sender, amount0Owed);
             
-            if (code == 0 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
-                floorPosition.amount0LowerBound = amount0Owed;
-            } else if (code == 1 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
-                anchorPosition.amount0LowerBound = amount0Owed;
-            } else if (code == 2 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
-                discoveryPosition.amount0LowerBound = amount0Owed;
-            }
+            // if (code == 0 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
+            //     floorPosition.amount0LowerBound = amount0Owed;
+            // } else if (code == 1 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
+            //     anchorPosition.amount0LowerBound = amount0Owed;
+            // } else if (code == 2 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
+            //     discoveryPosition.amount0LowerBound = amount0Owed;
+            // }
         
         } else {
             revert(
@@ -95,13 +95,13 @@ contract Deployer is Owned {
 
             if (amount1Owed > 0) ERC20(token1).transfer(msg.sender, amount1Owed);
 
-            if (code == 0 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
-                floorPosition.amount1UpperBound = amount1Owed;
-            } else if (code == 1 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
-                anchorPosition.amount1UpperBound = amount1Owed;
-            } else if (code == 2 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
-                discoveryPosition.amount1UpperBound = amount1Owed;
-            }      
+            // if (code == 0 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
+            //     floorPosition.amount1UpperBound = amount1Owed;
+            // } else if (code == 1 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
+            //     anchorPosition.amount1UpperBound = amount1Owed;
+            // } else if (code == 2 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
+            //     discoveryPosition.amount1UpperBound = amount1Owed;
+            // }      
 
         } else {
             revert(

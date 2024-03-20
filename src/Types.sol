@@ -10,9 +10,6 @@ struct LiquidityPosition {
     int24 upperTick;
     uint128 liquidity;
     uint256 price;
-    uint256 amount0LowerBound;
-    uint256 amount1UpperBound;
-    uint256 amount1UpperBoundVirtual;
 }
 
 enum LiquidityType {
@@ -32,4 +29,9 @@ struct DeployLiquidityParameters {
 struct AmountsToMint {
     uint256 amount0;
     uint256 amount1;
+}
+
+struct VaultInfo {
+    address token0;
+    address token1;
 }

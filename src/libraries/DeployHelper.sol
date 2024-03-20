@@ -70,10 +70,7 @@ library DeployHelper {
             lowerTick: lowerTick, 
             upperTick: upperTick, 
             liquidity: liquidity, 
-            price: _floorPrice,
-            amount0LowerBound: 0,
-            amount1UpperBound: 0,
-            amount1UpperBoundVirtual: 0
+            price: _floorPrice
         });
 
         return (

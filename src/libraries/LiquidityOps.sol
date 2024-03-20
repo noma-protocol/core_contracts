@@ -23,55 +23,69 @@ import {
     AmountsToMint
 } from "../Types.sol";
 
-library LiquidityHelper {
+library LiquidityOps {
 
     function shift(
         address pool,
-        LiquidityPosition[] memory positions,
-        LiquidityType liquidityType
+        LiquidityPosition[] memory positions
     ) internal returns (
         uint256 currentLiquidityRatio, 
-        LiquidityPosition memory newPosition
+        LiquidityPosition memory newPosition,
+        uint256 newFloorPrice
     ) {
 
         // Ratio of the anchor's price to market price
         currentLiquidityRatio = ModelHelper.getLiquidityRatio(pool, positions[1]);
         
-        (,,, uint256 balanceToken1BeforeCollect) = Underlying.getUnderlyingBalances(pool, positions[1]);
+        (,,, uint256 anchorToken1Balance) = Underlying.getUnderlyingBalances(pool, positions[1]);
         
         Uniswap.collect(pool, address(this), positions[1].lowerTick, positions[1].upperTick);
-        Uniswap.collect(pool, address(this), positions[2].lowerTick, positions[2].upperTick);
+        // Uniswap.collect(pool, address(this), positions[2].lowerTick, positions[2].upperTick);
 
-        if (currentLiquidityRatio < 1e18) {
-            
-            // Shift --> ETH after skim at floor = ETH before skim at anchor - (liquidity ratio * ETH before skim at anchor)
-            uint256 toSkim = balanceToken1BeforeCollect - (
+        uint256 twoPercentDropThreshold = 98e16; 
+
+        if (currentLiquidityRatio < twoPercentDropThreshold) {
+            // Shift --> ETH after skim at floor = 
+            // ETH before skim at anchor - (liquidity ratio * ETH before skim at anchor)
+            uint256 toSkim = anchorToken1Balance - (
                 DecimalMath
                 .multiplyDecimal(
                     currentLiquidityRatio, 
-                    balanceToken1BeforeCollect
+                    anchorToken1Balance
                 )
             );
 
             if (toSkim > 0) {
                 
                 addToFloor(pool, positions[0], toSkim);
+                
+                (,,, uint256 floorNewToken1Balance) = Underlying.getUnderlyingBalances(pool, positions[0]);
 
                 (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
-
                 uint256 priceLower = Utils.addBips(Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, 18), -250);
 
                 int24 tickLower = Conversions.priceToTick(int256(priceLower), 60);
-                int24 tickUpper = Conversions.priceToTick(int256(Utils.addBips(priceLower, 500)), 60);
+                int24 tickUpper = Conversions.priceToTick(int256(Utils.addBips(priceLower, 250)), 60);
 
                 newPosition = reDeploy(pool, sqrtRatioX96, tickLower, tickUpper, LiquidityType.Anchor);
 
-            } else {
-                revert("Nothing to skim");
-            }
+                uint256 circulatingSupply = ModelHelper.getCirculatingSupply(pool, positions[1], positions[2]);
 
-        }  else {
-            revert("liqRatio >= 1");
+                if (circulatingSupply > 0) {
+                    
+                    uint256 totalAbsorbableByAnchor = ModelHelper.getPositionCapacity(pool, newPosition);
+                    
+                    newFloorPrice = DecimalMath.divideDecimal(
+                        floorNewToken1Balance,
+                        circulatingSupply - totalAbsorbableByAnchor
+                    );
+
+                }
+
+            } 
+        
+        } else {
+            revert("shift: Above threshold");
         }
     }
 
@@ -128,18 +142,13 @@ library LiquidityHelper {
                 liquidityType, 
                 false
             );
-        } else {
-            revert("doDeployPosition: liquidity is 0");
-        }  
+        } 
 
         newPosition = LiquidityPosition({
             lowerTick: lowerTick, 
             upperTick: upperTick, 
             liquidity: liquidity, 
-            price: 0,
-            amount0LowerBound: 0,
-            amount1UpperBound: 0,
-            amount1UpperBoundVirtual: 0
+            price: 0
         });    
     }
 
@@ -171,7 +180,7 @@ library LiquidityHelper {
                     LiquidityType.Floor, 
                     false
                 );
-            }
+            } 
 
         }        
     }

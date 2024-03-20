@@ -8,7 +8,7 @@ import {Owned} from "solmate/auth/Owned.sol";
 
 import {Utils} from "./libraries/Utils.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
-import {LiquidityHelper} from "./libraries/LiquidityHelper.sol";
+import {LiquidityOps} from "./libraries/LiquidityOps.sol";
 import {Underlying} from "./libraries/Underlying.sol";
 
 import {Conversions} from "./libraries/Conversions.sol";
@@ -17,7 +17,8 @@ import {ModelHelper} from "./libraries/ModelHelper.sol";
 import {
     tickSpacing, 
     LiquidityPosition, 
-    LiquidityType
+    LiquidityType,
+    VaultInfo
 } from "./Types.sol";
 
 contract Vault is Owned {
@@ -26,19 +27,21 @@ contract Vault is Owned {
     LiquidityPosition private anchorPosition;
     LiquidityPosition private discoveryPosition;
 
-    address public token0;
-    address public token1;
-    address public deployerContract;
+    VaultInfo public vaultInfo;
+    address private deployerContract;
 
     IUniswapV3Pool public pool;
 
-    bool initialized; 
-    uint256 lastLiquidityRatio;
+    bool private initialized; 
+    uint256 private lastLiquidityRatio;
+
+    event FloorUpdated(uint256 floorPrice, uint256 floorCapacity);
 
     constructor(address _pool) Owned(msg.sender) {
         pool = IUniswapV3Pool(_pool);
-        token0 = pool.token0();
-        token1 = pool.token1();
+        VaultInfo storage _vaultInfo = vaultInfo;
+        _vaultInfo.token0 = pool.token0();
+        _vaultInfo.token1 = pool.token1();
         initialized = false;
         lastLiquidityRatio = 0;
     }
@@ -76,15 +79,15 @@ contract Vault is Owned {
     {
         require(msg.sender == address(pool), "cc");
 
-        uint256 token0Balance = ERC20(token0).balanceOf(address(this));
-        uint256 token1Balance = ERC20(token1).balanceOf(address(this));
+        uint256 token0Balance = ERC20(vaultInfo.token0).balanceOf(address(this));
+        uint256 token1Balance = ERC20(vaultInfo.token1).balanceOf(address(this));
 
         if (token0Balance >= amount0Owed) {
-            if (amount0Owed > 0) ERC20(token0).transfer(msg.sender, amount0Owed);
+            if (amount0Owed > 0) ERC20(vaultInfo.token0).transfer(msg.sender, amount0Owed);
         } 
 
         if (token1Balance >= amount1Owed) {
-            if (amount1Owed > 0) ERC20(token1).transfer(msg.sender, amount1Owed); 
+            if (amount1Owed > 0) ERC20(vaultInfo.token1).transfer(msg.sender, amount1Owed); 
         } 
     }
 
@@ -98,21 +101,31 @@ contract Vault is Owned {
 
         (
             uint256 currentLiquidityRatio, 
-            LiquidityPosition memory newPosition
-        ) = LiquidityHelper
+            LiquidityPosition memory newPosition,
+            uint256 newFloorPrice
+        ) = LiquidityOps
         .shift(
             address(pool),
-            positions,
-            LiquidityType.Anchor
+            positions
         );
 
         lastLiquidityRatio = currentLiquidityRatio;
         anchorPosition = newPosition;
 
         // Emit event
+        emit FloorUpdated(
+            newFloorPrice, 
+            ModelHelper
+            .getPositionCapacity(
+                address(pool), 
+                floorPosition
+            )
+        );
     }    
 
-    function getUnderlyingBalances(LiquidityType liquidityType) public 
+    function getUnderlyingBalances(
+        LiquidityType liquidityType
+    ) public 
     view 
     returns (int24, int24, uint256, uint256) {
 
@@ -129,7 +142,16 @@ contract Vault is Owned {
         return Underlying.getUnderlyingBalances(address(pool), position);
     }
 
-    function getVaultInfo() public view returns (uint256, uint256, uint256, uint256, uint256) {
+    function getVaultInfo() public view 
+    returns (
+        uint256, 
+        uint256, 
+        uint256, 
+        uint256, 
+        uint256, 
+        address, 
+        address
+    ) {
         (uint160 sqrtPriceX96,,,,,,) = pool.slot0();
 
         return (
@@ -137,7 +159,9 @@ contract Vault is Owned {
             ModelHelper.getCirculatingSupply(address(pool), anchorPosition, discoveryPosition),
             Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18),
             ModelHelper.getPositionCapacity(address(pool), anchorPosition),
-            ModelHelper.getPositionCapacity(address(pool), floorPosition)
+            ModelHelper.getPositionCapacity(address(pool), floorPosition),
+            vaultInfo.token0,
+            vaultInfo.token1            
         );
     }
     
