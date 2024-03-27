@@ -44,6 +44,7 @@ library LiquidityDeployer {
             lowerAnchorPrice,
             int256(deployParams.bips)
         );
+
         int24 lowerAnchorTick = Conversions.priceToTick(
             int256(lowerAnchorPrice),
             deployParams.tickSpacing
@@ -73,8 +74,8 @@ library LiquidityDeployer {
             upperTick,
             LiquidityType.Anchor,
             AmountsToMint({
-                amount0: (balanceToken0 * 30) / 100,
-                amount1: balanceToken1
+                amount0: 5 ether,
+                amount1: 0
             })
         );
 

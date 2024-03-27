@@ -177,7 +177,9 @@ contract Deployer is Owned {
             discoveryPosition.upperTick != 0, 
             "not deployed"
         );
-
+        
+        uint256 balanceToken0 = ERC20(token0).balanceOf(address(this));
+        ERC20(token0).transfer(vault, balanceToken0);
         IVault(vault).initialize(floorPosition, anchorPosition, discoveryPosition);
     }
 

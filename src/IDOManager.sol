@@ -116,14 +116,15 @@ contract IDOManager is Owned {
             amount1Max
         );
 
-        if (liquidity > 0) {
-            Uniswap.mint(address(pool), address(this), lowerTick, upperTick, liquidity, LiquidityType.Floor, false);
-        } else {
-            revert("createIDO: liquidity is 0");
-        }
+        // if (liquidity > 0) {
+        //     Uniswap.mint(address(pool), address(this), lowerTick, upperTick, liquidity, LiquidityType.Floor, false);
+        // } else {
+        //     revert("createIDO: liquidity is 0");
+        // }
 
-        ERC20(vaultInfo.token0).transfer(receiver, totalSupply - launchSupply);
-        IDOPosition = LiquidityPosition(lowerTick, upperTick, liquidity, IDOPrice);
+        ERC20(vaultInfo.token0).transfer(receiver, totalSupply);
+        //ERC20(vaultInfo.token0).transfer(receiver, totalSupply - launchSupply);
+        // IDOPosition = LiquidityPosition(lowerTick, upperTick, liquidity, IDOPrice);
     }
 
     // Test function

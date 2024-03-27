@@ -89,13 +89,20 @@ contract ModelHelper {
         );
 
         if (liquidity > 0) {
-            (amount0Current, ) = LiquidityAmounts
-            .getAmountsForLiquidity(
-                TickMath.getSqrtRatioAtTick(position.lowerTick),
+            // (amount0Current, ) = LiquidityAmounts
+            // .getAmountsForLiquidity(
+            //     TickMath.getSqrtRatioAtTick(position.lowerTick),
+            //     TickMath.getSqrtRatioAtTick(position.lowerTick),
+            //     TickMath.getSqrtRatioAtTick(position.upperTick),
+            //     liquidity
+            // );      
+            amount0Current = LiquidityAmounts
+            .getAmount0ForLiquidity(
+                // TickMath.getSqrtRatioAtTick(position.lowerTick),
                 TickMath.getSqrtRatioAtTick(position.lowerTick),
                 TickMath.getSqrtRatioAtTick(position.upperTick),
                 liquidity
-            );      
+            );
         }
     } 
 
@@ -154,17 +161,15 @@ contract ModelHelper {
 
         uint256 totalSupply = ERC20(address(IUniswapV3Pool(pool).token0())).totalSupply();
 
-        (  
-            ,,uint256 amount0CurrentAnchor, 
-        ) = Underlying.getUnderlyingBalances(pool, vault, anchorPosition);
+        (,,uint256 amount0CurrentFloor, ) = Underlying.getUnderlyingBalances(pool, vault, floorPosition);
+
+        (,,uint256 amount0CurrentAnchor, ) = Underlying.getUnderlyingBalances(pool, vault, anchorPosition);
         
-        (
-            ,,uint256 amount0CurrentDiscovery,             
-        ) = Underlying.getUnderlyingBalances(pool, vault, discoveryPosition);
+        (,,uint256 amount0CurrentDiscovery, ) = Underlying.getUnderlyingBalances(pool, vault, discoveryPosition);
 
         uint256 protocolUnusedBalanceToken0 = ERC20(address(IUniswapV3Pool(pool).token0())).balanceOf(vault);
     
-        return totalSupply - (amount0CurrentAnchor + amount0CurrentDiscovery + protocolUnusedBalanceToken0);
+        return totalSupply - (amount0CurrentFloor + amount0CurrentAnchor + amount0CurrentDiscovery + protocolUnusedBalanceToken0);
     } 
 
     function estimateNewFloorPrice(

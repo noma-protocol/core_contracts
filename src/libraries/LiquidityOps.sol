@@ -46,6 +46,7 @@ library LiquidityOps {
         // Ratio of the anchor's price to market price
         currentLiquidityRatio = IModelHelper(modelHelper).getLiquidityRatio(pool);
         (,,, uint256 anchorToken1Balance) = IModelHelper(modelHelper).getUnderlyingBalances(pool, address(this), LiquidityType.Anchor);
+        (,,, uint256 discoveryToken1Balance) = IModelHelper(modelHelper).getUnderlyingBalances(pool, address(this), LiquidityType.Discovery);
         (,,, uint256 floorToken1Balance) = IModelHelper(modelHelper).getUnderlyingBalances(pool, address(this), LiquidityType.Floor);
 
         // Uniswap.collect(pool, address(this), positions[1].lowerTick, positions[1].upperTick);
@@ -72,8 +73,8 @@ library LiquidityOps {
 
                 if (circulatingSupply > 0) {
 
-                    (,,, uint256 floorNewToken1Balance) = 
-                    Underlying.getUnderlyingBalances(pool, address(this), positions[0]);
+                    // (,,, uint256 floorNewToken1Balance) = 
+                    // Underlying.getUnderlyingBalances(pool, address(this), positions[0]);
                     
                     // newFloorPrice = DecimalMath.divideDecimal(
                     //     floorNewToken1Balance,
@@ -124,6 +125,8 @@ library LiquidityOps {
                     shiftPositions(
                         pool, 
                         deployer,
+                        anchorToken1Balance,
+                        discoveryToken1Balance,
                         positions
                     );
 
@@ -146,6 +149,8 @@ library LiquidityOps {
     function shiftPositions(
         address pool,
         address deployer,
+        uint256 anchorToken1Balance,
+        uint256 discoveryToken1Balance,
         LiquidityPosition[] memory positions
     ) internal returns (
         LiquidityPosition memory anchor, 
@@ -160,14 +165,7 @@ library LiquidityOps {
             250
         );
 
-        // Deploy new anchor position
-        anchor = reDeploy(
-            pool,
-            deployer,
-            positions[0].upperTick, 
-            Conversions.priceToTick(int256(priceLower), 60), 
-            LiquidityType.Anchor
-        );
+        // uint256 balanceToken1BeforeCollect = ERC20(IUniswapV3Pool(pool).token1()).balanceOf(address(this));
 
         // Collect discovery liquidity
         Uniswap.collect(
@@ -177,13 +175,39 @@ library LiquidityOps {
             positions[2].upperTick
         );
 
-        discovery = reDeploy(
+        // uint256 balanceToken1AfterCollect = ERC20(IUniswapV3Pool(pool).token1()).balanceOf(address(this));
+        // uint256 balanceToken0AfterCollect = ERC20(IUniswapV3Pool(pool).token0()).balanceOf(address(this));
+
+            // revert(
+            //     string(
+            //         abi.encodePacked("balanceToken1AfterCollect: ", 
+            //         Utils._uint2str(anchorToken1Balance + discoveryToken1Balance)
+            //         )
+            //     )
+            // );
+        // Deploy new anchor position
+        anchor = reDeploy(
             pool,
-            deployer, 
-            anchor.upperTick, 
-            Conversions.priceToTick(int256(priceLower * 5), 60), 
-            LiquidityType.Discovery 
-        );        
+            deployer,
+            positions[0].upperTick, 
+            Conversions.priceToTick(int256(priceLower), 60), 
+            anchorToken1Balance + discoveryToken1Balance, 
+            LiquidityType.Anchor
+        );
+
+        return (
+            anchor,
+            discovery
+        );
+
+        // discovery = reDeploy(
+        //     pool,
+        //     deployer, 
+        //     anchor.upperTick, 
+        //     Conversions.priceToTick(int256(priceLower * 3), 60), 
+        //     0,
+        //     LiquidityType.Discovery 
+        // );        
     }
 
     function reDeploy(
@@ -191,6 +215,7 @@ library LiquidityOps {
         address deployer,
         int24 lowerTick,
         int24 upperTick,
+        uint256 amount1ToDeploy,
         LiquidityType liquidityType
     ) internal returns (LiquidityPosition memory newPosition) {
         require(upperTick > lowerTick, "invalid ticks");
@@ -200,18 +225,19 @@ library LiquidityOps {
 
         uint256 amount0ToDeploy = liquidityType == LiquidityType.Discovery ? 
         balanceToken0 - (balanceToken0 * 25 / 100) :
-        balanceToken0;
+        0;
 
-        uint256 amount1ToDeploy = liquidityType == LiquidityType.Discovery ? 
-        0 :
-        balanceToken1;
-
-        // ERC20(IUniswapV3Pool(pool).token0()).transfer(deployer, amount0ToDeploy);
-        // ERC20(IUniswapV3Pool(pool).token1()).transfer(deployer, amount1ToDeploy);
+        // if (amountToSkimFromDiscovery  == 0) {
+        //     amount1ToDeploy = liquidityType == LiquidityType.Discovery ? 
+        //     0 :
+        //     balanceToken1;
+        // } else {
+        //     amount1ToDeploy = amountToSkimFromDiscovery;
+        // }
 
         ERC20(IUniswapV3Pool(pool).token0()).approve(deployer, amount0ToDeploy);
         ERC20(IUniswapV3Pool(pool).token1()).approve(deployer, amount1ToDeploy);
-        
+
         newPosition = IDeployer(deployer)
         .doDeployPosition(
             pool, 
