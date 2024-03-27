@@ -13,14 +13,14 @@ import {Owned} from "solmate/auth/Owned.sol";
 import {TickMath} from '@uniswap/v3-core/libraries/TickMath.sol';
 
 import {Vault} from "./Vault.sol";
-
+ 
 import {IWETH} from "./interfaces/IWETH.sol";
 import {NomaToken} from "./token/NomaToken.sol";
 import {Conversions} from "./libraries/Conversions.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {feeTier, tickSpacing, LiquidityPosition, LiquidityType, VaultInfo} from "./Types.sol";
 import {Uniswap} from "./libraries/Uniswap.sol";
-
+ 
 contract IDOManager is Owned {
 
     bool private initialized;
@@ -35,16 +35,17 @@ contract IDOManager is Owned {
     address private uniswapFactory;
 
     VaultInfo private  vaultInfo;
-
+    address private modelHelper;
     uint256 private IDOPrice;
 
     LiquidityPosition private IDOPosition;
 
     constructor(
         address _uniswapFactory, 
+        address _modelHelper,
         address _token1,
-            uint256 _totalSupply, 
-            uint16 _percentageForSale
+        uint256 _totalSupply, 
+        uint16 _percentageForSale
     ) Owned(msg.sender) { 
         require(
             _percentageForSale > 0 && 
@@ -67,6 +68,7 @@ contract IDOManager is Owned {
         VaultInfo storage _vaultInfo = vaultInfo;
         _vaultInfo.token0 = address(amphorToken);
         _vaultInfo.token1 = _token1;
+        modelHelper = _modelHelper;
 
     }
 
@@ -88,7 +90,7 @@ contract IDOManager is Owned {
             );
         } 
 
-        vault = new Vault(address(pool));
+        vault = new Vault(address(pool), address(modelHelper));
         
         IDOPrice = _IDOPrice;
         initialized = true;
@@ -139,6 +141,7 @@ contract IDOManager is Owned {
     }
 
     function collectIDOFunds(address receiver) public {
+        require(initialized, "not initialized");
 
         uint256 balanceBeforeSwap = ERC20(vaultInfo.token1).balanceOf(address(this));
 
@@ -169,6 +172,7 @@ contract IDOManager is Owned {
         
         // Send left over token0 to contract owner
         ERC20(vaultInfo.token0).transfer(owner, ERC20(vaultInfo.token0).balanceOf(address(this)));
+
         // Send token1 to receiver (Deployer contract)
         ERC20(vaultInfo.token1).transfer(receiver, ERC20(vaultInfo.token1).balanceOf(address(this)));
     }

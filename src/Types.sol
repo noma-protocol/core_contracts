@@ -35,3 +35,8 @@ struct VaultInfo {
     address token0;
     address token1;
 }
+
+struct ShiftOpResult {
+    uint256 currentLiquidityRatio;
+    uint256 newFloorPrice;
+}

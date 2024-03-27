@@ -109,7 +109,7 @@ library Uniswap {
         bool isLimitOrder
     ) internal {
         
-        // uint256 balanceBeforeSwap = ERC20(zeroForOne ? token1 : token0).balanceOf(address(this));
+        uint256 balanceBeforeSwap = ERC20(zeroForOne ? token1 : token0).balanceOf(receiver);
         uint160 slippagePrice = zeroForOne ? basePrice - (basePrice / 25) : basePrice + (basePrice / 25);
 
         try IUniswapV3Pool(pool).swap(
@@ -119,10 +119,10 @@ library Uniswap {
             isLimitOrder ? basePrice : slippagePrice,
             ""
         ) {
-            // uint256 balanceAfterSwap = ERC20(zeroForOne ? token1 : token0).balanceOf(address(this));
-            // if (balanceBeforeSwap == balanceAfterSwap) {
-            //     revert("no tokens exchanged");
-            // }
+            uint256 balanceAfterSwap = ERC20(zeroForOne ? token1 : token0).balanceOf(receiver);
+            if (balanceBeforeSwap == balanceAfterSwap) {
+                revert("no tokens exchanged");
+            }
         } catch {
             revert("Error swapping tokens");
         }

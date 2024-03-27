@@ -34,14 +34,16 @@ library DeployHelper {
         uint256 balanceToken1 = ERC20(pool.token1()).balanceOf(address(this));
         
         (uint160 sqrtRatioX96,,,,,,) = pool.slot0();
-        (int24 lowerTick, int24 upperTick) = Conversions.computeSingleTick(_floorPrice, tickSpacing);
-
+        // (int24 lowerTick, int24 upperTick) = Conversions.computeSingleTick(_floorPrice, tickSpacing);
+        int24 lowerTick = TickMath.getTickAtSqrtRatio(Conversions.priceToSqrtPriceX96(1e18, tickSpacing));
+        int24 upperTick =  TickMath.getTickAtSqrtRatio(Conversions.priceToSqrtPriceX96(1.0202003198939318e18, tickSpacing));
+        
         uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
             sqrtRatioX96,
             TickMath.getSqrtRatioAtTick(lowerTick),
             TickMath.getSqrtRatioAtTick(upperTick),
             0,
-            (balanceToken1 * 95) / 100 // % of WETH
+            (balanceToken1 * 66) / 100 // % of WETH
         );
 
         if (liquidity > 0) {

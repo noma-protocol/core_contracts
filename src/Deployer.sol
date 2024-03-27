@@ -14,7 +14,8 @@ import {LiquidityDeployer} from "./libraries/LiquidityDeployer.sol";
 import {DeployHelper} from "./libraries/DeployHelper.sol";
 
 import {
-    feeTier, 
+    feeTier,
+    AmountsToMint, 
     tickSpacing, 
     LiquidityPosition, 
     LiquidityType, 
@@ -58,7 +59,11 @@ contract Deployer is Owned {
     /**
      * @notice Uniswap V3 callback function, called back on pool.mint
      */
-    function uniswapV3MintCallback(uint256 amount0Owed, uint256 amount1Owed, bytes calldata data)
+    function uniswapV3MintCallback(
+        uint256 amount0Owed, 
+        uint256 amount1Owed, 
+        bytes calldata data
+    )
         external
     {
         require(msg.sender == address(pool), "cc");
@@ -81,14 +86,14 @@ contract Deployer is Owned {
             // }
         
         } else {
-            revert(
-                string(
-                    abi.encodePacked(
-                        "insufficient token0 balance, owed: ", 
-                        Utils._uint2str(amount0Owed)
-                        )
-                    )
-                );
+            // revert(
+            //     string(
+            //         abi.encodePacked(
+            //             "insufficient token0 balance, owed: ", 
+            //             Utils._uint2str(amount0Owed)
+            //             )
+            //         )
+            //     );
         }
 
         if (token1Balance >= amount1Owed) {
@@ -104,13 +109,13 @@ contract Deployer is Owned {
             // }      
 
         } else {
-            revert(
-                string(
-                    abi.encodePacked("insufficient token1 balance, owed: ", 
-                    Utils._uint2str(amount1Owed)
-                    )
-                )
-            );
+            // revert(
+            //     string(
+            //         abi.encodePacked("insufficient token1 balance, owed: ", 
+            //         Utils._uint2str(amount1Owed)
+            //         )
+            //     )
+            // );
         }
     }
 
@@ -150,9 +155,29 @@ contract Deployer is Owned {
         emit AnchorDeployed(newPosition);
     }
 
-    function deployDiscovery(uint256 upperDiscoveryPrice) public initialized /*onlyOwner*/{
+    function doDeployPosition(
+        address pool,
+        address receiver,
+        int24 lowerTick,
+        int24 upperTick,
+        LiquidityType liquidityType,
+        AmountsToMint memory amounts
+    ) public returns (LiquidityPosition memory newPosition) {
+        return LiquidityDeployer
+        .doDeployPosition(
+            address(pool),
+            receiver,
+            lowerTick,
+            upperTick,
+            liquidityType,
+            amounts
+        );
+    }
 
-        (LiquidityPosition memory newPosition,) = LiquidityDeployer
+    function deployDiscovery(uint256 upperDiscoveryPrice) public initialized /*onlyOwner*/ 
+    returns (LiquidityPosition memory newPosition, LiquidityType liquidityType) {
+
+        (newPosition,) = LiquidityDeployer
         .deployDiscovery(
             address(pool), 
             vault,
@@ -161,10 +186,21 @@ contract Deployer is Owned {
             tickSpacing
         );
 
+        liquidityType = LiquidityType.Discovery;
         discoveryPosition = newPosition;
         emit DiscoveryDeployed(newPosition);
     }
  
+    function shiftFloor(
+        address pool,
+        address receiver,
+        uint256 newPrice,
+        LiquidityPosition memory floorPosition
+    ) public  returns (LiquidityPosition memory newPosition) {
+
+        return LiquidityDeployer.shiftFloor(pool, receiver, newPrice, floorPosition);
+    }
+
     function finalize() public initialized /*onlyOwner*/ {
         require(
             floorPosition.upperTick != 0 &&
@@ -173,17 +209,17 @@ contract Deployer is Owned {
             "not deployed"
         );
 
-        ERC20(token0).transfer(vault, ERC20(token0).balanceOf(address(this)));
-        ERC20(token1).transfer(vault, ERC20(token1).balanceOf(address(this)));
+        // ERC20(token0).transfer(vault, ERC20(token0).balanceOf(address(this)));
+        // ERC20(token1).transfer(vault, ERC20(token1).balanceOf(address(this)));
 
         IVault(vault).initialize(floorPosition, anchorPosition, discoveryPosition);
     }
 
     modifier initialized() {
         require(
-                address(vault) != address(0) && 
-                address(pool) != address(0), 
-                "not initialized"
+            address(vault) != address(0) && 
+            address(pool) != address(0), 
+            "not initialized"
         );
         _;
     }

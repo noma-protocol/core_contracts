@@ -6,13 +6,11 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {Owned} from "solmate/auth/Owned.sol";
 
-import {Utils} from "./libraries/Utils.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
 import {LiquidityOps} from "./libraries/LiquidityOps.sol";
 import {Underlying} from "./libraries/Underlying.sol";
-
-import {Conversions} from "./libraries/Conversions.sol";
-import {ModelHelper} from "./libraries/ModelHelper.sol";
+// import {ModelHelper} from "./libraries/ModelHelper.sol";
+import {IModelHelper} from "./interfaces/IModelHelper.sol";
 
 import {
     tickSpacing, 
@@ -21,15 +19,18 @@ import {
     VaultInfo
 } from "./Types.sol";
 
+error AlreadyInitialized();
+error InvalidCaller();
+
 contract Vault is Owned {
 
     LiquidityPosition private floorPosition;
     LiquidityPosition private anchorPosition;
     LiquidityPosition private discoveryPosition;
 
-    VaultInfo public vaultInfo;
+    VaultInfo private vaultInfo;
     address private deployerContract;
-
+    address private modelHelper;
     IUniswapV3Pool public pool;
 
     bool private initialized; 
@@ -37,8 +38,9 @@ contract Vault is Owned {
 
     event FloorUpdated(uint256 floorPrice, uint256 floorCapacity);
 
-    constructor(address _pool) Owned(msg.sender) {
+    constructor(address _pool, address _modelHelper) Owned(msg.sender) {
         pool = IUniswapV3Pool(_pool);
+        modelHelper = _modelHelper;
         VaultInfo storage _vaultInfo = vaultInfo;
         _vaultInfo.token0 = pool.token0();
         _vaultInfo.token1 = pool.token1();
@@ -51,18 +53,34 @@ contract Vault is Owned {
         LiquidityPosition memory _anchorPosition,
         LiquidityPosition memory _discoveryPosition
     ) public {
-        require(!initialized, "already initialized");
-        require(msg.sender == deployerContract, "invalid caller");
+        if (initialized) revert AlreadyInitialized();
+        if (msg.sender != deployerContract) revert InvalidCaller();
 
         floorPosition = _floorPosition;
         anchorPosition = _anchorPosition;
         discoveryPosition = _discoveryPosition;
 
+        LiquidityPosition[] memory positions = new LiquidityPosition[](3);
+
+        positions[0] = _floorPosition;
+        positions[1] = _anchorPosition;
+        positions[2] = _discoveryPosition;
+
+        require(positions[0].liquidity > 0 && 
+                positions[1].liquidity > 0 && 
+                positions[2].liquidity > 0, "invalid position");
+
+        IModelHelper(modelHelper).initialize(
+            deployerContract,
+            positions
+        );
+
         initialized = true;
+
     }
 
     function setDeployer(address _deployerContract) public /*onlyOwner*/ {
-        require(!initialized, "already initialized");
+        if (initialized) revert AlreadyInitialized();
 
         deployerContract = _deployerContract;
     }
@@ -92,32 +110,40 @@ contract Vault is Owned {
     }
 
     function shift() public {
-        // require(initialized, "not initialized");
+        require(initialized, "not initialized");
         
         LiquidityPosition[] memory positions = new LiquidityPosition[](3);
+
         positions[0] = floorPosition;
         positions[1] = anchorPosition;
         positions[2] = discoveryPosition;
 
         (
             uint256 currentLiquidityRatio, 
-            LiquidityPosition memory newPosition,
-            uint256 newFloorPrice
+            LiquidityPosition[3] memory newPositions
+            // uint256 newFloorPrice
         ) = LiquidityOps
         .shift(
             address(pool),
+            address(this),
+            deployerContract,
+            modelHelper,
             positions
         );
 
         lastLiquidityRatio = currentLiquidityRatio;
-        anchorPosition = newPosition;
+        
+        floorPosition = newPositions[0];
+        anchorPosition = newPositions[1];
+        discoveryPosition = newPositions[2];
 
         // Emit event
         emit FloorUpdated(
-            newFloorPrice, 
-            ModelHelper
+            0, 
+            IModelHelper(modelHelper)
             .getPositionCapacity(
                 address(pool), 
+                address(this),
                 floorPosition
             )
         );
@@ -125,44 +151,58 @@ contract Vault is Owned {
 
     function getUnderlyingBalances(
         LiquidityType liquidityType
-    ) public 
-    view 
+    ) external view 
     returns (int24, int24, uint256, uint256) {
+        // LiquidityPosition[] memory positions = new LiquidityPosition[](3);
 
-        LiquidityPosition memory position;
+        // positions[0] = floorPosition;
+        // positions[1] = anchorPosition;
+        // positions[2] = discoveryPosition;
 
-        if (liquidityType == LiquidityType.Floor) {
-            position = floorPosition;
-        } else if (liquidityType == LiquidityType.Anchor) {
-            position = anchorPosition;
-        } else if (liquidityType == LiquidityType.Discovery) {
-            position = discoveryPosition;
-        }
-
-        return Underlying.getUnderlyingBalances(address(pool), position);
+        return IModelHelper(modelHelper).getUnderlyingBalances(address(pool), address(this), liquidityType); 
     }
+
 
     function getVaultInfo() public view 
     returns (
-        uint256, 
-        uint256, 
-        uint256, 
-        uint256, 
-        uint256, 
-        address, 
-        address
+        uint256 liquidityRatio, 
+        uint256 circulatingSupply, 
+        uint256 spotPriceX96, 
+        uint256 anchorCapacity, 
+        uint256 floorCapacity, 
+        address token0, 
+        address token1,
+        uint256 newFloor
     ) {
-        (uint160 sqrtPriceX96,,,,,,) = pool.slot0();
+        LiquidityPosition[] memory positions = new LiquidityPosition[](3);
+
+        positions[0] = floorPosition;
+        positions[1] = anchorPosition;
+        positions[2] = discoveryPosition;
+
+        (
+            liquidityRatio, 
+            circulatingSupply, 
+            spotPriceX96, 
+            anchorCapacity, 
+            floorCapacity, 
+            token0, 
+            token1
+        ) =
+        IModelHelper(modelHelper).getVaultInfo(address(pool), address(this), vaultInfo);
+
+        newFloor = 0; //IModelHelper(modelHelper).estimateNewFloorPrice(address(pool), positions);
 
         return (
-            ModelHelper.getLiquidityRatio(address(pool), anchorPosition),
-            ModelHelper.getCirculatingSupply(address(pool), anchorPosition, discoveryPosition),
-            Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18),
-            ModelHelper.getPositionCapacity(address(pool), anchorPosition),
-            ModelHelper.getPositionCapacity(address(pool), floorPosition),
-            vaultInfo.token0,
-            vaultInfo.token1            
+            liquidityRatio, 
+            circulatingSupply, 
+            spotPriceX96, 
+            anchorCapacity, 
+            floorCapacity, 
+            token0, 
+            token1, 
+            newFloor
         );
     }
-    
+
 }

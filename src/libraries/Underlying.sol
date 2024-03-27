@@ -54,6 +54,7 @@ library Underlying {
 
     function getUnderlyingBalances(
         address pool,
+        address vault,
         LiquidityPosition memory position
     )
         internal
@@ -78,7 +79,7 @@ library Underlying {
         ) = IUniswapV3Pool(pool).positions(
             keccak256(
             abi.encodePacked(
-                address(this), 
+                vault, 
                 position.lowerTick, 
                 position.upperTick
                 )
@@ -120,9 +121,6 @@ library Underlying {
             // ) + uint256(tokensOwed1);
 
             // fee1 = fee1 - (fee1 * (250 + 3000)) / 10000;
-        }
-        // else {
-        //     revert("0 liquidity");
-        // }
+        }  
     }    
 }
