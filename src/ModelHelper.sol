@@ -36,18 +36,18 @@ contract ModelHelper {
         initialized = false;
     }
 
-    function initialize(
+    function updatePositions(
         address _deployerContract,
-        LiquidityPosition[] memory _positions
+        LiquidityPosition[3] memory _positions
     ) public {
-        if (initialized) revert AlreadyInitialized();
+        // if (initialized) revert AlreadyInitialized();
         // if (msg.sender != _deployerContract) revert InvalidCaller();
 
         floorPosition = _positions[0];
         anchorPosition = _positions[1];
         discoveryPosition = _positions[2];
 
-        initialized = true;
+        // initialized = true;
     }
 
     function getLiquidityRatio(

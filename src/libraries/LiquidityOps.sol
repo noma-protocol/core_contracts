@@ -45,7 +45,7 @@ library LiquidityOps {
         LiquidityPosition[3] memory newPositions
         // uint256 newFloorPrice
     ) {
-
+        require(positions.length == 3, "invalid positions");
         // Ratio of the anchor's price to market price
         currentLiquidityRatio = IModelHelper(modelHelper).getLiquidityRatio(pool);
         (,,, uint256 anchorToken1Balance) = IModelHelper(modelHelper).getUnderlyingBalances(pool, address(this), LiquidityType.Anchor);
@@ -110,7 +110,13 @@ library LiquidityOps {
                         .shiftFloor(
                             pool, 
                             address(this), 
-                            Conversions.sqrtPriceX96ToPrice(Conversions.tickToSqrtPriceX96(positions[0].upperTick), 18), 
+                            Conversions
+                            .sqrtPriceX96ToPrice(
+                                Conversions
+                                .tickToSqrtPriceX96(
+                                    positions[0].upperTick
+                                ), 
+                            18), 
                             positions[0]
                         );
 
@@ -128,6 +134,12 @@ library LiquidityOps {
 
                         newPositions[1] = anchor;
                         newPositions[2] = discovery;
+
+                        IModelHelper(modelHelper)
+                        .updatePositions(
+                            deployer,
+                            newPositions
+                        );
                     }
                 // }
             } 

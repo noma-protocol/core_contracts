@@ -39,6 +39,7 @@ contract Deployer is Owned {
     address vault;
     address public token0;
     address public token1;
+    address private modelHelper;
 
     IUniswapV3Pool public pool;
 
@@ -48,7 +49,8 @@ contract Deployer is Owned {
 
     constructor(
         address _vault, 
-        address _pool
+        address _pool,
+        address _modelHelper
     ) Owned(msg.sender) {
         pool = IUniswapV3Pool(_pool);
         vault = _vault;
@@ -192,13 +194,13 @@ contract Deployer is Owned {
     }
  
     function shiftFloor(
-        address pool,
+        address _pool,
         address receiver,
         uint256 newPrice,
-        LiquidityPosition memory floorPosition
+        LiquidityPosition memory _floorPosition
     ) public  returns (LiquidityPosition memory newPosition) {
 
-        return LiquidityDeployer.shiftFloor(pool, receiver, newPrice, floorPosition);
+        return LiquidityDeployer.shiftFloor(_pool, receiver, newPrice, _floorPosition);
     }
 
     function finalize() public initialized /*onlyOwner*/ {

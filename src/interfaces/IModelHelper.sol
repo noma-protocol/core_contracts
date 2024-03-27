@@ -14,8 +14,8 @@ interface IModelHelper{
     function getUnderlyingBalances(address pool, address vault, LiquidityType liquidityType) external view returns (int24, int24, uint256, uint256);
     function estimateNewFloorPrice(address pool) external view returns (uint256 newFloor);
     function getVaultInfo(address pool, address vault, VaultInfo memory vaultInfo) external view returns (uint256, uint256, uint256, uint256, uint256, address, address);
-    function initialize(
+    function updatePositions(
         address _deployerContract,
-        LiquidityPosition[] memory _positions
+        LiquidityPosition[3] memory _positions
     ) external;
 }

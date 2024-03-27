@@ -60,7 +60,7 @@ contract Vault is Owned {
         anchorPosition = _anchorPosition;
         discoveryPosition = _discoveryPosition;
 
-        LiquidityPosition[] memory positions = new LiquidityPosition[](3);
+        LiquidityPosition[3] memory positions;
 
         positions[0] = _floorPosition;
         positions[1] = _anchorPosition;
@@ -70,7 +70,8 @@ contract Vault is Owned {
                 positions[1].liquidity > 0 && 
                 positions[2].liquidity > 0, "invalid position");
 
-        IModelHelper(modelHelper).initialize(
+        IModelHelper(modelHelper)
+        .updatePositions(
             deployerContract,
             positions
         );
