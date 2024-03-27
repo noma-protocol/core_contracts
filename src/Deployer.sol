@@ -73,51 +73,18 @@ contract Deployer is Owned {
         uint256 token0Balance = ERC20(token0).balanceOf(address(this));
         uint256 token1Balance = ERC20(token1).balanceOf(address(this));
 
-        // (uint256 code, string memory message) = abi.decode(data, (uint256, string));
-
         if (token0Balance >= amount0Owed) {
-
             if (amount0Owed > 0) ERC20(token0).transfer(msg.sender, amount0Owed);
-            
-            // if (code == 0 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
-            //     floorPosition.amount0LowerBound = amount0Owed;
-            // } else if (code == 1 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
-            //     anchorPosition.amount0LowerBound = amount0Owed;
-            // } else if (code == 2 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
-            //     discoveryPosition.amount0LowerBound = amount0Owed;
-            // }
-        
         } else {
-            // revert(
-            //     string(
-            //         abi.encodePacked(
-            //             "insufficient token0 balance, owed: ", 
-            //             Utils._uint2str(amount0Owed)
-            //             )
-            //         )
-            //     );
+            ERC20(token0).transferFrom(vault, address(this), amount0Owed);
+            ERC20(token0).transfer(msg.sender, amount0Owed);
         }
 
         if (token1Balance >= amount1Owed) {
-
             if (amount1Owed > 0) ERC20(token1).transfer(msg.sender, amount1Owed);
-
-            // if (code == 0 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
-            //     floorPosition.amount1UpperBound = amount1Owed;
-            // } else if (code == 1 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
-            //     anchorPosition.amount1UpperBound = amount1Owed;
-            // } else if (code == 2 && keccak256(abi.encodePacked(message)) == keccak256(abi.encodePacked("mint"))) {
-            //     discoveryPosition.amount1UpperBound = amount1Owed;
-            // }      
-
         } else {
-            // revert(
-            //     string(
-            //         abi.encodePacked("insufficient token1 balance, owed: ", 
-            //         Utils._uint2str(amount1Owed)
-            //         )
-            //     )
-            // );
+            ERC20(token1).transferFrom(vault, address(this), amount1Owed);
+            ERC20(token1).transfer(msg.sender, amount1Owed);
         }
     }
 
@@ -210,9 +177,6 @@ contract Deployer is Owned {
             discoveryPosition.upperTick != 0, 
             "not deployed"
         );
-
-        // ERC20(token0).transfer(vault, ERC20(token0).balanceOf(address(this)));
-        // ERC20(token1).transfer(vault, ERC20(token1).balanceOf(address(this)));
 
         IVault(vault).initialize(floorPosition, anchorPosition, discoveryPosition);
     }

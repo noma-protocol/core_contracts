@@ -154,13 +154,13 @@ contract Vault is Owned {
         LiquidityType liquidityType
     ) external view 
     returns (int24, int24, uint256, uint256) {
-        // LiquidityPosition[] memory positions = new LiquidityPosition[](3);
 
-        // positions[0] = floorPosition;
-        // positions[1] = anchorPosition;
-        // positions[2] = discoveryPosition;
-
-        return IModelHelper(modelHelper).getUnderlyingBalances(address(pool), address(this), liquidityType); 
+        return IModelHelper(modelHelper)
+        .getUnderlyingBalances(
+            address(pool), 
+            address(this), 
+            liquidityType
+        ); 
     }
 
 

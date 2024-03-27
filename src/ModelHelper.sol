@@ -81,9 +81,9 @@ contract ModelHelper {
         ) = IUniswapV3Pool(pool).positions(
             keccak256(
             abi.encodePacked(
-                vault, 
-                position.lowerTick, 
-                position.upperTick
+                    vault, 
+                    position.lowerTick, 
+                    position.upperTick
                 )
             )            
         );
@@ -151,18 +151,20 @@ contract ModelHelper {
         address pool,
         address vault
     ) public view returns (uint256) {
-        uint256 totalSupply = ERC20(address(IUniswapV3Pool(pool).token0())).totalSupply();
-        uint256 protocolUnusedBalanceToken0 = ERC20(address(IUniswapV3Pool(pool).token0())).balanceOf(address(this));
 
-        (   
-            ,, uint256 amount0CurrentAnchor, 
+        uint256 totalSupply = ERC20(address(IUniswapV3Pool(pool).token0())).totalSupply();
+
+        (  
+            ,,uint256 amount0CurrentAnchor, 
         ) = Underlying.getUnderlyingBalances(pool, vault, anchorPosition);
         
         (
-            ,, uint256 amount0CurrentDiscovery,             
+            ,,uint256 amount0CurrentDiscovery,             
         ) = Underlying.getUnderlyingBalances(pool, vault, discoveryPosition);
+
+        uint256 protocolUnusedBalanceToken0 = ERC20(address(IUniswapV3Pool(pool).token0())).balanceOf(vault);
     
-        return totalSupply - (amount0CurrentAnchor + amount0CurrentDiscovery) - protocolUnusedBalanceToken0;
+        return totalSupply - (amount0CurrentAnchor + amount0CurrentDiscovery + protocolUnusedBalanceToken0);
     } 
 
     function estimateNewFloorPrice(

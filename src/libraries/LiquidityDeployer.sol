@@ -35,18 +35,6 @@ library LiquidityDeployer {
 
         (uint160 sqrtRatioX96,,,,,, ) = IUniswapV3Pool(pool).slot0();
 
-        // uint256 lowerAnchorPrice =
-        // !redeploy ? Utils.addBips(
-        //     Conversions.sqrtPriceX96ToPrice(
-        //         sqrtRatioX96,
-        //         18
-        //     ),
-        //     (int256(deployParams.bipsBelowSpot) * -1)
-        // ) : deployParams.lowerTick != 0 ? Conversions.sqrtPriceX96ToPrice(Conversions.tickToSqrtPriceX96(deployParams.lowerTick), 18) :
-        // Utils.addBips(
-        //     Conversions.sqrtPriceX96ToPrice(Conversions.tickToSqrtPriceX96(floorPosition.upperTick), 18),
-        //     (int256(deployParams.bipsBelowSpot) * -1)
-        // );
         uint256 lowerAnchorPrice = Conversions.sqrtPriceX96ToPrice(
             Conversions.tickToSqrtPriceX96(floorPosition.upperTick),
             18
@@ -202,8 +190,6 @@ library LiquidityDeployer {
         return newPosition;
     }
 
-
-        
     function doDeployPosition(
         address pool,
         address receiver,
@@ -223,24 +209,6 @@ library LiquidityDeployer {
             amounts.amount1
         );
 
-        // if (amounts.amount0 > 0) {
-        //     ERC20(IUniswapV3Pool(pool).token0())
-        //     .transferFrom(
-        //         receiver,
-        //         address(this),
-        //         amounts.amount0
-        //     );
-        // }
-
-        // if (amounts.amount1 > 0) {
-        //     ERC20(IUniswapV3Pool(pool).token1())
-        //     .transferFrom(
-        //         receiver,
-        //         address(this),
-        //         amounts.amount1
-        //     );
-        // }
-
         if (liquidity > 0) {
             Uniswap.mint(
                 pool, 
@@ -251,18 +219,19 @@ library LiquidityDeployer {
                 liquidityType, 
                 false
             );
-        } else {
-            revert(
-                string(
-                    abi.encodePacked(
-                            "doDeployPosition: liquidity is 0 : ", 
-                            Utils._uint2str(uint256(amounts.amount0))
-                            // " : ",
-                            // Utils._uint2str(uint256(amounts.amount1))
-                        )
-                    )
-                );
-        }
+        } 
+        // else {
+        //     revert(
+        //         string(
+        //             abi.encodePacked(
+        //                     "doDeployPosition: liquidity is 0 : ", 
+        //                     Utils._uint2str(uint256(amounts.amount0))
+        //                     // " : ",
+        //                     // Utils._uint2str(uint256(amounts.amount1))
+        //                 )
+        //             )
+        //         );
+        // }
 
         newPosition = LiquidityPosition({
             lowerTick: lowerTick, 
