@@ -37,7 +37,6 @@ contract ModelHelper {
     }
 
     function updatePositions(
-        address _deployerContract,
         LiquidityPosition[3] memory _positions
     ) public {
         // if (initialized) revert AlreadyInitialized();
@@ -67,7 +66,7 @@ contract ModelHelper {
         uint256 avgAnchorPrice = (anchorLowerPrice + anchorUpperPrice) / 2;
             
         uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, 18);
-        liquidityRatio = DecimalMath.divideDecimal(avgAnchorPrice, spotPrice);
+        liquidityRatio = DecimalMath.divideDecimal(anchorUpperPrice, spotPrice);
     }
 
     function getPositionCapacity(

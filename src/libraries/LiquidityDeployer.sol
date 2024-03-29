@@ -15,7 +15,12 @@ import {Underlying} from "./Underlying.sol";
 import {ModelHelper} from "../ModelHelper.sol";
 import {LiquidityOps} from "./LiquidityOps.sol";
 
-import {LiquidityPosition, LiquidityType, DeployLiquidityParameters, AmountsToMint} from "../Types.sol";
+import {
+    LiquidityPosition, 
+    LiquidityType, 
+    DeployLiquidityParameters, 
+    AmountsToMint
+} from "../Types.sol";
 
 library LiquidityDeployer {
     function deployAnchor(
@@ -53,7 +58,7 @@ library LiquidityDeployer {
         require(floorPosition.upperTick <= lowerAnchorTick, "some msg 1");
 
         (int24 lowerTick, int24 upperTick) = Conversions.computeRangeTicks(
-            lowerAnchorPrice,
+            lowerAnchorPrice + lowerAnchorPrice * 1 / 100,
             upperAnchorPrice,
             deployParams.tickSpacing
         );
@@ -180,6 +185,7 @@ library LiquidityDeployer {
                 newPosition.liquidity = newLiquidity;
                 newPosition.upperTick = upperTick;
                 newPosition.lowerTick = lowerTick;
+
             } else {
                 revert("shiftFloor: liquidity is 0");
             }
@@ -221,18 +227,16 @@ library LiquidityDeployer {
                 false
             );
         } 
-        // else {
-        //     revert(
-        //         string(
-        //             abi.encodePacked(
-        //                     "doDeployPosition: liquidity is 0 : ", 
-        //                     Utils._uint2str(uint256(amounts.amount0))
-        //                     // " : ",
-        //                     // Utils._uint2str(uint256(amounts.amount1))
-        //                 )
-        //             )
-        //         );
-        // }
+        else {
+            revert(
+                string(
+                    abi.encodePacked(
+                        "doDeployPosition: liquidity is 0 : ", 
+                        Utils._uint2str(uint256(sqrtRatioX96))
+                    )
+                )
+            );
+        }
 
         newPosition = LiquidityPosition({
             lowerTick: lowerTick, 

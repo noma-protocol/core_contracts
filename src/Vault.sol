@@ -72,7 +72,6 @@ contract Vault is Owned {
 
         IModelHelper(modelHelper)
         .updatePositions(
-            deployerContract,
             positions
         );
 
@@ -113,7 +112,7 @@ contract Vault is Owned {
     function shift() public {
         require(initialized, "not initialized");
         
-        LiquidityPosition[] memory positions = new LiquidityPosition[](3);
+        LiquidityPosition[3] memory positions;
 
         positions[0] = floorPosition;
         positions[1] = anchorPosition;

@@ -18,7 +18,7 @@ import {
     LiquidityType
 } from "../Types.sol";
 
-library  Floor {
+library Floor {
 
     function shiftFloor(
         address pool,

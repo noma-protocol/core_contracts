@@ -35,7 +35,7 @@ library LiquidityOps {
         address vault,
         address deployer,
         address modelHelper,
-        LiquidityPosition[] memory positions
+        LiquidityPosition[3] memory positions
     ) internal returns (
         uint256 currentLiquidityRatio, 
         LiquidityPosition[3] memory newPositions
@@ -45,9 +45,9 @@ library LiquidityOps {
 
         // Ratio of the anchor's price to market price
         currentLiquidityRatio = IModelHelper(modelHelper).getLiquidityRatio(pool);
+        
         (,,, uint256 anchorToken1Balance) = IModelHelper(modelHelper).getUnderlyingBalances(pool, address(this), LiquidityType.Anchor);
         (,,, uint256 discoveryToken1Balance) = IModelHelper(modelHelper).getUnderlyingBalances(pool, address(this), LiquidityType.Discovery);
-        (,,, uint256 floorToken1Balance) = IModelHelper(modelHelper).getUnderlyingBalances(pool, address(this), LiquidityType.Floor);
 
         // Uniswap.collect(pool, address(this), positions[1].lowerTick, positions[1].upperTick);
 
@@ -55,11 +55,11 @@ library LiquidityOps {
             
             // Shift --> ETH after skim at floor = 
             // ETH before skim at anchor - (liquidity ratio * ETH before skim at anchor)
-            uint256 toSkim = anchorToken1Balance - (
+            uint256 toSkim = (anchorToken1Balance + discoveryToken1Balance) - (
                 DecimalMath
                 .multiplyDecimal(
                     currentLiquidityRatio, 
-                    anchorToken1Balance
+                    (anchorToken1Balance + discoveryToken1Balance)
                 )
             );
 
@@ -97,45 +97,21 @@ library LiquidityOps {
                         positions[1].upperTick
                     );
 
-                    ERC20(IUniswapV3Pool(pool).token1()).transfer(
-                        deployer, 
-                        floorToken1Balance + toSkim
-                    );
-                    
-                    newPositions[0] = IDeployer(deployer) 
-                    .shiftFloor(
-                        pool, 
-                        address(this), 
-                        Conversions
-                        .sqrtPriceX96ToPrice(
-                            Conversions
-                            .tickToSqrtPriceX96(
-                                positions[0].upperTick
-                            ), 
-                        18), 
-                        positions[0]
-                    );
-
-                    positions[0] = newPositions[0];
-
                     (
-                        LiquidityPosition memory anchor, 
-                        LiquidityPosition memory discovery
+                       newPositions
                     ) =
                     shiftPositions(
                         pool, 
                         deployer,
-                        anchorToken1Balance,
+                        toSkim,
+                        modelHelper,
+                        anchorToken1Balance - toSkim,
                         discoveryToken1Balance,
                         positions
                     );
 
-                    newPositions[1] = anchor;
-                    newPositions[2] = discovery;
-
                     IModelHelper(modelHelper)
                     .updatePositions(
-                        deployer,
                         newPositions
                     );
                 }
@@ -149,15 +125,17 @@ library LiquidityOps {
     function shiftPositions(
         address pool,
         address deployer,
+        uint256 toSkim,
+        address modelHelper,
         uint256 anchorToken1Balance,
         uint256 discoveryToken1Balance,
-        LiquidityPosition[] memory positions
+        LiquidityPosition[3] memory positions
     ) internal returns (
-        LiquidityPosition memory anchor, 
-        LiquidityPosition memory discovery
+        LiquidityPosition[3] memory newPositions
     ) {
 
         (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
+
         uint256 priceLower = Utils
         .addBips(
             Conversions
@@ -165,7 +143,33 @@ library LiquidityOps {
             250
         );
 
-        // uint256 balanceToken1BeforeCollect = ERC20(IUniswapV3Pool(pool).token1()).balanceOf(address(this));
+        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, 18);
+
+        (,,, uint256 floorToken1Balance) = IModelHelper(modelHelper)
+        .getUnderlyingBalances(
+            pool, 
+            address(this), 
+            LiquidityType.Floor
+        );
+
+        ERC20(IUniswapV3Pool(pool).token1()).transfer(
+            deployer, 
+            floorToken1Balance + toSkim
+        );
+        
+        newPositions[0] = IDeployer(deployer) 
+        .shiftFloor(
+            pool, 
+            address(this), 
+            Conversions
+            .sqrtPriceX96ToPrice(
+                Conversions
+                .tickToSqrtPriceX96(
+                    positions[0].upperTick
+                ), 
+            18), 
+            positions[0]
+        );
 
         // Collect discovery liquidity
         Uniswap.collect(
@@ -175,39 +179,40 @@ library LiquidityOps {
             positions[2].upperTick
         );
 
-        // uint256 balanceToken1AfterCollect = ERC20(IUniswapV3Pool(pool).token1()).balanceOf(address(this));
-        // uint256 balanceToken0AfterCollect = ERC20(IUniswapV3Pool(pool).token0()).balanceOf(address(this));
-
-            // revert(
-            //     string(
-            //         abi.encodePacked("balanceToken1AfterCollect: ", 
-            //         Utils._uint2str(anchorToken1Balance + discoveryToken1Balance)
-            //         )
-            //     )
-            // );
         // Deploy new anchor position
-        anchor = reDeploy(
+        newPositions[1] = reDeploy(
             pool,
             deployer,
-            positions[0].upperTick, 
-            Conversions.priceToTick(int256(priceLower), 60), 
+            Conversions.priceToTick(int256(
+            Utils.addBips(
+                Conversions.sqrtPriceX96ToPrice(
+                    Conversions.tickToSqrtPriceX96(
+                        positions[0].upperTick
+                    ),
+                18), 
+                50)), 
+            60),
+            Conversions.priceToTick(
+                int256(
+                    spotPrice
+                ), 
+            60),             
             anchorToken1Balance + discoveryToken1Balance, 
             LiquidityType.Anchor
         );
 
-        return (
-            anchor,
-            discovery
-        );
-
-        // discovery = reDeploy(
-        //     pool,
-        //     deployer, 
-        //     anchor.upperTick, 
-        //     Conversions.priceToTick(int256(priceLower * 3), 60), 
-        //     0,
-        //     LiquidityType.Discovery 
-        // );        
+        newPositions[2] = reDeploy(
+            pool,
+            deployer, 
+            newPositions[1].upperTick,
+            Conversions.priceToTick(
+                int256(
+                    priceLower * 3
+                ), 
+            60), 
+            0,
+            LiquidityType.Discovery 
+        );        
     }
 
     function reDeploy(
@@ -225,18 +230,10 @@ library LiquidityOps {
 
         uint256 amount0ToDeploy = liquidityType == LiquidityType.Discovery ? 
         balanceToken0 - (balanceToken0 * 25 / 100) :
-        0;
-
-        // if (amountToSkimFromDiscovery  == 0) {
-        //     amount1ToDeploy = liquidityType == LiquidityType.Discovery ? 
-        //     0 :
-        //     balanceToken1;
-        // } else {
-        //     amount1ToDeploy = amountToSkimFromDiscovery;
-        // }
+        balanceToken0;
 
         ERC20(IUniswapV3Pool(pool).token0()).approve(deployer, amount0ToDeploy);
-        ERC20(IUniswapV3Pool(pool).token1()).approve(deployer, amount1ToDeploy);
+        ERC20(IUniswapV3Pool(pool).token1()).approve(deployer, amount1ToDeploy > 0 ? amount1ToDeploy : 1);
 
         newPosition = IDeployer(deployer)
         .doDeployPosition(
@@ -247,7 +244,7 @@ library LiquidityOps {
             liquidityType, 
             AmountsToMint({
                 amount0: amount0ToDeploy,
-                amount1: amount1ToDeploy
+                amount1: liquidityType == LiquidityType.Anchor ? amount1ToDeploy : 1
             })
         );     
     }
