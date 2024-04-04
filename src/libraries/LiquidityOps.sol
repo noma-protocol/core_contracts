@@ -51,7 +51,7 @@ library LiquidityOps {
 
         // Uniswap.collect(pool, address(this), positions[1].lowerTick, positions[1].upperTick);
 
-        if (currentLiquidityRatio < 99e16) {
+        if (currentLiquidityRatio <= 90e16) {
             
             // Shift --> ETH after skim at floor = 
             // ETH before skim at anchor - (liquidity ratio * ETH before skim at anchor)
@@ -63,7 +63,7 @@ library LiquidityOps {
                 )
             );
 
-            if (toSkim > 0) {
+            if (toSkim >= (anchorToken1Balance * 2 / 1000)) {
 
                 uint256 circulatingSupply = IModelHelper(modelHelper)
                 .getCirculatingSupply(
@@ -81,14 +81,6 @@ library LiquidityOps {
                     //     circulatingSupply - IModelHelper(modelHelper).getPositionCapacity(pool, vault, newPositions[0])
                     // );
                 
-                    // Collect floor liquidity
-                    Uniswap.collect(
-                        pool, 
-                        address(this), 
-                        positions[0].lowerTick, 
-                        positions[0].upperTick
-                    );
-
                     // Collect anchor liquidity
                     Uniswap.collect(
                         pool, 
@@ -97,9 +89,7 @@ library LiquidityOps {
                         positions[1].upperTick
                     );
 
-                    (
-                       newPositions
-                    ) =
+                    (newPositions) =
                     shiftPositions(
                         pool, 
                         deployer,
@@ -115,8 +105,16 @@ library LiquidityOps {
                         newPositions
                     );
                 }
-            } 
-
+            } else {
+            revert(
+                string(
+                    abi.encodePacked(
+                        "Nothing to skim : ", 
+                        Utils._uint2str(uint256(anchorToken1Balance * 5 / 1000))
+                    )
+                )
+            );
+            }
         } else {
             revert AboveThreshold();
         }
@@ -151,68 +149,95 @@ library LiquidityOps {
             address(this), 
             LiquidityType.Floor
         );
+       
+        if (positions[0].liquidity > 0) {
+            // Collect floor liquidity
+            Uniswap.collect(
+                pool, 
+                address(this), 
+                positions[0].lowerTick, 
+                positions[0].upperTick
+            );
 
-        ERC20(IUniswapV3Pool(pool).token1()).transfer(
-            deployer, 
-            floorToken1Balance + toSkim
-        );
-        
-        newPositions[0] = IDeployer(deployer) 
-        .shiftFloor(
-            pool, 
-            address(this), 
-            Conversions
-            .sqrtPriceX96ToPrice(
+            // TODO: use transferFrom
+            ERC20(IUniswapV3Pool(pool).token1()).transfer(
+                deployer, 
+                floorToken1Balance + toSkim
+            );
+
+            newPositions[0] = IDeployer(deployer) 
+            .shiftFloor(
+                pool, 
+                address(this), 
                 Conversions
-                .tickToSqrtPriceX96(
-                    positions[0].upperTick
-                ), 
-            18), 
-            positions[0]
-        );
-
-        // Collect discovery liquidity
-        Uniswap.collect(
-            pool, 
-            address(this), 
-            positions[2].lowerTick, 
-            positions[2].upperTick
-        );
-
-        // Deploy new anchor position
-        newPositions[1] = reDeploy(
-            pool,
-            deployer,
-            Conversions.priceToTick(int256(
-            Utils.addBips(
-                Conversions.sqrtPriceX96ToPrice(
-                    Conversions.tickToSqrtPriceX96(
+                .sqrtPriceX96ToPrice(
+                    Conversions
+                    .tickToSqrtPriceX96(
                         positions[0].upperTick
-                    ),
+                    ), 
                 18), 
-                50)), 
-            60),
-            Conversions.priceToTick(
-                int256(
-                    spotPrice
-                ), 
-            60),             
-            anchorToken1Balance + discoveryToken1Balance, 
-            LiquidityType.Anchor
-        );
+                positions[0]
+            );
 
-        newPositions[2] = reDeploy(
-            pool,
-            deployer, 
-            newPositions[1].upperTick,
-            Conversions.priceToTick(
-                int256(
-                    priceLower * 3
-                ), 
-            60), 
-            0,
-            LiquidityType.Discovery 
-        );        
+            // Collect discovery liquidity
+            Uniswap.collect(
+                pool, 
+                address(this), 
+                positions[2].lowerTick, 
+                positions[2].upperTick
+            );
+
+            // Deploy new anchor position
+            newPositions[1] = reDeploy(
+                pool,
+                deployer,
+                Conversions.priceToTick(
+                    int256(
+                        Utils.addBips(
+                            Conversions.sqrtPriceX96ToPrice(
+                                Conversions.tickToSqrtPriceX96(
+                                    newPositions[0].upperTick
+                                    ),
+                                18), 
+                            0)
+                    ), 
+                60),
+                Conversions.priceToTick(
+                    int256(
+                        spotPrice
+                    ), 
+                60),             
+                anchorToken1Balance + discoveryToken1Balance, 
+                LiquidityType.Anchor
+            );
+
+            newPositions[2] = reDeploy(
+                pool,
+                deployer, 
+                //newPositions[1].upperTick,
+                Utils.nearestUsableTick(
+                    Utils.addBipsToTick(newPositions[1].upperTick, 500)
+                ),
+                Conversions.priceToTick(
+                    int256(
+                        Utils
+                        .addBips(
+                            Conversions
+                            .sqrtPriceX96ToPrice(sqrtRatioX96, 18), 
+                            250
+                        ) * 3
+                    ), 
+                60), 
+                0,
+                LiquidityType.Discovery 
+            );   
+            
+            require(newPositions[2].liquidity > 0, "shiftPositions: no liquidity in Discovery");
+
+        } else {
+            revert("shiftPositions: no liquidity in Floor");
+        }
+
     }
 
     function reDeploy(
@@ -226,13 +251,12 @@ library LiquidityOps {
         require(upperTick > lowerTick, "invalid ticks");
         
         uint256 balanceToken0 = ERC20(IUniswapV3Pool(pool).token0()).balanceOf(address(this));
-        uint256 balanceToken1 = ERC20(IUniswapV3Pool(pool).token1()).balanceOf(address(this));
+        // uint256 balanceToken1 = ERC20(IUniswapV3Pool(pool).token1()).balanceOf(address(this));
 
         uint256 amount0ToDeploy = liquidityType == LiquidityType.Discovery ? 
-        balanceToken0 - (balanceToken0 * 25 / 100) :
-        balanceToken0;
+        balanceToken0 - (balanceToken0 * 25 / 100) : balanceToken0;
 
-        ERC20(IUniswapV3Pool(pool).token0()).approve(deployer, amount0ToDeploy);
+        ERC20(IUniswapV3Pool(pool).token0()).approve(deployer, balanceToken0);
         ERC20(IUniswapV3Pool(pool).token1()).approve(deployer, amount1ToDeploy > 0 ? amount1ToDeploy : 1);
 
         newPosition = IDeployer(deployer)
@@ -243,7 +267,7 @@ library LiquidityOps {
             upperTick,
             liquidityType, 
             AmountsToMint({
-                amount0: amount0ToDeploy,
+                amount0: balanceToken0,
                 amount1: liquidityType == LiquidityType.Anchor ? amount1ToDeploy : 1
             })
         );     

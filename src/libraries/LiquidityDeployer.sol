@@ -172,6 +172,7 @@ library LiquidityDeployer {
             );
 
             if (newLiquidity > 0) {
+                
                 Uniswap.mint(
                     pool,
                     receiver,
@@ -216,6 +217,8 @@ library LiquidityDeployer {
             amounts.amount1
         );
 
+        require(amounts.amount0 >= 1 ether, "doDeployPosition: amount0 is too low");
+
         if (liquidity > 0) {
             Uniswap.mint(
                 pool, 
@@ -226,13 +229,12 @@ library LiquidityDeployer {
                 liquidityType, 
                 false
             );
-        } 
-        else {
+        } else {
             revert(
                 string(
                     abi.encodePacked(
                         "doDeployPosition: liquidity is 0 : ", 
-                        Utils._uint2str(uint256(sqrtRatioX96))
+                        Utils._uint2str(uint256(liquidity))
                     )
                 )
             );

@@ -19,6 +19,22 @@ library Utils {
         }
     }
 
+    // Function to add bips to a tick value, assuming bips can be within int24 positive range
+    function addBipsToTick(int24 currentTick, int24 bips) public pure returns (int24) {
+        require(currentTick >= 0, "Current tick must be non-negative");
+        // Assuming bips are provided as a positive int24 value, equivalent to uint256 value within int24 range
+        require(bips >= 0 && bips <= 10000, "Bips must be positive and not exceed 10000");
+
+        // Directly use int24 for calculations to avoid type conversion
+        int24 additionalAmount = (currentTick * bips) / 10000;
+        int24 newTickValue = currentTick + additionalAmount;
+
+        // Ensure the new tick value remains within the int24 positive range
+        require(newTickValue >= 0, "Resulting tick value out of int24 positive range");
+
+        return newTickValue;
+    }
+
     function intToString(int256 _value) public pure returns (string memory) {
         // Handle zero case explicitly
         if (_value == 0) {
@@ -78,14 +94,14 @@ library Utils {
         return uint256(uint24(_value));
     }
 
-    function toHexChar(uint8 byteValue) private pure returns (bytes memory) {
+    function toHexChar(uint8 byteValue) internal pure returns (bytes memory) {
         bytes memory alphabet = "0123456789abcdef";
         bytes memory result = new bytes(1);
         result[0] = alphabet[byteValue];
         return result;
     }
 
-    function addressToString(address _address) public pure returns (string memory) {
+    function addressToString(address _address) internal pure returns (string memory) {
         bytes32 _bytes = bytes32(uint256(uint160(_address)));
         bytes memory hexString = new bytes(42);
         hexString[0] = "0";
@@ -100,7 +116,7 @@ library Utils {
         return string(hexString);
     }
     
-    function bytesToString(bytes memory byteData) public pure returns (string memory) {
+    function bytesToString(bytes memory byteData) internal pure returns (string memory) {
         bytes memory stringBytes = new bytes(byteData.length);
 
         for (uint i=0; i<byteData.length; i++) {
@@ -110,7 +126,28 @@ library Utils {
         return string(stringBytes);
     }
 
-    function compareStrings(string memory a, string memory b) public pure returns (bool) {
+    function compareStrings(string memory a, string memory b) internal pure returns (bool) {
         return (keccak256(abi.encodePacked((a))) == keccak256(abi.encodePacked((b))));
     }
+
+    // TICK CALCULATION FUNCTIONS
+
+    function nearestUsableTick(int24 _tick) pure public returns (int24) {
+        if (_tick < 0) {
+            return -_nearestNumber(-_tick, 60);
+        } else {
+            return _nearestNumber(_tick, 60);
+        }
+    }
+
+    function _nearestNumber(int24 _tick, int24 _tickInterval) internal pure returns (int24) {
+        int24 high = ((_tick + _tickInterval - 1) / _tickInterval) * _tickInterval;
+        int24 low = high - _tickInterval;
+        if (abs(_tick - high) < abs(_tick - low)) return high;
+        else return low;
+    }
+
+    function abs(int x) pure private returns (uint) {
+        return uint(x >= 0 ? x : -x);
+    }    
 }

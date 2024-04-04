@@ -55,15 +55,13 @@ contract ModelHelper {
             
         (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
 
-        uint256 anchorLowerPrice = Conversions.sqrtPriceX96ToPrice(
-                Conversions.tickToSqrtPriceX96(anchorPosition.lowerTick),
-            18);
+        // uint256 anchorLowerPrice = Conversions.sqrtPriceX96ToPrice(
+        //         Conversions.tickToSqrtPriceX96(anchorPosition.lowerTick),
+        //     18);
 
         uint256 anchorUpperPrice = Conversions.sqrtPriceX96ToPrice(
                 Conversions.tickToSqrtPriceX96(anchorPosition.upperTick),
             18);
-
-        uint256 avgAnchorPrice = (anchorLowerPrice + anchorUpperPrice) / 2;
             
         uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, 18);
         liquidityRatio = DecimalMath.divideDecimal(anchorUpperPrice, spotPrice);
