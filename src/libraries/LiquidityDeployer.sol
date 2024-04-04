@@ -149,7 +149,8 @@ library LiquidityDeployer {
     function shiftFloor(
         address pool,
         address receiver,
-        uint256 currentPrice,
+        uint256 currentFloorPrice,
+        uint256 newFloorPrice,
         LiquidityPosition memory floorPosition
     ) public returns (LiquidityPosition memory newPosition) {
         (uint160 sqrtRatioX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
@@ -158,7 +159,7 @@ library LiquidityDeployer {
             
             (int24 lowerTick, int24 upperTick) = Conversions
             .computeSingleTick(
-                currentPrice + ((currentPrice * 2) / 100),
+                newFloorPrice > 0 ? newFloorPrice : currentFloorPrice,
                 60
             );
 

@@ -12,7 +12,8 @@ interface IDeployer {
     function shiftFloor(
         address pool,
         address receiver,
-        uint256 _floorPrice,
+        uint256 currentFloorPrice,
+        uint256 newFloorPrice,
         LiquidityPosition memory floorPosition
     ) external  returns (LiquidityPosition memory newPosition);
     function doDeployPosition(

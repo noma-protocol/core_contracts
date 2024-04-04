@@ -163,11 +163,18 @@ contract Deployer is Owned {
     function shiftFloor(
         address _pool,
         address receiver,
-        uint256 newPrice,
+        uint256 currentFloorPrice,
+        uint256 newFloorPrice,
         LiquidityPosition memory _floorPosition
     ) public  returns (LiquidityPosition memory newPosition) {
 
-        return LiquidityDeployer.shiftFloor(_pool, receiver, newPrice, _floorPosition);
+        return LiquidityDeployer.shiftFloor(
+            _pool, 
+            receiver, 
+            currentFloorPrice, 
+            newFloorPrice, 
+            _floorPosition
+        );
     }
 
     function finalize() public initialized /*onlyOwner*/ {

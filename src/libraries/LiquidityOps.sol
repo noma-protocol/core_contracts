@@ -50,6 +50,11 @@ library LiquidityOps {
         (,,, uint256 discoveryToken1Balance) = IModelHelper(modelHelper).getUnderlyingBalances(pool, address(this), LiquidityType.Discovery);
 
         // Uniswap.collect(pool, address(this), positions[1].lowerTick, positions[1].upperTick);
+        uint256 circulatingSupply = IModelHelper(modelHelper)
+        .getCirculatingSupply(
+            pool,
+            vault
+        );
 
         if (currentLiquidityRatio <= 90e16) {
             
@@ -65,21 +70,8 @@ library LiquidityOps {
 
             if (toSkim >= (anchorToken1Balance * 2 / 1000)) {
 
-                uint256 circulatingSupply = IModelHelper(modelHelper)
-                .getCirculatingSupply(
-                    pool,
-                    vault
-                );
 
                 if (circulatingSupply > 0) {
-
-                    // (,,, uint256 floorNewToken1Balance) = 
-                    // Underlying.getUnderlyingBalances(pool, address(this), positions[0]);
-                    
-                    // newFloorPrice = DecimalMath.divideDecimal(
-                    //     floorNewToken1Balance,
-                    //     circulatingSupply - IModelHelper(modelHelper).getPositionCapacity(pool, vault, newPositions[0])
-                    // );
                 
                     // Collect anchor liquidity
                     Uniswap.collect(
@@ -89,11 +81,23 @@ library LiquidityOps {
                         positions[1].upperTick
                     );
 
+                    uint256 newFloorPrice = 
+                    computeNewFloorPrice(
+                        pool, 
+                        vault, 
+                        toSkim, 
+                        circulatingSupply, 
+                        positions, 
+                        newPositions, 
+                        modelHelper
+                    );
+                    
                     (newPositions) =
                     shiftPositions(
                         pool, 
                         deployer,
                         toSkim,
+                        newFloorPrice,
                         modelHelper,
                         anchorToken1Balance - toSkim,
                         discoveryToken1Balance,
@@ -105,15 +109,18 @@ library LiquidityOps {
                         newPositions
                     );
                 }
+
             } else {
-            revert(
-                string(
-                    abi.encodePacked(
-                        "Nothing to skim : ", 
-                        Utils._uint2str(uint256(anchorToken1Balance * 5 / 1000))
+
+                revert(
+                    string(
+                        abi.encodePacked(
+                            "Nothing to skim : ", 
+                            Utils._uint2str(uint256(toSkim))
+                        )
                     )
-                )
-            );
+                );
+            
             }
         } else {
             revert AboveThreshold();
@@ -124,6 +131,7 @@ library LiquidityOps {
         address pool,
         address deployer,
         uint256 toSkim,
+        uint256 newFloorPrice,
         address modelHelper,
         uint256 anchorToken1Balance,
         uint256 discoveryToken1Balance,
@@ -176,6 +184,7 @@ library LiquidityOps {
                         positions[0].upperTick
                     ), 
                 18), 
+                newFloorPrice,
                 positions[0]
             );
 
@@ -271,6 +280,34 @@ library LiquidityOps {
                 amount1: liquidityType == LiquidityType.Anchor ? amount1ToDeploy : 1
             })
         );     
+    }
+
+    function computeNewFloorPrice(
+        address pool,
+        address vault,
+        uint256 toSkim,
+        uint256 circulatingSupply,
+        LiquidityPosition[3] memory positions,
+        LiquidityPosition[3] memory newPositions,
+        address modelHelper
+    ) internal view returns (uint256 newFloorPrice) {
+
+        (,,, uint256 floorNewToken1Balance) = 
+        Underlying.getUnderlyingBalances(pool, address(this), positions[0]);
+        
+        newFloorPrice = DecimalMath.divideDecimal(
+            floorNewToken1Balance + toSkim,
+            circulatingSupply - IModelHelper(modelHelper)
+            .getPositionCapacity(
+                pool, 
+                vault, 
+                newPositions[0]
+            )
+        );
+
+        if (newFloorPrice <= 1e18) {
+            return 0;
+        }
     }
 
     function getVaultInfo(
