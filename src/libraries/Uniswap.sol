@@ -95,6 +95,7 @@ library Uniswap {
             //         )
             //     )                
             // );
+            revert("collect: liquidity is 0");
         }
     }
 

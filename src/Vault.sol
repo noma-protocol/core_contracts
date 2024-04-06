@@ -16,7 +16,8 @@ import {
     tickSpacing, 
     LiquidityPosition, 
     LiquidityType,
-    VaultInfo
+    VaultInfo,
+    ProtocolAddresses
 } from "./Types.sol";
 
 error AlreadyInitialized();
@@ -76,7 +77,6 @@ contract Vault is Owned {
         );
 
         initialized = true;
-
     }
 
     function setDeployer(address _deployerContract) public /*onlyOwner*/ {
@@ -119,23 +119,25 @@ contract Vault is Owned {
         positions[2] = discoveryPosition;
 
         (
-            uint256 currentLiquidityRatio, 
-            LiquidityPosition[3] memory newPositions
+            uint256 currentLiquidityRatio 
+            // LiquidityPosition[3] memory newPositions
             // uint256 newFloorPrice
         ) = LiquidityOps
         .shift(
-            address(pool),
-            address(this),
-            deployerContract,
-            modelHelper,
+            ProtocolAddresses({
+                pool: address(pool),
+                vault: address(this),
+                deployer: deployerContract,
+                modelHelper: modelHelper
+            }),
             positions
         );
 
         lastLiquidityRatio = currentLiquidityRatio;
         
-        floorPosition = newPositions[0];
-        anchorPosition = newPositions[1];
-        discoveryPosition = newPositions[2];
+        // floorPosition = newPositions[0];
+        // anchorPosition = newPositions[1];
+        // discoveryPosition = newPositions[2];
 
         // Emit event
         emit FloorUpdated(

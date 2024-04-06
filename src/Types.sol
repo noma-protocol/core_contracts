@@ -40,3 +40,22 @@ struct ShiftOpResult {
     uint256 currentLiquidityRatio;
     uint256 newFloorPrice;
 }
+
+struct ProtocolAddresses {
+    address pool;
+    address vault;
+    address deployer;
+    address modelHelper;
+}
+
+struct ShiftParameters {
+    address pool;
+    address deployer;
+    uint256 toSkim;
+    uint256 newFloorPrice;
+    address modelHelper;
+    uint256 floorToken1Balance;
+    uint256 anchorToken1Balance;
+    uint256 discoveryToken1Balance;    
+    LiquidityPosition[3] positions;
+}

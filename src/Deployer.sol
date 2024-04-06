@@ -165,6 +165,8 @@ contract Deployer is Owned {
         address receiver,
         uint256 currentFloorPrice,
         uint256 newFloorPrice,
+        uint256 newFloorBalance,
+        uint256 currentFloorBalance,
         LiquidityPosition memory _floorPosition
     ) public  returns (LiquidityPosition memory newPosition) {
 
@@ -172,8 +174,30 @@ contract Deployer is Owned {
             _pool, 
             receiver, 
             currentFloorPrice, 
-            newFloorPrice, 
+            newFloorPrice,
+            newFloorBalance,
+            currentFloorBalance,
             _floorPosition
+        );
+    }
+
+    function computeNewFloorPrice(
+        address pool,
+        address vault,
+        uint256 toSkim,
+        uint256 circulatingSupply,
+        LiquidityPosition[3] memory positions,
+        // LiquidityPosition[3] memory newPositions,
+        uint256 anchorCapacity
+    ) external view returns (uint256 newFloorPrice) {
+        return LiquidityDeployer.computeNewFloorPrice(
+            pool,
+            vault,
+            toSkim,
+            circulatingSupply,
+            positions,
+            // newPositions,
+            anchorCapacity
         );
     }
 

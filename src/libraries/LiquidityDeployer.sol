@@ -14,6 +14,7 @@ import {DecimalMath} from "./DecimalMath.sol";
 import {Underlying} from "./Underlying.sol";
 import {ModelHelper} from "../ModelHelper.sol";
 import {LiquidityOps} from "./LiquidityOps.sol";
+import {IModelHelper} from "../interfaces/IModelHelper.sol";
 
 import {
     LiquidityPosition, 
@@ -151,17 +152,50 @@ library LiquidityDeployer {
         address receiver,
         uint256 currentFloorPrice,
         uint256 newFloorPrice,
+        uint256 newFloorBalance,
+        uint256 currentFloorBalance,
         LiquidityPosition memory floorPosition
     ) public returns (LiquidityPosition memory newPosition) {
+
         (uint160 sqrtRatioX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
 
         if (floorPosition.liquidity > 0) {
             
-            (int24 lowerTick, int24 upperTick) = Conversions
-            .computeSingleTick(
-                newFloorPrice > 0 ? newFloorPrice : currentFloorPrice,
+            (int24 lowerTick, int24 upperTick) = 
+            Conversions.computeSingleTick(
+                newFloorPrice > 1 ? newFloorPrice : 
+                // Conversions
+                // .sqrtPriceX96ToPrice(
+                //     Conversions
+                //     .tickToSqrtPriceX96(
+                //         floorPosition.lowerTick
+                //     ), 
+                // 18),
+                currentFloorPrice,
                 60
             );
+
+            if (newFloorPrice > 1) {
+                if (ERC20(IUniswapV3Pool(pool).token1()).balanceOf(receiver) < newFloorBalance) {
+
+                    revert(
+                        string(
+                            abi.encodePacked(
+                                "token1 receiver balance : ", 
+                                Utils._uint2str(uint256(ERC20(IUniswapV3Pool(pool).token1()).balanceOf(receiver)))
+                            )
+                        )
+                    );
+
+                } else {
+
+                    ERC20(IUniswapV3Pool(pool).token1()).transferFrom(
+                        receiver,
+                        address(this),
+                        newFloorBalance
+                    );                
+                }
+            }
 
             uint128 newLiquidity = LiquidityAmounts
             .getLiquidityForAmounts(
@@ -169,11 +203,11 @@ library LiquidityDeployer {
                 TickMath.getSqrtRatioAtTick(lowerTick),
                 TickMath.getSqrtRatioAtTick(upperTick),
                 0,
-                ERC20(IUniswapV3Pool(pool).token1()).balanceOf(address(this))
+                newFloorPrice > 1 ? newFloorBalance : currentFloorBalance
             );
 
             if (newLiquidity > 0) {
-                
+
                 Uniswap.mint(
                     pool,
                     receiver,
@@ -189,7 +223,14 @@ library LiquidityDeployer {
                 newPosition.lowerTick = lowerTick;
 
             } else {
-                revert("shiftFloor: liquidity is 0");
+            revert(
+                string(
+                    abi.encodePacked(
+                        "shiftFloor: liquidity is 0 : ", 
+                        Utils._uint2str(uint256(currentFloorBalance))
+                    )
+                )
+            );
             }
 
         } else {
@@ -249,4 +290,35 @@ library LiquidityDeployer {
         });    
     }
 
+    function computeNewFloorPrice(
+        address pool,
+        address vault,
+        uint256 toSkim,
+        uint256 circulatingSupply,
+        LiquidityPosition[3] memory positions,
+        // LiquidityPosition[3] memory newPositions,
+        uint256 anchorCapacity
+    ) internal view returns (uint256 newFloorPrice) {
+
+        (,,, uint256 floorNewToken1Balance) = 
+        Underlying.getUnderlyingBalances(pool, address(this), positions[0]);
+
+        newFloorPrice = DecimalMath.divideDecimal(
+            floorNewToken1Balance + toSkim,
+            circulatingSupply - anchorCapacity
+        );
+
+        // revert(
+        //     string(
+        //         abi.encodePacked(
+        //             "computeNewFloorPrice : ", 
+        //             Utils._uint2str(uint256(anchorCapacity))
+        //         )
+        //     )
+        // );
+
+        if (newFloorPrice <= 1e18) {
+            return 0;
+        }
+    }
 }

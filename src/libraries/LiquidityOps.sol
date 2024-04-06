@@ -22,7 +22,9 @@ import {
     LiquidityType, 
     DeployLiquidityParameters,
     AmountsToMint,
-    VaultInfo
+    VaultInfo,
+    ShiftParameters,
+    ProtocolAddresses
 } from "../Types.sol";
 
 error InvalidTick();
@@ -31,29 +33,38 @@ error AboveThreshold();
 library LiquidityOps {
    
     function shift(
-        address pool,
-        address vault,
-        address deployer,
-        address modelHelper,
+        ProtocolAddresses memory addresses,
         LiquidityPosition[3] memory positions
-    ) internal returns (
-        uint256 currentLiquidityRatio, 
-        LiquidityPosition[3] memory newPositions
+    ) internal 
+    onlyNotEmptyPositions(addresses.pool, positions) 
+    returns (
+        uint256 currentLiquidityRatio
         // uint256 newFloorPrice
     ) {
         require(positions.length == 3, "invalid positions");
 
         // Ratio of the anchor's price to market price
-        currentLiquidityRatio = IModelHelper(modelHelper).getLiquidityRatio(pool);
+        currentLiquidityRatio = IModelHelper(addresses.modelHelper)
+        .getLiquidityRatio(addresses.pool);
         
-        (,,, uint256 anchorToken1Balance) = IModelHelper(modelHelper).getUnderlyingBalances(pool, address(this), LiquidityType.Anchor);
-        (,,, uint256 discoveryToken1Balance) = IModelHelper(modelHelper).getUnderlyingBalances(pool, address(this), LiquidityType.Discovery);
+        (,,, uint256 anchorToken1Balance) = IModelHelper(addresses.modelHelper)
+        .getUnderlyingBalances(
+            addresses.pool, 
+            address(this), 
+            LiquidityType.Anchor
+        );
 
-        // Uniswap.collect(pool, address(this), positions[1].lowerTick, positions[1].upperTick);
-        uint256 circulatingSupply = IModelHelper(modelHelper)
+        (,,, uint256 discoveryToken1Balance) = IModelHelper(addresses.modelHelper)
+        .getUnderlyingBalances(
+            addresses.pool, 
+            address(this), 
+            LiquidityType.Discovery
+        );
+
+        uint256 circulatingSupply = IModelHelper(addresses.modelHelper)
         .getCirculatingSupply(
-            pool,
-            vault
+            addresses.pool,
+            addresses.vault
         );
 
         if (currentLiquidityRatio <= 90e16) {
@@ -69,57 +80,65 @@ library LiquidityOps {
             );
 
             if (toSkim >= (anchorToken1Balance * 2 / 1000)) {
-
-
                 if (circulatingSupply > 0) {
                 
-                    // Collect anchor liquidity
-                    Uniswap.collect(
-                        pool, 
-                        address(this), 
-                        positions[1].lowerTick, 
-                        positions[1].upperTick
+                    uint256 anchorCapacity = IModelHelper(addresses.modelHelper)
+                    .getPositionCapacity(
+                        addresses.pool, 
+                        addresses.vault, 
+                        positions[1]
                     );
 
-                    uint256 newFloorPrice = 
-                    computeNewFloorPrice(
-                        pool, 
-                        vault, 
+                    uint256 newFloorPrice = IDeployer(addresses.deployer)
+                    .computeNewFloorPrice(
+                        addresses.pool, 
+                        addresses.vault, 
                         toSkim, 
                         circulatingSupply, 
                         positions, 
-                        newPositions, 
-                        modelHelper
-                    );
-                    
-                    (newPositions) =
-                    shiftPositions(
-                        pool, 
-                        deployer,
-                        toSkim,
-                        newFloorPrice,
-                        modelHelper,
-                        anchorToken1Balance - toSkim,
-                        discoveryToken1Balance,
-                        positions
+                        anchorCapacity
                     );
 
-                    IModelHelper(modelHelper)
+
+
+                    (,,, uint256 floorToken1Balance) = IModelHelper(addresses.modelHelper)
+                    .getUnderlyingBalances(
+                        addresses.pool, 
+                        address(this), 
+                        LiquidityType.Floor
+                    );
+
+                    (positions) =
+                    shiftPositions(
+                        ShiftParameters({
+                            pool: addresses.pool,
+                            deployer: addresses.deployer,
+                            toSkim: toSkim,
+                            newFloorPrice: newFloorPrice,
+                            modelHelper: addresses.modelHelper,
+                            floorToken1Balance: floorToken1Balance,
+                            anchorToken1Balance: anchorToken1Balance,
+                            discoveryToken1Balance: discoveryToken1Balance,
+                            positions: positions
+                        })
+                    );
+
+                    IModelHelper(addresses.modelHelper)
                     .updatePositions(
-                        newPositions
+                        positions
                     );
                 }
 
             } else {
 
-                revert(
-                    string(
-                        abi.encodePacked(
-                            "Nothing to skim : ", 
-                            Utils._uint2str(uint256(toSkim))
-                        )
-                    )
-                );
+                // revert(
+                //     string(
+                //         abi.encodePacked(
+                //             "Nothing to skim : ", 
+                //             Utils._uint2str(uint256(toSkim))
+                //         )
+                //     )
+                // );
             
             }
         } else {
@@ -128,125 +147,109 @@ library LiquidityOps {
     }
 
     function shiftPositions(
-        address pool,
-        address deployer,
-        uint256 toSkim,
-        uint256 newFloorPrice,
-        address modelHelper,
-        uint256 anchorToken1Balance,
-        uint256 discoveryToken1Balance,
-        LiquidityPosition[3] memory positions
+        ShiftParameters memory params
     ) internal returns (
         LiquidityPosition[3] memory newPositions
     ) {
 
-        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
-
-        uint256 priceLower = Utils
-        .addBips(
-            Conversions
-            .sqrtPriceX96ToPrice(sqrtRatioX96, 18), 
-            250
-        );
-
-        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, 18);
-
-        (,,, uint256 floorToken1Balance) = IModelHelper(modelHelper)
-        .getUnderlyingBalances(
-            pool, 
-            address(this), 
-            LiquidityType.Floor
-        );
+        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(params.pool).slot0();
        
-        if (positions[0].liquidity > 0) {
+        if (params.positions[0].liquidity > 0) {
+
+            ERC20(IUniswapV3Pool(params.pool).token1())
+            .approve(params.deployer, params.floorToken1Balance + params.toSkim);
+
             // Collect floor liquidity
             Uniswap.collect(
-                pool, 
+                params.pool, 
                 address(this), 
-                positions[0].lowerTick, 
-                positions[0].upperTick
-            );
+                params.positions[0].lowerTick, 
+                params.positions[0].upperTick
+            ); 
 
-            // TODO: use transferFrom
-            ERC20(IUniswapV3Pool(pool).token1()).transfer(
-                deployer, 
-                floorToken1Balance + toSkim
-            );
-
-            newPositions[0] = IDeployer(deployer) 
+            newPositions[0] = IDeployer(params.deployer) 
             .shiftFloor(
-                pool, 
+                params.pool, 
                 address(this), 
                 Conversions
                 .sqrtPriceX96ToPrice(
                     Conversions
                     .tickToSqrtPriceX96(
-                        positions[0].upperTick
+                        params.positions[0].upperTick
                     ), 
                 18), 
-                newFloorPrice,
-                positions[0]
+                params.newFloorPrice,
+                params.floorToken1Balance + params.toSkim,
+                params.floorToken1Balance,
+                params.positions[0]
             );
 
             // Collect discovery liquidity
             Uniswap.collect(
-                pool, 
+                params.pool, 
                 address(this), 
-                positions[2].lowerTick, 
-                positions[2].upperTick
+                params.positions[2].lowerTick, 
+                params.positions[2].upperTick
             );
+
+            // Collect anchor liquidity
+            Uniswap.collect(
+                params.pool, 
+                address(this), 
+                params.positions[1].lowerTick, 
+                params.positions[1].upperTick
+            ); 
 
             // Deploy new anchor position
             newPositions[1] = reDeploy(
-                pool,
-                deployer,
-                Conversions.priceToTick(
-                    int256(
-                        Utils.addBips(
-                            Conversions.sqrtPriceX96ToPrice(
-                                Conversions.tickToSqrtPriceX96(
-                                    newPositions[0].upperTick
-                                    ),
-                                18), 
-                            0)
-                    ), 
-                60),
-                Conversions.priceToTick(
-                    int256(
-                        spotPrice
-                    ), 
-                60),             
-                anchorToken1Balance + discoveryToken1Balance, 
+                params.pool,
+                params.deployer,
+                newPositions[0].upperTick,                
+                Utils.nearestUsableTick(
+                    TickMath.getTickAtSqrtRatio(sqrtRatioX96)      
+                ),
+                params.anchorToken1Balance + params.discoveryToken1Balance, 
                 LiquidityType.Anchor
             );
 
             newPositions[2] = reDeploy(
-                pool,
-                deployer, 
-                //newPositions[1].upperTick,
+                params.pool,
+                params.deployer, 
                 Utils.nearestUsableTick(
                     Utils.addBipsToTick(newPositions[1].upperTick, 500)
                 ),
-                Conversions.priceToTick(
-                    int256(
-                        Utils
-                        .addBips(
-                            Conversions
-                            .sqrtPriceX96ToPrice(sqrtRatioX96, 18), 
-                            250
-                        ) * 3
-                    ), 
-                60), 
+                Utils.nearestUsableTick(
+                    TickMath.getTickAtSqrtRatio(sqrtRatioX96) * 3     
+                ),                
                 0,
                 LiquidityType.Discovery 
             );   
             
-            require(newPositions[2].liquidity > 0, "shiftPositions: no liquidity in Discovery");
+            // require(
+            //     newPositions[0].liquidity > 0 &&
+            //     newPositions[1].liquidity > 0 && 
+            //     newPositions[2].liquidity > 0, 
+            //     "shiftPositions: no liquidity in positions"
+            // );
 
         } else {
             revert("shiftPositions: no liquidity in Floor");
         }
 
+    }
+
+    function collectLiquidityForPositions(
+        address pool,
+        LiquidityPosition[3] memory positions
+    ) internal {
+        for (uint256 i = 0; i < positions.length; i++) {
+            Uniswap.collect(
+                pool, 
+                address(this), 
+                positions[i].lowerTick, 
+                positions[i].upperTick
+            );
+        }
     }
 
     function reDeploy(
@@ -282,34 +285,6 @@ library LiquidityOps {
         );     
     }
 
-    function computeNewFloorPrice(
-        address pool,
-        address vault,
-        uint256 toSkim,
-        uint256 circulatingSupply,
-        LiquidityPosition[3] memory positions,
-        LiquidityPosition[3] memory newPositions,
-        address modelHelper
-    ) internal view returns (uint256 newFloorPrice) {
-
-        (,,, uint256 floorNewToken1Balance) = 
-        Underlying.getUnderlyingBalances(pool, address(this), positions[0]);
-        
-        newFloorPrice = DecimalMath.divideDecimal(
-            floorNewToken1Balance + toSkim,
-            circulatingSupply - IModelHelper(modelHelper)
-            .getPositionCapacity(
-                pool, 
-                vault, 
-                newPositions[0]
-            )
-        );
-
-        if (newFloorPrice <= 1e18) {
-            return 0;
-        }
-    }
-
     function getVaultInfo(
         address pool,
         address vault,
@@ -338,4 +313,32 @@ library LiquidityOps {
             vaultInfo.token1            
         );
     }    
+
+    modifier onlyNotEmptyPositions(
+        address pool,
+        LiquidityPosition[3] memory positions
+    ) {
+
+        for (uint256 i = 0; i < positions.length; i++) {
+
+            require(
+                positions[i].lowerTick > 0 || 
+                positions[i].upperTick > 0, "invalid position"
+            );    
+                   
+            bytes32 positionId = keccak256(
+                abi.encodePacked(
+                    address(this), 
+                    positions[i].lowerTick, 
+                    positions[i].upperTick
+                )
+            );
+
+            (uint128 liquidity,,,,) = IUniswapV3Pool(pool).positions(positionId);
+
+            require(liquidity > 0, "onlyNotEmptyPositions");
+        }
+        _;
+    }
+
 }

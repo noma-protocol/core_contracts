@@ -14,6 +14,8 @@ interface IDeployer {
         address receiver,
         uint256 currentFloorPrice,
         uint256 newFloorPrice,
+        uint256 newFloorBalance,
+        uint256 currentFloorBalance,
         LiquidityPosition memory floorPosition
     ) external  returns (LiquidityPosition memory newPosition);
     function doDeployPosition(
@@ -29,5 +31,13 @@ interface IDeployer {
         int24 lowerTick,
         int24 upperTick,
         LiquidityType liquidityType
-    ) external returns (LiquidityPosition memory newPosition);    
+    ) external returns (LiquidityPosition memory newPosition);
+    function computeNewFloorPrice(
+        address pool,
+        address vault,
+        uint256 toSkim,
+        uint256 circulatingSupply,
+        LiquidityPosition[3] memory positions,
+        uint256 anchorCapacity        
+    ) external view returns (uint256 newFloorPrice);    
 }
