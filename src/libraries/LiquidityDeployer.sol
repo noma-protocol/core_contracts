@@ -223,14 +223,14 @@ library LiquidityDeployer {
                 newPosition.lowerTick = lowerTick;
 
             } else {
-            revert(
-                string(
-                    abi.encodePacked(
-                        "shiftFloor: liquidity is 0 : ", 
-                        Utils._uint2str(uint256(currentFloorBalance))
+                revert(
+                    string(
+                        abi.encodePacked(
+                            "shiftFloor: liquidity is 0 : ", 
+                            Utils._uint2str(uint256(currentFloorBalance))
+                        )
                     )
-                )
-            );
+                );
             }
 
         } else {
@@ -295,9 +295,8 @@ library LiquidityDeployer {
         address vault,
         uint256 toSkim,
         uint256 circulatingSupply,
-        LiquidityPosition[3] memory positions,
-        // LiquidityPosition[3] memory newPositions,
-        uint256 anchorCapacity
+        uint256 anchorCapacity,
+        LiquidityPosition[3] memory positions
     ) internal view returns (uint256 newFloorPrice) {
 
         (,,, uint256 floorNewToken1Balance) = 

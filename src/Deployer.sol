@@ -186,18 +186,17 @@ contract Deployer is Owned {
         ProtocolAddresses memory addresses,
         uint256 toSkim,
         uint256 circulatingSupply,
-        LiquidityPosition[3] memory positions,
-        // LiquidityPosition[3] memory newPositions,
-        uint256 anchorCapacity
+        uint256 anchorCapacity,
+        LiquidityPosition[3] memory positions
     ) external view returns (uint256 newFloorPrice) {
         return LiquidityDeployer.computeNewFloorPrice(
             addresses.pool,
             addresses.vault,
             toSkim,
             circulatingSupply,
-            positions,
-            // newPositions,
-            anchorCapacity
+            anchorCapacity,
+            positions
+            // newPositions
         );
     }
 

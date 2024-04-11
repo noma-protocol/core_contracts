@@ -4,7 +4,8 @@ pragma solidity ^0.8.0;
 import {
     LiquidityPosition,
     AmountsToMint,
-    LiquidityType
+    LiquidityType,
+    ProtocolAddresses
 } from "../Types.sol";
 
 interface IDeployer {
@@ -33,8 +34,7 @@ interface IDeployer {
         LiquidityType liquidityType
     ) external returns (LiquidityPosition memory newPosition);
     function computeNewFloorPrice(
-        address pool,
-        address vault,
+        ProtocolAddresses memory addresses,
         uint256 toSkim,
         uint256 circulatingSupply,
         uint256 anchorCapacity,

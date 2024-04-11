@@ -66,7 +66,6 @@ library LiquidityOps {
             if (toSkim >= (anchorToken1Balance * 2 / 1000)) {
                 if (circulatingSupply > 0) {
                 
- 
                     (,,, uint256 floorToken1Balance) = IModelHelper(addresses.modelHelper)
                     .getUnderlyingBalances(
                         addresses.pool, 
@@ -117,19 +116,29 @@ library LiquidityOps {
     function preShiftPositions(
         PreShiftParameters memory params,
         LiquidityPosition[3] memory _positions
-    ) internal returns (LiquidityPosition[3] memory positions) {
+    ) internal returns (LiquidityPosition[3] memory newPositions) {
 
-        uint256 newFloorPrice = IDeployer(params.addresses.deployer)
+        address deployer = params.addresses.deployer;
+
+        uint256 newFloorPrice = IDeployer(deployer)
                 .computeNewFloorPrice(
-                    params.addresses.pool,
-                    params.addresses.vault,
+                    params.addresses,
                     params.toSkim,
                     params.circulatingSupply,
                     params.anchorCapacity,
                     _positions
                 );
 
-        (positions) =
+        // revert(
+        //     string(
+        //         abi.encodePacked(
+        //             "Nothing to skim : ", 
+        //             Utils._uint2str(uint256(newFloorPrice))
+        //         )
+        //     )
+        // );
+
+        (newPositions) =
         shiftPositions(
             ShiftParameters({
                 pool: params.addresses.pool,
@@ -146,7 +155,7 @@ library LiquidityOps {
 
         IModelHelper(params.addresses.modelHelper)
         .updatePositions(
-            _positions
+            newPositions
         );
     }
 
@@ -231,8 +240,8 @@ library LiquidityOps {
             
             require(
                 newPositions[0].liquidity > 0 &&
-                newPositions[1].liquidity > 0,
-            //    &&  newPositions[2].liquidity > 0, 
+                newPositions[1].liquidity > 0 &&  
+                newPositions[2].liquidity > 0, 
                 "shiftPositions: no liquidity in positions"
             );
 
@@ -240,20 +249,6 @@ library LiquidityOps {
             revert("shiftPositions: no liquidity in Floor");
         }
 
-    }
-
-    function collectLiquidityForPositions(
-        address pool,
-        LiquidityPosition[3] memory positions
-    ) internal {
-        for (uint256 i = 0; i < positions.length; i++) {
-            Uniswap.collect(
-                pool, 
-                address(this), 
-                positions[i].lowerTick, 
-                positions[i].upperTick
-            );
-        }
     }
 
     function reDeploy(
@@ -342,12 +337,26 @@ library LiquidityOps {
         return (circulatingSupply, anchorToken1Balance, discoveryToken1Balance);
     }
 
+    function collectLiquidityForPositions(
+        address pool,
+        LiquidityPosition[3] memory positions
+    ) internal {
+        for (uint256 i = 0; i < positions.length; i++) {
+            Uniswap.collect(
+                pool, 
+                address(this), 
+                positions[i].lowerTick, 
+                positions[i].upperTick
+            );
+        }
+    }
+
     modifier onlyNotEmptyPositions(
         address pool,
         LiquidityPosition[3] memory positions
     ) {
 
-        for (uint256 i = 0; i < 2; i++) {
+        for (uint256 i = 0; i < positions.length; i++) {
 
             require(
                 positions[i].lowerTick > 0 || 

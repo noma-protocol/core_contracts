@@ -135,9 +135,9 @@ contract Vault is Owned {
 
         lastLiquidityRatio = currentLiquidityRatio;
         
-        floorPosition = newPositions[0];
-        anchorPosition = newPositions[1];
-        discoveryPosition = newPositions[2];
+        // floorPosition = newPositions[0];
+        // anchorPosition = newPositions[1];
+        // discoveryPosition = newPositions[2];
 
         // Emit event
         emit FloorUpdated(
