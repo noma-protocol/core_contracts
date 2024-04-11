@@ -59,3 +59,19 @@ struct ShiftParameters {
     uint256 discoveryToken1Balance;    
     LiquidityPosition[3] positions;
 }
+
+struct VaultData {
+    uint256 anchorToken1Balance;
+    uint256 discoveryToken1Balance;
+    uint256 circulatingSupply;
+}
+
+struct PreShiftParameters {
+    ProtocolAddresses addresses;
+    uint256 toSkim;
+    uint256 circulatingSupply;
+    uint256 anchorCapacity;
+    uint256 floorToken1Balance;
+    uint256 anchorToken1Balance;
+    uint256 discoveryToken1Balance;
+}

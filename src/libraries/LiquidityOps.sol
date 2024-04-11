@@ -24,22 +24,24 @@ import {
     AmountsToMint,
     VaultInfo,
     ShiftParameters,
-    ProtocolAddresses
+    ProtocolAddresses,
+    VaultData,
+    PreShiftParameters
 } from "../Types.sol";
 
 error InvalidTick();
 error AboveThreshold();
 
 library LiquidityOps {
-   
+
     function shift(
         ProtocolAddresses memory addresses,
         LiquidityPosition[3] memory positions
     ) internal 
     onlyNotEmptyPositions(addresses.pool, positions) 
     returns (
-        uint256 currentLiquidityRatio
-        // uint256 newFloorPrice
+        uint256 currentLiquidityRatio,
+        LiquidityPosition[3] memory newPositions
     ) {
         require(positions.length == 3, "invalid positions");
 
@@ -47,25 +49,7 @@ library LiquidityOps {
         currentLiquidityRatio = IModelHelper(addresses.modelHelper)
         .getLiquidityRatio(addresses.pool);
         
-        (,,, uint256 anchorToken1Balance) = IModelHelper(addresses.modelHelper)
-        .getUnderlyingBalances(
-            addresses.pool, 
-            address(this), 
-            LiquidityType.Anchor
-        );
-
-        (,,, uint256 discoveryToken1Balance) = IModelHelper(addresses.modelHelper)
-        .getUnderlyingBalances(
-            addresses.pool, 
-            address(this), 
-            LiquidityType.Discovery
-        );
-
-        uint256 circulatingSupply = IModelHelper(addresses.modelHelper)
-        .getCirculatingSupply(
-            addresses.pool,
-            addresses.vault
-        );
+        (uint256 circulatingSupply, uint256 anchorToken1Balance, uint256 discoveryToken1Balance) = getVaulData(addresses);
 
         if (currentLiquidityRatio <= 90e16) {
             
@@ -82,25 +66,7 @@ library LiquidityOps {
             if (toSkim >= (anchorToken1Balance * 2 / 1000)) {
                 if (circulatingSupply > 0) {
                 
-                    uint256 anchorCapacity = IModelHelper(addresses.modelHelper)
-                    .getPositionCapacity(
-                        addresses.pool, 
-                        addresses.vault, 
-                        positions[1]
-                    );
-
-                    uint256 newFloorPrice = IDeployer(addresses.deployer)
-                    .computeNewFloorPrice(
-                        addresses.pool, 
-                        addresses.vault, 
-                        toSkim, 
-                        circulatingSupply, 
-                        positions, 
-                        anchorCapacity
-                    );
-
-
-
+ 
                     (,,, uint256 floorToken1Balance) = IModelHelper(addresses.modelHelper)
                     .getUnderlyingBalances(
                         addresses.pool, 
@@ -108,25 +74,27 @@ library LiquidityOps {
                         LiquidityType.Floor
                     );
 
-                    (positions) =
-                    shiftPositions(
-                        ShiftParameters({
-                            pool: addresses.pool,
-                            deployer: addresses.deployer,
-                            toSkim: toSkim,
-                            newFloorPrice: newFloorPrice,
-                            modelHelper: addresses.modelHelper,
-                            floorToken1Balance: floorToken1Balance,
-                            anchorToken1Balance: anchorToken1Balance,
-                            discoveryToken1Balance: discoveryToken1Balance,
-                            positions: positions
-                        })
+                    uint256 anchorCapacity = IModelHelper(addresses.modelHelper)
+                    .getPositionCapacity(
+                        addresses.pool, 
+                        addresses.vault, 
+                        positions[1]
                     );
 
-                    IModelHelper(addresses.modelHelper)
-                    .updatePositions(
+                    newPositions = preShiftPositions(
+                        PreShiftParameters({
+                            addresses: addresses,
+                            toSkim: toSkim,
+                            circulatingSupply : circulatingSupply,
+                            anchorCapacity: anchorCapacity,
+                            floorToken1Balance: floorToken1Balance,
+                            anchorToken1Balance: anchorToken1Balance,
+                            discoveryToken1Balance: discoveryToken1Balance
+                        }),
                         positions
                     );
+                    
+                    return (currentLiquidityRatio, newPositions);
                 }
 
             } else {
@@ -144,6 +112,42 @@ library LiquidityOps {
         } else {
             revert AboveThreshold();
         }
+    }
+
+    function preShiftPositions(
+        PreShiftParameters memory params,
+        LiquidityPosition[3] memory _positions
+    ) internal returns (LiquidityPosition[3] memory positions) {
+
+        uint256 newFloorPrice = IDeployer(params.addresses.deployer)
+                .computeNewFloorPrice(
+                    params.addresses.pool,
+                    params.addresses.vault,
+                    params.toSkim,
+                    params.circulatingSupply,
+                    params.anchorCapacity,
+                    _positions
+                );
+
+        (positions) =
+        shiftPositions(
+            ShiftParameters({
+                pool: params.addresses.pool,
+                deployer: params.addresses.deployer,
+                toSkim: params.toSkim,
+                newFloorPrice: newFloorPrice,
+                modelHelper: params.addresses.modelHelper,
+                floorToken1Balance: params.floorToken1Balance,
+                anchorToken1Balance: params.anchorToken1Balance,
+                discoveryToken1Balance: params.discoveryToken1Balance,
+                positions: _positions
+            })
+        );
+
+        IModelHelper(params.addresses.modelHelper)
+        .updatePositions(
+            _positions
+        );
     }
 
     function shiftPositions(
@@ -216,7 +220,7 @@ library LiquidityOps {
                 params.pool,
                 params.deployer, 
                 Utils.nearestUsableTick(
-                    Utils.addBipsToTick(newPositions[1].upperTick, 500)
+                    Utils.addBipsToTick(newPositions[1].upperTick, 300)
                 ),
                 Utils.nearestUsableTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96) * 3     
@@ -225,12 +229,12 @@ library LiquidityOps {
                 LiquidityType.Discovery 
             );   
             
-            // require(
-            //     newPositions[0].liquidity > 0 &&
-            //     newPositions[1].liquidity > 0 && 
-            //     newPositions[2].liquidity > 0, 
-            //     "shiftPositions: no liquidity in positions"
-            // );
+            require(
+                newPositions[0].liquidity > 0 &&
+                newPositions[1].liquidity > 0,
+            //    &&  newPositions[2].liquidity > 0, 
+                "shiftPositions: no liquidity in positions"
+            );
 
         } else {
             revert("shiftPositions: no liquidity in Floor");
@@ -314,12 +318,36 @@ library LiquidityOps {
         );
     }    
 
+    function getVaulData(ProtocolAddresses memory addresses) internal view returns (uint256, uint256, uint256) {
+        (,,, uint256 anchorToken1Balance) = IModelHelper(addresses.modelHelper)
+        .getUnderlyingBalances(
+            addresses.pool, 
+            address(this), 
+            LiquidityType.Anchor
+        );
+
+        (,,, uint256 discoveryToken1Balance) = IModelHelper(addresses.modelHelper)
+        .getUnderlyingBalances(
+            addresses.pool, 
+            address(this), 
+            LiquidityType.Discovery
+        );
+
+        uint256 circulatingSupply = IModelHelper(addresses.modelHelper)
+        .getCirculatingSupply(
+            addresses.pool,
+            addresses.vault
+        );
+        
+        return (circulatingSupply, anchorToken1Balance, discoveryToken1Balance);
+    }
+
     modifier onlyNotEmptyPositions(
         address pool,
         LiquidityPosition[3] memory positions
     ) {
 
-        for (uint256 i = 0; i < positions.length; i++) {
+        for (uint256 i = 0; i < 2; i++) {
 
             require(
                 positions[i].lowerTick > 0 || 
@@ -335,7 +363,6 @@ library LiquidityOps {
             );
 
             (uint128 liquidity,,,,) = IUniswapV3Pool(pool).positions(positionId);
-
             require(liquidity > 0, "onlyNotEmptyPositions");
         }
         _;

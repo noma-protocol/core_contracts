@@ -119,8 +119,8 @@ contract Vault is Owned {
         positions[2] = discoveryPosition;
 
         (
-            uint256 currentLiquidityRatio 
-            // LiquidityPosition[3] memory newPositions
+            uint256 currentLiquidityRatio,
+            LiquidityPosition[3] memory newPositions
             // uint256 newFloorPrice
         ) = LiquidityOps
         .shift(
@@ -135,9 +135,9 @@ contract Vault is Owned {
 
         lastLiquidityRatio = currentLiquidityRatio;
         
-        // floorPosition = newPositions[0];
-        // anchorPosition = newPositions[1];
-        // discoveryPosition = newPositions[2];
+        floorPosition = newPositions[0];
+        anchorPosition = newPositions[1];
+        discoveryPosition = newPositions[2];
 
         // Emit event
         emit FloorUpdated(

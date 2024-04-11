@@ -37,7 +37,7 @@ interface IDeployer {
         address vault,
         uint256 toSkim,
         uint256 circulatingSupply,
-        LiquidityPosition[3] memory positions,
-        uint256 anchorCapacity        
+        uint256 anchorCapacity,
+        LiquidityPosition[3] memory positions
     ) external view returns (uint256 newFloorPrice);    
 }

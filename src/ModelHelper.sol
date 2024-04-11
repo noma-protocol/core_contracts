@@ -120,7 +120,7 @@ contract ModelHelper {
             position = discoveryPosition;
         }
 
-        // require(position.liquidity > 0, "no liquidity");
+        require(position.liquidity > 0, "no liquidity");
         return Underlying.getUnderlyingBalances(address(pool), vault, position);
     }
 

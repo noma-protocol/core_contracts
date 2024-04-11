@@ -19,7 +19,8 @@ import {
     tickSpacing, 
     LiquidityPosition, 
     LiquidityType, 
-    DeployLiquidityParameters
+    DeployLiquidityParameters,
+    ProtocolAddresses
 } from "./Types.sol";
 
 interface IVault {
@@ -182,8 +183,7 @@ contract Deployer is Owned {
     }
 
     function computeNewFloorPrice(
-        address pool,
-        address vault,
+        ProtocolAddresses memory addresses,
         uint256 toSkim,
         uint256 circulatingSupply,
         LiquidityPosition[3] memory positions,
@@ -191,8 +191,8 @@ contract Deployer is Owned {
         uint256 anchorCapacity
     ) external view returns (uint256 newFloorPrice) {
         return LiquidityDeployer.computeNewFloorPrice(
-            pool,
-            vault,
+            addresses.pool,
+            addresses.vault,
             toSkim,
             circulatingSupply,
             positions,
