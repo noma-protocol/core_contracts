@@ -151,6 +151,16 @@ contract Vault is Owned {
         );
     }    
 
+    function updatePositions(LiquidityPosition[3] memory _positions) public {
+        require(initialized, "not initialized");
+        require(msg.sender == address(this), "invalid caller");
+        
+        floorPosition = _positions[0];
+        anchorPosition = _positions[1];
+        discoveryPosition = _positions[2];
+    }
+
+        
     function getUnderlyingBalances(
         LiquidityType liquidityType
     ) external view 

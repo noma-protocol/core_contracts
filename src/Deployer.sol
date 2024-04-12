@@ -183,16 +183,17 @@ contract Deployer is Owned {
     }
 
     function computeNewFloorPrice(
-        ProtocolAddresses memory addresses,
+        address _pool,
         uint256 toSkim,
+        uint256 floorNewToken1Balance,
         uint256 circulatingSupply,
         uint256 anchorCapacity,
         LiquidityPosition[3] memory positions
     ) external view returns (uint256 newFloorPrice) {
         return LiquidityDeployer.computeNewFloorPrice(
-            addresses.pool,
-            addresses.vault,
+            _pool,
             toSkim,
+            floorNewToken1Balance,
             circulatingSupply,
             anchorCapacity,
             positions

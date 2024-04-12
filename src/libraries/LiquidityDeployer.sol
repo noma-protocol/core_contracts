@@ -131,19 +131,6 @@ library LiquidityDeployer {
 
         newPosition.price = upperDiscoveryPrice;
 
-        // if (newPosition.liquidity > 0) {
-        //     revert(
-        //         string(
-        //             abi.encodePacked(
-        //                     "amount0 : ",
-        //                     Utils._uint2str(uint256(newPosition.liquidity))
-        //                     // " : ",
-        //                     // Utils._uint2str(uint256(amounts.amount1))
-        //                 )
-        //             )
-        //         );
-        // }
-
         return (newPosition, LiquidityType.Discovery);
     }
 
@@ -175,35 +162,13 @@ library LiquidityDeployer {
                 60
             );
 
-            if (newFloorPrice > 1) {
-                if (ERC20(IUniswapV3Pool(pool).token1()).balanceOf(receiver) < newFloorBalance) {
-
-                    revert(
-                        string(
-                            abi.encodePacked(
-                                "token1 receiver balance : ", 
-                                Utils._uint2str(uint256(ERC20(IUniswapV3Pool(pool).token1()).balanceOf(receiver)))
-                            )
-                        )
-                    );
-
-                } else {
-
-                    ERC20(IUniswapV3Pool(pool).token1()).transferFrom(
-                        receiver,
-                        address(this),
-                        newFloorBalance
-                    );                
-                }
-            }
-
             uint128 newLiquidity = LiquidityAmounts
             .getLiquidityForAmounts(
                 sqrtRatioX96,
                 TickMath.getSqrtRatioAtTick(lowerTick),
                 TickMath.getSqrtRatioAtTick(upperTick),
                 0,
-                newFloorPrice > 1 ? newFloorBalance : currentFloorBalance
+                newFloorBalance > currentFloorBalance ? newFloorBalance : currentFloorBalance
             );
 
             if (newLiquidity > 0) {
@@ -292,32 +257,37 @@ library LiquidityDeployer {
 
     function computeNewFloorPrice(
         address pool,
-        address vault,
         uint256 toSkim,
+        uint256 floorNewToken1Balance,
         uint256 circulatingSupply,
         uint256 anchorCapacity,
         LiquidityPosition[3] memory positions
-    ) internal view returns (uint256 newFloorPrice) {
+    ) internal view returns (uint256) {
+        require(
+            positions[0].liquidity > 0 &&
+            positions[1].liquidity > 0 &&  
+            positions[2].liquidity > 0, 
+            "computeNewFloorPrice: no liquidity in positions"
+        );
 
-        (,,, uint256 floorNewToken1Balance) = 
-        Underlying.getUnderlyingBalances(pool, address(this), positions[0]);
-
-        newFloorPrice = DecimalMath.divideDecimal(
+        uint256 newFloorPrice = DecimalMath.divideDecimal(
             floorNewToken1Balance + toSkim,
             circulatingSupply - anchorCapacity
         );
 
-        // revert(
-        //     string(
-        //         abi.encodePacked(
-        //             "computeNewFloorPrice : ", 
-        //             Utils._uint2str(uint256(anchorCapacity))
-        //         )
-        //     )
-        // );
-
         if (newFloorPrice <= 1e18) {
             return 0;
+        } else {
+            return newFloorPrice;
+            
+            revert(
+                string(
+                    abi.encodePacked(
+                        "pool: newFloorPrice is : ", 
+                        Utils._uint2str(uint256(newFloorPrice))
+                    )
+                )
+            );            
         }
     }
 }

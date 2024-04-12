@@ -29,6 +29,10 @@ import {
     PreShiftParameters
 } from "../Types.sol";
 
+interface IVault {
+    function updatePositions(LiquidityPosition[3] memory newPositions) external;
+}
+
 error InvalidTick();
 error AboveThreshold();
 
@@ -51,7 +55,7 @@ library LiquidityOps {
         
         (uint256 circulatingSupply, uint256 anchorToken1Balance, uint256 discoveryToken1Balance) = getVaulData(addresses);
 
-        if (currentLiquidityRatio <= 90e16) {
+        if (currentLiquidityRatio <= 98e16) {
             
             // Shift --> ETH after skim at floor = 
             // ETH before skim at anchor - (liquidity ratio * ETH before skim at anchor)
@@ -108,6 +112,15 @@ library LiquidityOps {
                 // );
             
             }
+
+                // revert(
+                //     string(
+                //         abi.encodePacked(
+                //             "Nothing to skim : ", 
+                //             Utils._uint2str(uint256(toSkim))
+                //         )
+                //     )
+                // );
         } else {
             revert AboveThreshold();
         }
@@ -118,12 +131,15 @@ library LiquidityOps {
         LiquidityPosition[3] memory _positions
     ) internal returns (LiquidityPosition[3] memory newPositions) {
 
+        address modelHelper = params.addresses.modelHelper;
         address deployer = params.addresses.deployer;
+        address pool = params.addresses.pool;
 
         uint256 newFloorPrice = IDeployer(deployer)
                 .computeNewFloorPrice(
-                    params.addresses,
+                    pool,
                     params.toSkim,
+                    params.floorToken1Balance,
                     params.circulatingSupply,
                     params.anchorCapacity,
                     _positions
@@ -153,7 +169,12 @@ library LiquidityOps {
             })
         );
 
-        IModelHelper(params.addresses.modelHelper)
+        IModelHelper(modelHelper)
+        .updatePositions(
+            newPositions
+        );
+
+        IVault(params.addresses.vault)
         .updatePositions(
             newPositions
         );
@@ -168,10 +189,7 @@ library LiquidityOps {
         (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(params.pool).slot0();
        
         if (params.positions[0].liquidity > 0) {
-
-            ERC20(IUniswapV3Pool(params.pool).token1())
-            .approve(params.deployer, params.floorToken1Balance + params.toSkim);
-
+            
             // Collect floor liquidity
             Uniswap.collect(
                 params.pool, 
@@ -179,6 +197,29 @@ library LiquidityOps {
                 params.positions[0].lowerTick, 
                 params.positions[0].upperTick
             ); 
+
+            // Collect discovery liquidity
+            Uniswap.collect(
+                params.pool, 
+                address(this), 
+                params.positions[2].lowerTick, 
+                params.positions[2].upperTick
+            );
+
+            // Collect anchor liquidity
+            Uniswap.collect(
+                params.pool, 
+                address(this), 
+                params.positions[1].lowerTick, 
+                params.positions[1].upperTick
+            ); 
+
+            if (params.floorToken1Balance + params.toSkim > params.floorToken1Balance) {
+                ERC20(IUniswapV3Pool(params.pool).token1()).transfer(
+                    params.deployer, 
+                    params.floorToken1Balance + params.toSkim
+                );
+            }
 
             newPositions[0] = IDeployer(params.deployer) 
             .shiftFloor(
@@ -197,21 +238,6 @@ library LiquidityOps {
                 params.positions[0]
             );
 
-            // Collect discovery liquidity
-            Uniswap.collect(
-                params.pool, 
-                address(this), 
-                params.positions[2].lowerTick, 
-                params.positions[2].upperTick
-            );
-
-            // Collect anchor liquidity
-            Uniswap.collect(
-                params.pool, 
-                address(this), 
-                params.positions[1].lowerTick, 
-                params.positions[1].upperTick
-            ); 
 
             // Deploy new anchor position
             newPositions[1] = reDeploy(
@@ -221,7 +247,7 @@ library LiquidityOps {
                 Utils.nearestUsableTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96)      
                 ),
-                params.anchorToken1Balance + params.discoveryToken1Balance, 
+                (params.anchorToken1Balance + params.discoveryToken1Balance) - params.toSkim, 
                 LiquidityType.Anchor
             );
 

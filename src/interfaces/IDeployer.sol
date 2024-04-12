@@ -34,8 +34,9 @@ interface IDeployer {
         LiquidityType liquidityType
     ) external returns (LiquidityPosition memory newPosition);
     function computeNewFloorPrice(
-        ProtocolAddresses memory addresses,
+        address pool,
         uint256 toSkim,
+        uint256 floorNewTokenBalance,
         uint256 circulatingSupply,
         uint256 anchorCapacity,
         LiquidityPosition[3] memory positions
