@@ -276,6 +276,49 @@ library LiquidityOps {
         }
 
     }
+    
+    function slide(
+        ProtocolAddresses memory addresses,
+        LiquidityPosition[3] memory positions
+    ) internal returns (
+        LiquidityPosition[3] memory newPositions
+    ) {
+        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(addresses.pool).slot0();
+
+        // Ratio of the anchor's price to market price
+        uint256 currentLiquidityRatio = IModelHelper(addresses.modelHelper)
+        .getLiquidityRatio(addresses.pool);
+                
+        (, uint256 anchorToken1Balance, uint256 discoveryToken1Balance) = getVaulData(addresses);
+
+        if (currentLiquidityRatio <= 120e16) {
+            // Collect anchor liquidity
+            Uniswap.collect(
+                addresses.pool, 
+                address(this), 
+                positions[1].lowerTick, 
+                positions[1].upperTick
+            ); 
+
+            //Shift anchor position
+            newPositions[1] = reDeploy(
+                addresses.pool,
+                addresses.deployer,
+                positions[0].upperTick,                
+                Utils.nearestUsableTick(
+                    TickMath.getTickAtSqrtRatio(sqrtRatioX96)      
+                ),
+                anchorToken1Balance, 
+                LiquidityType.Anchor
+            );  
+
+            require(
+                newPositions[1].liquidity > 0, 
+                "slide: no liquidity in positions"
+            );           
+        }
+        
+    }
 
     function reDeploy(
         address pool,
@@ -310,35 +353,6 @@ library LiquidityOps {
         );     
     }
 
-    function getVaultInfo(
-        address pool,
-        address vault,
-        address modelHelper,
-        VaultInfo memory vaultInfo,
-        LiquidityPosition[] memory positions
-    ) internal view 
-    returns (
-        uint256, 
-        uint256, 
-        uint256, 
-        uint256, 
-        uint256, 
-        address, 
-        address
-    ) {
-        (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
-
-        return (
-            IModelHelper(modelHelper).getLiquidityRatio(address(pool)),
-            IModelHelper(modelHelper).getCirculatingSupply(address(pool), vault),
-            Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18),
-            IModelHelper(modelHelper).getPositionCapacity(address(pool), vault, positions[1]),
-            IModelHelper(modelHelper).getPositionCapacity(address(pool), vault, positions[0]),
-            vaultInfo.token0,
-            vaultInfo.token1            
-        );
-    }    
-
     function getVaulData(ProtocolAddresses memory addresses) internal view returns (uint256, uint256, uint256) {
         (,,, uint256 anchorToken1Balance) = IModelHelper(addresses.modelHelper)
         .getUnderlyingBalances(
@@ -361,20 +375,6 @@ library LiquidityOps {
         );
         
         return (circulatingSupply, anchorToken1Balance, discoveryToken1Balance);
-    }
-
-    function collectLiquidityForPositions(
-        address pool,
-        LiquidityPosition[3] memory positions
-    ) internal {
-        for (uint256 i = 0; i < positions.length; i++) {
-            Uniswap.collect(
-                pool, 
-                address(this), 
-                positions[i].lowerTick, 
-                positions[i].upperTick
-            );
-        }
     }
 
     modifier onlyNotEmptyPositions(

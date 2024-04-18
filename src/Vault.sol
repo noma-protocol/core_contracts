@@ -121,7 +121,6 @@ contract Vault is Owned {
         (
             uint256 currentLiquidityRatio,
             LiquidityPosition[3] memory newPositions
-            // uint256 newFloorPrice
         ) = LiquidityOps
         .shift(
             ProtocolAddresses({
@@ -133,11 +132,7 @@ contract Vault is Owned {
             positions
         );
 
-        lastLiquidityRatio = currentLiquidityRatio;
-        
-        // floorPosition = newPositions[0];
-        // anchorPosition = newPositions[1];
-        // discoveryPosition = newPositions[2];
+        floorPosition = newPositions[0];
 
         // Emit event
         emit FloorUpdated(
@@ -150,6 +145,31 @@ contract Vault is Owned {
             )
         );
     }    
+
+    // function slide() public {
+    //     require(initialized, "not initialized");
+
+    //     LiquidityPosition[3] memory positions;
+
+    //     positions[0] = floorPosition;
+    //     positions[1] = anchorPosition;
+    //     positions[2] = discoveryPosition;
+
+    //     (
+    //         LiquidityPosition[3] memory newPositions
+    //     ) = LiquidityOps
+    //     .slide(
+    //         ProtocolAddresses({
+    //             pool: address(pool),
+    //             vault: address(this),
+    //             deployer: deployerContract,
+    //             modelHelper: modelHelper
+    //         }),
+    //         positions
+    //     );
+
+    //     // Emit event
+    // }
 
     function updatePositions(LiquidityPosition[3] memory _positions) public {
         require(initialized, "not initialized");
@@ -216,5 +236,4 @@ contract Vault is Owned {
             newFloor
         );
     }
-
 }
