@@ -3,13 +3,9 @@ pragma solidity ^0.8.0;
 
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 
-import {ERC20} from "solmate/tokens/ERC20.sol";
 import {Owned} from "solmate/auth/Owned.sol";
-
 import {IWETH} from "./interfaces/IWETH.sol";
 import {LiquidityOps} from "./libraries/LiquidityOps.sol";
-import {Underlying} from "./libraries/Underlying.sol";
-// import {ModelHelper} from "./libraries/ModelHelper.sol";
 import {IModelHelper} from "./interfaces/IModelHelper.sol";
 
 import {
@@ -19,6 +15,16 @@ import {
     VaultInfo,
     ProtocolAddresses
 } from "./Types.sol";
+
+interface IERC20 {
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+}
+
+interface IVaultsController {
+    function shift(ProtocolAddresses _parameters, address vault) external;
+    function slide(ProtocolAddresses _parameters, address vault) external;
+}
 
 error AlreadyInitialized();
 error InvalidCaller();
@@ -30,8 +36,10 @@ contract Vault is Owned {
     LiquidityPosition private discoveryPosition;
 
     VaultInfo private vaultInfo;
+    
     address private deployerContract;
     address private modelHelper;
+
     IUniswapV3Pool public pool;
 
     bool private initialized; 
@@ -97,79 +105,29 @@ contract Vault is Owned {
     {
         require(msg.sender == address(pool), "cc");
 
-        uint256 token0Balance = ERC20(vaultInfo.token0).balanceOf(address(this));
-        uint256 token1Balance = ERC20(vaultInfo.token1).balanceOf(address(this));
+        uint256 token0Balance = IERC20(vaultInfo.token0).balanceOf(address(this));
+        uint256 token1Balance = IERC20(vaultInfo.token1).balanceOf(address(this));
 
         if (token0Balance >= amount0Owed) {
-            if (amount0Owed > 0) ERC20(vaultInfo.token0).transfer(msg.sender, amount0Owed);
+            if (amount0Owed > 0) IERC20(vaultInfo.token0).transfer(msg.sender, amount0Owed);
         } 
 
         if (token1Balance >= amount1Owed) {
-            if (amount1Owed > 0) ERC20(vaultInfo.token1).transfer(msg.sender, amount1Owed); 
+            if (amount1Owed > 0) IERC20(vaultInfo.token1).transfer(msg.sender, amount1Owed); 
         } 
     }
 
     function shift() public {
         require(initialized, "not initialized");
-        
-        LiquidityPosition[3] memory positions;
 
-        positions[0] = floorPosition;
-        positions[1] = anchorPosition;
-        positions[2] = discoveryPosition;
 
-        (
-            uint256 currentLiquidityRatio,
-            LiquidityPosition[3] memory newPositions
-        ) = LiquidityOps
-        .shift(
-            ProtocolAddresses({
-                pool: address(pool),
-                vault: address(this),
-                deployer: deployerContract,
-                modelHelper: modelHelper
-            }),
-            positions
-        );
 
-        floorPosition = newPositions[0];
-
-        // Emit event
-        emit FloorUpdated(
-            0, 
-            IModelHelper(modelHelper)
-            .getPositionCapacity(
-                address(pool), 
-                address(this),
-                floorPosition
-            )
-        );
     }    
 
-    // function slide() public {
-    //     require(initialized, "not initialized");
+    function slide() public  {
+        require(initialized, "not initialized");
 
-    //     LiquidityPosition[3] memory positions;
-
-    //     positions[0] = floorPosition;
-    //     positions[1] = anchorPosition;
-    //     positions[2] = discoveryPosition;
-
-    //     (
-    //         LiquidityPosition[3] memory newPositions
-    //     ) = LiquidityOps
-    //     .slide(
-    //         ProtocolAddresses({
-    //             pool: address(pool),
-    //             vault: address(this),
-    //             deployer: deployerContract,
-    //             modelHelper: modelHelper
-    //         }),
-    //         positions
-    //     );
-
-    //     // Emit event
-    // }
+    }
 
     function updatePositions(LiquidityPosition[3] memory _positions) public {
         require(initialized, "not initialized");
@@ -194,6 +152,16 @@ contract Vault is Owned {
         ); 
     }
 
+    function _getPositions() internal view
+    returns (LiquidityPosition[3] memory) {
+        LiquidityPosition[3] memory positions;
+
+        positions[0] = floorPosition;
+        positions[1] = anchorPosition;
+        positions[2] = discoveryPosition;
+
+        return positions;
+    }
 
     function getVaultInfo() public view 
     returns (
