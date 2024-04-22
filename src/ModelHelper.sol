@@ -17,50 +17,34 @@ import {Utils} from "./libraries/Utils.sol";
 import {
     LiquidityPosition,
     LiquidityType,
+    TokenInfo,
     VaultInfo
 } from "./Types.sol";
 
 error AlreadyInitialized();
 error InvalidCaller();
 
-contract ModelHelper {
+interface IVault {
+    function getPositions() external view returns (LiquidityPosition[3] memory);
+}
 
-    LiquidityPosition private floorPosition;
-    LiquidityPosition private anchorPosition;
-    LiquidityPosition private discoveryPosition;
+contract ModelHelper {
 
     bool private initialized;
     address private deployerContract;
 
-    constructor() {
-        initialized = false;
-    }
-
-    function updatePositions(
-        LiquidityPosition[3] memory _positions
-    ) public {
-        // if (initialized) revert AlreadyInitialized();
-        // if (msg.sender != _deployerContract) revert InvalidCaller();
-
-        floorPosition = _positions[0];
-        anchorPosition = _positions[1];
-        discoveryPosition = _positions[2];
-
-        // initialized = true;
-    }
+    constructor() {}
 
     function getLiquidityRatio(
-        address pool
+        address pool,
+        address vault
     ) public view returns (uint256 liquidityRatio) {
-            
+        LiquidityPosition[3] memory positions = IVault(vault).getPositions();
+
         (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
 
-        // uint256 anchorLowerPrice = Conversions.sqrtPriceX96ToPrice(
-        //         Conversions.tickToSqrtPriceX96(anchorPosition.lowerTick),
-        //     18);
-
         uint256 anchorUpperPrice = Conversions.sqrtPriceX96ToPrice(
-                Conversions.tickToSqrtPriceX96(anchorPosition.upperTick),
+                Conversions.tickToSqrtPriceX96(positions[1].upperTick),
             18);
             
         uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, 18);
@@ -85,17 +69,9 @@ contract ModelHelper {
             )            
         );
 
-        if (liquidity > 0) {
-            // (amount0Current, ) = LiquidityAmounts
-            // .getAmountsForLiquidity(
-            //     TickMath.getSqrtRatioAtTick(position.lowerTick),
-            //     TickMath.getSqrtRatioAtTick(position.lowerTick),
-            //     TickMath.getSqrtRatioAtTick(position.upperTick),
-            //     liquidity
-            // );      
+        if (liquidity > 0) { 
             amount0Current = LiquidityAmounts
             .getAmount0ForLiquidity(
-                // TickMath.getSqrtRatioAtTick(position.lowerTick),
                 TickMath.getSqrtRatioAtTick(position.lowerTick),
                 TickMath.getSqrtRatioAtTick(position.upperTick),
                 liquidity
@@ -109,15 +85,15 @@ contract ModelHelper {
         LiquidityType liquidityType
     ) public view 
     returns (int24, int24, uint256, uint256) {
-
+        LiquidityPosition[3] memory positions = IVault(vault).getPositions();
         LiquidityPosition memory position;
 
         if (liquidityType == LiquidityType.Floor) {
-            position = floorPosition;
+            position = positions[0];
         } else if (liquidityType == LiquidityType.Anchor) {
-            position = anchorPosition;
+            position = positions[1];
         } else if (liquidityType == LiquidityType.Discovery) {
-            position = discoveryPosition;
+            position = positions[2];
         }
 
         require(position.liquidity > 0, "no liquidity");
@@ -127,42 +103,33 @@ contract ModelHelper {
     function getVaultInfo(
         address pool,
         address vault,
-        VaultInfo memory vaultInfo  
+        TokenInfo memory tokenInfo  
     ) public view 
     returns (
-        uint256, 
-        uint256, 
-        uint256, 
-        uint256, 
-        uint256, 
-        address, 
-        address
+        VaultInfo memory vaultInfo
     ) {
+        LiquidityPosition[3] memory positions = IVault(vault).getPositions();
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
-
-        return (
-            getLiquidityRatio(address(pool)),
-            getCirculatingSupply(address(pool), vault),
-            Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18),
-            getPositionCapacity(address(pool), vault, anchorPosition),
-            getPositionCapacity(address(pool), vault, floorPosition),
-            vaultInfo.token0,
-            vaultInfo.token1            
-        );
+        
+        vaultInfo.liquidityRatio = getLiquidityRatio(pool, vault);
+        vaultInfo.circulatingSupply = getCirculatingSupply(pool, vault);
+        vaultInfo.spotPriceX96 = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+        vaultInfo.anchorCapacity = getPositionCapacity(pool, vault, positions[1]);
+        vaultInfo.floorCapacity = getPositionCapacity(pool, vault, positions[0]);
+        vaultInfo.token0 = tokenInfo.token0;
+        vaultInfo.token1 = tokenInfo.token1;
     }   
 
     function getCirculatingSupply(
         address pool,
         address vault
     ) public view returns (uint256) {
-
+        LiquidityPosition[3] memory positions = IVault(vault).getPositions();
         uint256 totalSupply = ERC20(address(IUniswapV3Pool(pool).token0())).totalSupply();
 
-        (,,uint256 amount0CurrentFloor, ) = Underlying.getUnderlyingBalances(pool, vault, floorPosition);
-
-        (,,uint256 amount0CurrentAnchor, ) = Underlying.getUnderlyingBalances(pool, vault, anchorPosition);
-        
-        (,,uint256 amount0CurrentDiscovery, ) = Underlying.getUnderlyingBalances(pool, vault, discoveryPosition);
+        (,,uint256 amount0CurrentFloor, ) = Underlying.getUnderlyingBalances(pool, vault, positions[0]);
+        (,,uint256 amount0CurrentAnchor, ) = Underlying.getUnderlyingBalances(pool, vault, positions[1]);
+        (,,uint256 amount0CurrentDiscovery, ) = Underlying.getUnderlyingBalances(pool, vault, positions[2]);
 
         uint256 protocolUnusedBalanceToken0 = ERC20(address(IUniswapV3Pool(pool).token0())).balanceOf(vault);
     
@@ -173,13 +140,14 @@ contract ModelHelper {
         address pool,
         address vault
     ) internal view returns (uint256) {
-     
+        LiquidityPosition[3] memory positions = IVault(vault).getPositions();
+
         uint256 circulatingSupply = getCirculatingSupply(pool, vault);
-        uint256 anchorCapacity = getPositionCapacity(pool, vault, anchorPosition);
+        uint256 anchorCapacity = getPositionCapacity(pool, vault, positions[1]);
 
         (
            ,,, uint256 amount1Current
-        ) = Underlying.getUnderlyingBalances(pool, address(this), floorPosition);
+        ) = Underlying.getUnderlyingBalances(pool, address(this), positions[0]);
      
         return DecimalMath.divideDecimal(amount1Current, circulatingSupply - anchorCapacity);
     }

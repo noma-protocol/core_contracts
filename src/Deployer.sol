@@ -25,9 +25,7 @@ import {
 
 interface IVault {
     function initialize(
-        LiquidityPosition memory _floorPosition,
-        LiquidityPosition memory _anchorPosition,
-        LiquidityPosition memory _discoveryPosition
+        LiquidityPosition[3] memory positions
     ) external;
 }
 
@@ -208,10 +206,12 @@ contract Deployer is Owned {
             discoveryPosition.upperTick != 0, 
             "not deployed"
         );
+
+        LiquidityPosition[3] memory positions = [floorPosition, anchorPosition, discoveryPosition];
         
         uint256 balanceToken0 = ERC20(token0).balanceOf(address(this));
         ERC20(token0).transfer(vault, balanceToken0);
-        IVault(vault).initialize(floorPosition, anchorPosition, discoveryPosition);
+        IVault(vault).initialize(positions);
     }
 
     modifier initialized() {

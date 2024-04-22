@@ -22,7 +22,7 @@ import {
     LiquidityType, 
     DeployLiquidityParameters,
     AmountsToMint,
-    VaultInfo,
+    TokenInfo,
     ShiftParameters,
     ProtocolAddresses,
     VaultData,
@@ -51,7 +51,7 @@ library LiquidityOps {
 
         // Ratio of the anchor's price to market price
         currentLiquidityRatio = IModelHelper(addresses.modelHelper)
-        .getLiquidityRatio(addresses.pool);
+        .getLiquidityRatio(addresses.pool, addresses.vault);
         
         (uint256 circulatingSupply, uint256 anchorToken1Balance, uint256 discoveryToken1Balance) = getVaulData(addresses);
 
@@ -100,27 +100,8 @@ library LiquidityOps {
                     return (currentLiquidityRatio, newPositions);
                 }
 
-            } else {
+            } 
 
-                // revert(
-                //     string(
-                //         abi.encodePacked(
-                //             "Nothing to skim : ", 
-                //             Utils._uint2str(uint256(toSkim))
-                //         )
-                //     )
-                // );
-            
-            }
-
-                // revert(
-                //     string(
-                //         abi.encodePacked(
-                //             "Nothing to skim : ", 
-                //             Utils._uint2str(uint256(toSkim))
-                //         )
-                //     )
-                // );
         } else {
             revert AboveThreshold();
         }
@@ -169,10 +150,10 @@ library LiquidityOps {
             })
         );
 
-        IModelHelper(modelHelper)
-        .updatePositions(
-            newPositions
-        );
+        // IModelHelper(modelHelper)
+        // .updatePositions(
+        //     newPositions
+        // );
 
         IVault(params.addresses.vault)
         .updatePositions(
@@ -287,7 +268,7 @@ library LiquidityOps {
 
         // Ratio of the anchor's price to market price
         uint256 currentLiquidityRatio = IModelHelper(addresses.modelHelper)
-        .getLiquidityRatio(addresses.pool);
+        .getLiquidityRatio(addresses.pool, addresses.vault);
                 
         (, uint256 anchorToken1Balance, uint256 discoveryToken1Balance) = getVaulData(addresses);
 
