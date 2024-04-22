@@ -31,7 +31,7 @@ struct AmountsToMint {
     uint256 amount1;
 }
 
-struct VaultInfo {
+struct TokenInfo {
     address token0;
     address token1;
 }
@@ -64,6 +64,17 @@ struct VaultData {
     uint256 anchorToken1Balance;
     uint256 discoveryToken1Balance;
     uint256 circulatingSupply;
+}
+
+struct VaultInfo {
+    uint256 liquidityRatio;
+    uint256 circulatingSupply; 
+    uint256 spotPriceX96;
+    uint256 anchorCapacity; 
+    uint256 floorCapacity;
+    address token0;
+    address token1;
+    uint256 newFloor;
 }
 
 struct PreShiftParameters {

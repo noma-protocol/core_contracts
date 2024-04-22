@@ -18,7 +18,7 @@ import {IWETH} from "./interfaces/IWETH.sol";
 import {NomaToken} from "./token/NomaToken.sol";
 import {Conversions} from "./libraries/Conversions.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {feeTier, tickSpacing, LiquidityPosition, LiquidityType, VaultInfo} from "./Types.sol";
+import {feeTier, tickSpacing, LiquidityPosition, LiquidityType, TokenInfo} from "./Types.sol";
 import {Uniswap} from "./libraries/Uniswap.sol";
  
 contract IDOManager is Owned {
@@ -34,7 +34,7 @@ contract IDOManager is Owned {
     uint256 private launchSupply;
     address private uniswapFactory;
 
-    VaultInfo private  vaultInfo;
+    TokenInfo private  tokenInfo;
     address private modelHelper;
     uint256 private IDOPrice;
 
@@ -65,9 +65,9 @@ contract IDOManager is Owned {
 
         uniswapFactory = _uniswapFactory;
 
-        VaultInfo storage _vaultInfo = vaultInfo;
-        _vaultInfo.token0 = address(amphorToken);
-        _vaultInfo.token1 = _token1;
+        TokenInfo storage tokenInfo = tokenInfo;
+        tokenInfo.token0 = address(amphorToken);
+        tokenInfo.token1 = _token1;
         modelHelper = _modelHelper;
 
     }
@@ -77,12 +77,12 @@ contract IDOManager is Owned {
 
         IUniswapV3Factory factory = IUniswapV3Factory(uniswapFactory);
         pool = IUniswapV3Pool(
-            factory.getPool(vaultInfo.token0, vaultInfo.token1, feeTier)
+            factory.getPool(tokenInfo.token0, tokenInfo.token1, feeTier)
         );
 
         if (address(pool) == address(0)) {
             pool = IUniswapV3Pool(
-                factory.createPool(vaultInfo.token0, vaultInfo.token1, feeTier)
+                factory.createPool(tokenInfo.token0, tokenInfo.token1, feeTier)
             );
             IUniswapV3Pool(pool)
             .initialize(
@@ -122,8 +122,8 @@ contract IDOManager is Owned {
         //     revert("createIDO: liquidity is 0");
         // }
 
-        ERC20(vaultInfo.token0).transfer(receiver, totalSupply);
-        //ERC20(vaultInfo.token0).transfer(receiver, totalSupply - launchSupply);
+        ERC20(tokenInfo.token0).transfer(receiver, totalSupply);
+        //ERC20(tokenInfo.token0).transfer(receiver, totalSupply - launchSupply);
         // IDOPosition = LiquidityPosition(lowerTick, upperTick, liquidity, IDOPrice);
     }
 
@@ -132,8 +132,8 @@ contract IDOManager is Owned {
         Uniswap.swap(
             address(pool),
             receiver,
-            vaultInfo.token0,
-            vaultInfo.token1,
+            tokenInfo.token0,
+            tokenInfo.token1,
             Conversions.priceToSqrtPriceX96(int256(price), tickSpacing),
             amountToken1,
             false,
@@ -144,7 +144,7 @@ contract IDOManager is Owned {
     function collectIDOFunds(address receiver) public {
         require(initialized, "not initialized");
 
-        uint256 balanceBeforeSwap = ERC20(vaultInfo.token1).balanceOf(address(this));
+        uint256 balanceBeforeSwap = ERC20(tokenInfo.token1).balanceOf(address(this));
 
         bytes32 IDOPositionId = keccak256(
             abi.encodePacked(
@@ -168,14 +168,14 @@ contract IDOManager is Owned {
             revert("collectWETH: liquidity is 0");
         }
 
-        uint256 balanceAfterSwap = ERC20(vaultInfo.token1).balanceOf(address(this));
+        uint256 balanceAfterSwap = ERC20(tokenInfo.token1).balanceOf(address(this));
         require(balanceAfterSwap > balanceBeforeSwap, "no tokens exchanged");
         
         // Send left over token0 to contract owner
-        ERC20(vaultInfo.token0).transfer(owner, ERC20(vaultInfo.token0).balanceOf(address(this)));
+        ERC20(tokenInfo.token0).transfer(owner, ERC20(tokenInfo.token0).balanceOf(address(this)));
 
         // Send token1 to receiver (Deployer contract)
-        ERC20(vaultInfo.token1).transfer(receiver, ERC20(vaultInfo.token1).balanceOf(address(this)));
+        ERC20(tokenInfo.token1).transfer(receiver, ERC20(tokenInfo.token1).balanceOf(address(this)));
     }
 
     // Test function
@@ -183,8 +183,8 @@ contract IDOManager is Owned {
     //     Uniswap.swap(
     //         address(pool),
     //         receiver,
-    //         vaultInfo.token0,
-    //         vaultInfo.token1,
+    //         tokenInfo.token0,
+    //         tokenInfo.token1,
     //         Conversions.priceToSqrtPriceX96(int256(price), tickSpacing),
     //         amount,
     //         true,
@@ -197,8 +197,8 @@ contract IDOManager is Owned {
         Uniswap.swap(
             address(pool),
             receiver,
-            vaultInfo.token0,
-            vaultInfo.token1,
+            tokenInfo.token0,
+            tokenInfo.token1,
             Conversions.priceToSqrtPriceX96(int256(price), tickSpacing),
             amount,
             false,
@@ -214,11 +214,11 @@ contract IDOManager is Owned {
     {
         require(msg.sender == address(pool), "callback caller");
 
-        uint256 token0Balance = ERC20(vaultInfo.token0).balanceOf(address(this));
-        uint256 token1Balance = ERC20(vaultInfo.token1).balanceOf(address(this));
+        uint256 token0Balance = ERC20(tokenInfo.token0).balanceOf(address(this));
+        uint256 token1Balance = ERC20(tokenInfo.token1).balanceOf(address(this));
 
         if (token0Balance >= amount0Owed) {
-            if (amount0Owed > 0) ERC20(vaultInfo.token0).transfer(msg.sender, amount0Owed);
+            if (amount0Owed > 0) ERC20(tokenInfo.token0).transfer(msg.sender, amount0Owed);
         } else {
             revert(
                 string(
@@ -231,7 +231,7 @@ contract IDOManager is Owned {
         }
 
         if (token1Balance >= amount1Owed) {
-            if (amount1Owed > 0) ERC20(vaultInfo.token1).transfer(msg.sender, amount1Owed);
+            if (amount1Owed > 0) ERC20(tokenInfo.token1).transfer(msg.sender, amount1Owed);
         } else {
             revert(
                 string(
@@ -252,9 +252,9 @@ contract IDOManager is Owned {
         require(msg.sender == address(pool), "callback caller");
 
         if (amount0Delta > 0) {
-           ERC20(vaultInfo.token0).transfer(msg.sender, uint256(amount0Delta));
+           ERC20(tokenInfo.token0).transfer(msg.sender, uint256(amount0Delta));
         } else if (amount1Delta > 0) {
-            ERC20(vaultInfo.token1).transfer(msg.sender, uint256(amount1Delta));
+            ERC20(tokenInfo.token1).transfer(msg.sender, uint256(amount1Delta));
         }
     }
 
@@ -262,14 +262,14 @@ contract IDOManager is Owned {
 
     receive() external payable {
 
-        uint256 balanceBefore = ERC20(vaultInfo.token1).balanceOf(address(this));
+        uint256 balanceBefore = ERC20(tokenInfo.token1).balanceOf(address(this));
 
-        IWETH(vaultInfo.token1).deposit{value: msg.value}();
+        IWETH(tokenInfo.token1).deposit{value: msg.value}();
 
-        uint256 balanceAfter = ERC20(vaultInfo.token1).balanceOf(address(this));
+        uint256 balanceAfter = ERC20(tokenInfo.token1).balanceOf(address(this));
         uint256 excessAmount = balanceAfter - balanceBefore;
 
-        ERC20(vaultInfo.token1).transfer(owner, excessAmount);
+        ERC20(tokenInfo.token1).transfer(owner, excessAmount);
     }
 
 }
