@@ -224,7 +224,9 @@ library LiquidityDeployer {
             amounts.amount1
         );
 
-        require(amounts.amount0 >= 1 ether, "doDeployPosition: amount0 is too low");
+        if (liquidityType == LiquidityType.Discovery) {
+            require(amounts.amount0 >= 1 ether, "doDeployPosition: amount0 is too low");
+        }
 
         if (liquidity > 0) {
             Uniswap.mint(
