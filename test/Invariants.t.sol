@@ -5,7 +5,6 @@ import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
-import {IQuoter} from "@uniswap/v3-periphery/interfaces/IQuoter.sol";
 
 import {Deployer} from "../src/Deployer.sol";
 import {Vault} from  "../src/Vault.sol";
@@ -82,11 +81,9 @@ contract Invariants is Test {
         vm.recordLogs();
         vm.startBroadcast(privateKey);
 
-        // Check the total supply of the token
         uint256 totalSupply = noma.totalSupply();
         console.log("Total supply is %s", totalSupply);
 
-        // Assert that the total supply is as expected
         assertEq(totalSupply, 100e18, "Total supply is not correct");
 
         vm.stopBroadcast();
@@ -124,28 +121,6 @@ contract Invariants is Test {
 
             console.log("Traded %s Ethereum, received %s tokens", (i + 1) * tradeAmount, receivedAmount);
 
-            // Check that received amount is within 4% of tradeAmount
-            // This requires knowing how many tokens we expect to receive per Ether
-            // uint256 tradeAmount, address quoterAddress, address tokenIn, address tokenOut, uint24 poolFee
-            // uint256 expectedAmount = getExpectedTokens(
-            //     tradeAmount, 
-            //     quoterAddress, 
-            //     IUniswapV3Pool(pool).token0(), 
-            //     IUniswapV3Pool(pool).token1(), 
-            //     3000,
-            //     sqrtPriceX96
-            // );
-
-            // console.log("Expected amount is: ", expectedAmount);
-            // uint256 lowerBound = expectedAmount * 96 / 100; // 4% less than expected
-            // uint256 upperBound = expectedAmount * 104 / 100; // 4% more than expected
-            // require(
-            //     receivedAmount >= lowerBound && receivedAmount <= upperBound,
-            //     "Received token amount is outside the acceptable range"
-            // );
-
-            // Update tokenBalanceBefore for the next iteration
-            // tokenBalanceBefore = tokenBalanceAfter;
         }
         vm.stopBroadcast();
     }
@@ -164,8 +139,6 @@ contract Invariants is Test {
         console.log("Spot price is: ", spotPrice);
 
         uint8 totalTradesBuy = 24;
-        uint8 totalTradesSell = 4;
-        uint256 tradeAmount = 1.6 ether;
         uint256 tradeAmountWETH = 2 ether;
 
         IWETH(WETH).deposit{ value:  tradeAmountWETH * totalTradesBuy}();
@@ -190,38 +163,15 @@ contract Invariants is Test {
         uint256 tokenBalanceBeforeSelling = noma.balanceOf(address(deployer));
         console.log("Token balance before selling is %s", tokenBalanceBeforeSelling);
 
-        uint256 tokenToSend = tradeAmount * totalTradesSell;
-
-        // if (tokenBalanceBeforeSelling >= 13.37e18) {
-
         noma.transfer(idoManager, tokenBalanceBeforeSelling);
 
-        // for (uint i = 0; i < totalTradesSell; i++) {
         (sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
         spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
         managerContract.sellTokens(spotPrice - (spotPrice * 15/100), tokenBalanceBeforeSelling, address(deployer));
-        // }
-
-        // uint256 tokenBalanceAfterSelling = noma.balanceOf(address(deployer));
-        // console.log("Token balance after selling is %s", tokenBalanceBeforeSelling);
 
         (sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
         spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
         console.log("Spot price is: ", spotPrice);
-
-        // } else {
-        //     // revert(Utils._uint2str(tokenBalanceBeforeSelling));
-        //     revert("Not enough balance to sell");
-        // }
-
-        // uint256 circulatingSupplyAfter = modelHelper.getCirculatingSupply(pool, address(vault));
-        // console.log("Circulating supply is: ", circulatingSupplyAfter);
-
-        // uint256 delta = circulatingSupplyBefore - circulatingSupplyAfter;
-        // console.log("Amount sold is %s", delta);
-        
-        // // test that remaining amount is less than 4% of initial amount
-        // Utils.testLessThan(circulatingSupplyBefore - delta, 1e18 * 4 / 100);
 
         vm.stopBroadcast();
     }
@@ -236,7 +186,6 @@ contract Invariants is Test {
         uint8 totalTrades = 100;
         uint256 tradeAmount = 1 ether;
 
-        // Simulating a deposit and transfer to the IDO manager contract
         IWETH(WETH).deposit{ value: 100 ether }();
         IWETH(WETH).transfer(idoManager, tradeAmount * totalTrades);
 
@@ -263,6 +212,7 @@ contract Invariants is Test {
             vault.shift();
             nextFloorPrice = getNextFloorPrice(pool, address(vault));
             console.log("Next floor price (after shift) is: ", nextFloorPrice);
+            solvencyInvariant();
         } else {
             revert("No shift triggered");
         }
@@ -278,7 +228,6 @@ contract Invariants is Test {
         uint8 totalTrades = 2;
         uint256 tradeAmount = 0.005 ether;
 
-        // Simulating a deposit and transfer to the IDO manager contract
         IWETH(WETH).deposit{ value: 10 ether }();
         IWETH(WETH).transfer(idoManager, tradeAmount * totalTrades);
 
@@ -287,21 +236,15 @@ contract Invariants is Test {
         console.log("Circulating supply is: ", circulatingSupplyBefore);
 
         for (uint i = 0; i < totalTrades; i++) {
-            // Buy tokens using the manager contract
             managerContract.buyTokens(spotPrice, tradeAmount, address(this));
         }
         
-        // Check the new token balance after buying
         uint256 tokenBalanceAfter = noma.balanceOf(address(this));
         console.log("Token balance after buying is %s", tokenBalanceAfter);
 
         uint256 circulatingSupplyAfter = modelHelper.getCirculatingSupply(pool, address(vault));
         console.log("Circulating supply is: ", circulatingSupplyAfter);
 
-        // Check that the token balance has increased after buying
-        // Utils.testLessThan(tokenBalanceBefore, tokenBalanceAfter);
-
-        // Check that the circulating supply matches the token balance after buying
         assertEq(tokenBalanceAfter + 3, circulatingSupplyAfter, "Circulating supply does not match bought tokens");
     }
 
@@ -315,27 +258,24 @@ contract Invariants is Test {
         uint8 totalTrades = 2;
         uint256 tradeAmount = 0.005 ether;
 
-
-        // Simulating a deposit and transfer to the IDO manager contract
         IWETH(WETH).deposit{ value: 10 ether }();
         IWETH(WETH).transfer(idoManager, tradeAmount * totalTrades);
 
         for (uint i = 0; i < totalTrades; i++) {
-            // Buy tokens using the manager contract
             managerContract.buyTokens(spotPrice, tradeAmount, address(deployer));
         }
- 
 
         uint256 nextFloorPrice = getNextFloorPrice(pool, address(vault));
+        uint256 liquidityRatio = modelHelper.getLiquidityRatio(pool, address(vault));
+        console.log("Liquidity ratio is: ", liquidityRatio);
 
-        if (nextFloorPrice > 0.98e18) {
+        if (liquidityRatio > 0.98e18) {
 
             console.log("Attempt to shift positions");
-            vm.expectRevert(bytes4(0xe40aeaf5)); // custom error AboveThreshold()"
+            // custom error AboveThreshold()"
+            vm.expectRevert(bytes4(0xe40aeaf5));
             vault.shift();
-
-            // nextFloorPrice = getNextFloorPrice(pool, address(vault));
-            // console.log("Next floor price (after shift) is: ", nextFloorPrice);
+            solvencyInvariant();
         }  
         
     }
@@ -350,12 +290,10 @@ contract Invariants is Test {
         uint8 totalTrades = 5;
         uint256 tradeAmount = 0.05 ether;
 
-        // Simulating a deposit and transfer to the IDO manager contract
         IWETH(WETH).deposit{ value: 10 ether }();
         IWETH(WETH).transfer(idoManager, tradeAmount * totalTrades);
 
         for (uint i = 0; i < totalTrades; i++) {
-            // Buy tokens using the manager contract
             managerContract.buyTokens(spotPrice, tradeAmount, address(deployer));
         }
 
@@ -368,13 +306,75 @@ contract Invariants is Test {
         uint256 nextFloorPrice = DecimalMath.divideDecimal(floorBalance, circulatingSupply > anchorCapacity ? circulatingSupply - anchorCapacity : circulatingSupply);
         console.log("Next floor price is: ", nextFloorPrice);
 
-        if (nextFloorPrice < 0.98e18) {
+        uint256 liquidityRatio = modelHelper.getLiquidityRatio(pool, address(vault));
+        console.log("Liquidity ratio is: ", liquidityRatio);
+
+        if (liquidityRatio < 0.98e18) {
             console.log("Attempt to shift positions");
             vault.shift();
             nextFloorPrice = getNextFloorPrice(pool, address(vault));
             console.log("Next floor price (after shift) is: ", nextFloorPrice);     
             require(nextFloorPrice > 0.98e18, "Next floor price is below threshold");  
         }  
+    }
+    
+    function testSlide() public {
+        IDOManager managerContract = IDOManager(idoManager);
+        Vault vault = managerContract.vault();
+        address pool = address(vault.pool());
+
+        (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
+        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+        uint8 totalTrades = 100;
+        uint256 tradeAmount = 1 ether;
+
+        IWETH(WETH).deposit{ value: 100 ether }();
+        IWETH(WETH).transfer(idoManager, tradeAmount * totalTrades);
+
+        uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault));
+        console.log("Circulating supply is: ", circulatingSupplyBefore);
+
+        for (uint i = 0; i < totalTrades; i++) {
+            spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+            if (i >= 4) {
+                spotPrice = spotPrice + (spotPrice * i / 100);
+            }
+            managerContract.buyTokens(spotPrice, tradeAmount, address(this));
+        }
+
+        uint256 liquidityRatio = modelHelper.getLiquidityRatio(pool, address(vault));
+
+        if (liquidityRatio < 0.98e18) {
+            console.log("Attempt to shift positions");
+            vault.shift();
+        }  
+
+        uint256 tokenBalanceBeforeSelling = noma.balanceOf(address(this));
+        console.log("Token balance before selling is %s", tokenBalanceBeforeSelling);
+
+        noma.transfer(idoManager, tokenBalanceBeforeSelling);
+
+        (sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
+        spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+
+        managerContract.sellTokens(
+            spotPrice - (spotPrice * 15/100), 
+            tokenBalanceBeforeSelling, 
+            address(deployer)
+        );
+
+        liquidityRatio = modelHelper.getLiquidityRatio(pool, address(vault));
+        console.log("Liquidity ratio is: ", liquidityRatio);
+
+        if (liquidityRatio > 1.2e18) {
+            console.log("Attempt to slide positions");
+            vault.slide();
+            solvencyInvariant();
+        } else {
+            revert("No slide triggered");
+        
+        }
+
     }
 
     function getNextFloorPrice(address pool, address vault) public view returns (uint256) {
@@ -386,28 +386,29 @@ contract Invariants is Test {
         return DecimalMath.divideDecimal(floorBalance, circulatingSupply > anchorCapacity ? circulatingSupply - anchorCapacity : circulatingSupply);
     }
 
-    function getPositions(address vault) public view returns (LiquidityPosition[3] memory) {
-        return IVault(vault).getPositions();
+    function solvencyInvariant() public view {
+        IDOManager managerContract = IDOManager(idoManager);
+        Vault vault = managerContract.vault();
+        address pool = address(vault.pool());
+
+        // To guarantee solvency, Noma ensures that capacity > circulating supply each liquidity is deployed.
+
+        uint256 circulatingSupply = modelHelper.getCirculatingSupply(pool, address(vault));
+        console.log("Circulating supply is: ", circulatingSupply);
+
+        LiquidityPosition[3] memory positions = vault.getPositions();
+        uint256 anchorCapacity = modelHelper.getPositionCapacity(pool, address(vault), positions[1]);
+        (,,,uint256 floorBalance) = Underlying.getUnderlyingBalances(pool, address(vault), positions[0]);
+
+        require(anchorCapacity + floorBalance > circulatingSupply, "Insolvency invariant failed");
     }
 
-    function getExpectedTokens(
-        uint256 tradeAmount, 
-        address quoterAddress, 
-        address tokenIn, 
-        address tokenOut, 
-        uint24 poolFee,
-        uint160 sqrtPriceX96
-    ) internal returns (uint256 expectedAmount) {
-        IQuoter quoter = IQuoter(quoterAddress);
-        
-        expectedAmount = quoter
-        .quoteExactInputSingle(
-            tokenIn,
-            tokenOut,
-            poolFee,
-            tradeAmount,
-            sqrtPriceX96
-        );
+    function testSolvencyInvariant() public {
+        solvencyInvariant();
+    }
+
+    function getPositions(address vault) public view returns (LiquidityPosition[3] memory) {
+        return IVault(vault).getPositions();
     }
     
 }
