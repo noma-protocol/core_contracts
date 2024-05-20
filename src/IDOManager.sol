@@ -15,19 +15,20 @@ import {TickMath} from '@uniswap/v3-core/libraries/TickMath.sol';
 import {Vault} from "./Vault.sol";
  
 import {IWETH} from "./interfaces/IWETH.sol";
-import {NomaToken} from "./token/NomaToken.sol";
+import {MockNomaToken} from "./token/MockNomaToken.sol";
 import {Conversions} from "./libraries/Conversions.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {feeTier, tickSpacing, LiquidityPosition, LiquidityType, TokenInfo} from "./Types.sol";
 import {Uniswap} from "./libraries/Uniswap.sol";
- 
+import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
+
 contract IDOManager is Owned {
 
     bool private initialized;
 
     IUniswapV3Pool public pool;
 
-    NomaToken private amphorToken;
+    MockNomaToken private amphorToken;
     Vault public vault;
 
     uint256 private totalSupply;
@@ -59,10 +60,11 @@ contract IDOManager is Owned {
         // Dev: force desired token order on Uniswap V3
         uint256 nonce = 0;
         do {
-            amphorToken = new NomaToken{salt: bytes32(nonce)}(address(this), totalSupply);
+            amphorToken = new MockNomaToken{salt: bytes32(nonce)}();
             nonce++;
         } while (address(amphorToken) >= _token1);
-
+        
+        amphorToken.initialize(address(this), totalSupply);
         uniswapFactory = _uniswapFactory;
 
         TokenInfo storage tokenInfo = tokenInfo;
@@ -179,20 +181,6 @@ contract IDOManager is Owned {
     }
 
     // Test function
-    // function sellTokens(uint256 price, uint256 amount, address receiver) public {
-    //     Uniswap.swap(
-    //         address(pool),
-    //         receiver,
-    //         tokenInfo.token0,
-    //         tokenInfo.token1,
-    //         Conversions.priceToSqrtPriceX96(int256(price), tickSpacing),
-    //         amount,
-    //         true,
-    //         false
-    //     );        
-    // }
-
-    // Test function
     function buyTokens(uint256 price, uint256 amount, address receiver) public {
         Uniswap.swap(
             address(pool),
@@ -202,6 +190,19 @@ contract IDOManager is Owned {
             Conversions.priceToSqrtPriceX96(int256(price), tickSpacing),
             amount,
             false,
+            false
+        );        
+    }
+ 
+    function sellTokens(uint256 price, uint256 amount, address receiver) public {
+        Uniswap.swap(
+            address(pool),
+            receiver,
+            tokenInfo.token0,
+            tokenInfo.token1,
+            Conversions.priceToSqrtPriceX96(int256(price), tickSpacing),
+            amount,
+            true,
             false
         );        
     }
