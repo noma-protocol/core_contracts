@@ -99,13 +99,11 @@ contract Vault is Owned {
 
     }
 
-    function setParameters(address _deployerContract, address something) public /*onlyOwner*/ {
+    function setParameters(address _deployerContract) public onlyOwner {
         if (initialized) revert AlreadyInitialized();
 
         deployerContract = _deployerContract;
     }
-
-
 
     function shift() public {
         require(initialized, "not initialized");
