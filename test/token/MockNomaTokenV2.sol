@@ -26,11 +26,11 @@ contract MockNomaTokenV2 is Initializable, ERC20Upgradeable, OwnableUpgradeable,
         return keccak256("eip1967.proxy.implementation");
     }
 
-    function transfer(address recipient, uint256 amount) public override onlyUniswapV3(msg.sender) returns (bool) {
+    function transfer(address recipient, uint256 amount) public override onlyUniswapV3(msg.sender, recipient) returns (bool) {
         return super.transfer(recipient, amount);
     }
 
-    function transferFrom(address sender, address recipient, uint256 amount) public override onlyUniswapV3(msg.sender) returns (bool) {
+    function transferFrom(address sender, address recipient, uint256 amount) public override onlyUniswapV3(sender, recipient) returns (bool) {
         return super.transferFrom(sender, recipient, amount);
     }
 
@@ -42,9 +42,9 @@ contract MockNomaTokenV2 is Initializable, ERC20Upgradeable, OwnableUpgradeable,
         allowedPools[pool] = false;
     }
     
-    modifier onlyUniswapV3(address sender) {
+    modifier onlyUniswapV3(address sender, address recipient) {
         require(
-            allowedPools[sender],
+            allowedPools[sender] || allowedPools[recipient],
             "Token can only be transferred via Uniswap V3"
         );
         _;
