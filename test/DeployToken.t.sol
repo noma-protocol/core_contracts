@@ -5,12 +5,12 @@ import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 
 import "../src/token/MockNomaToken.sol";
-import "./token/MockNomaTokenV2.sol";
+import "./token/TestMockNomaTokenV2.sol";
 import "openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract DeployToken is Test {
     MockNomaToken public mockNomaToken;
-    MockNomaTokenV2 public mockNomaTokenV2;
+    TestMockNomaTokenV2 public mockNomaTokenV2;
     ERC1967Proxy public proxy;
 
     address deployer = address(1);
@@ -56,14 +56,14 @@ contract DeployToken is Test {
 
     function testUpgrade() public {
         // Deploy new implementation
-        mockNomaTokenV2 = new MockNomaTokenV2();
+        mockNomaTokenV2 = new TestMockNomaTokenV2();
 
         // Upgrade the proxy to use the new implementation
         vm.prank(deployer);
         MockNomaToken(address(proxy)).upgradeToAndCall(address(mockNomaTokenV2), new bytes(0));
 
-        // Cast the proxy to MockNomaTokenV2 to interact with the new implementation
-        MockNomaTokenV2 upgraded = MockNomaTokenV2(address(proxy));
+        // Cast the proxy to TestMockNomaTokenV2 to interact with the new implementation
+        TestMockNomaTokenV2 upgraded = TestMockNomaTokenV2(address(proxy));
 
         mockNomaTokenV2 = upgraded;
         bytes32 uuid = mockNomaTokenV2.proxiableUUID();
@@ -87,7 +87,7 @@ contract DeployToken is Test {
         assertEq(mockNomaToken.proxiableUUID(), uuid);
 
         // Deploy new implementation
-        mockNomaTokenV2 = new MockNomaTokenV2();
+        mockNomaTokenV2 = new TestMockNomaTokenV2();
         assertEq(mockNomaTokenV2.proxiableUUID(), uuid);
     }
 }

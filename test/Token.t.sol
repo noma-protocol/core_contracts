@@ -3,12 +3,12 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "../src/token/MockNomaToken.sol";
-import "./token/MockNomaTokenV2.sol";
+import "./token/TestMockNomaTokenV2.sol";
 import "openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract MockNomaTokenTest is Test {
     MockNomaToken public mockNomaToken;
-    MockNomaTokenV2 public mockNomaTokenV2;
+    TestMockNomaTokenV2 public mockNomaTokenV2;
     ERC1967Proxy public proxy;
 
     address deployer = vm.envAddress("DEPLOYER");
@@ -56,14 +56,14 @@ contract MockNomaTokenTest is Test {
 
     function testUpgrade() public {
         // Deploy new implementation
-        mockNomaTokenV2 = new MockNomaTokenV2();
+        mockNomaTokenV2 = new TestMockNomaTokenV2();
 
         // Upgrade the proxy to use the new implementation
         vm.prank(deployer);
         MockNomaToken(address(proxy)).upgradeToAndCall(address(mockNomaTokenV2), new bytes(0));
 
         // Cast the proxy to MockNomaTokenV2 to interact with the new implementation
-        MockNomaTokenV2 upgraded = MockNomaTokenV2(address(proxy));
+        TestMockNomaTokenV2 upgraded = TestMockNomaTokenV2(address(proxy));
 
         // Check if the new implementation is in use
         assertEq(upgraded.version(), "V2");
@@ -71,10 +71,10 @@ contract MockNomaTokenTest is Test {
 
     function testOnlyUniswapV3Restriction() public {
         // Deploy new implementation and upgrade the proxy
-        mockNomaTokenV2 = new MockNomaTokenV2();
+        mockNomaTokenV2 = new TestMockNomaTokenV2();
         vm.prank(deployer);
         MockNomaToken(address(proxy)).upgradeToAndCall(address(mockNomaTokenV2), new bytes(0));
-        MockNomaTokenV2 upgraded = MockNomaTokenV2(address(proxy));
+        TestMockNomaTokenV2 upgraded = TestMockNomaTokenV2(address(proxy));
 
         // Allow uniswapV3Pool to perform transfers
         vm.prank(deployer);
