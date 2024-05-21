@@ -92,7 +92,7 @@ contract IDOManager is Owned {
             );
         } 
 
-        vault = new Vault(address(pool), address(modelHelper));
+        vault = new Vault(msg.sender, address(pool), address(modelHelper));
         
         IDOPrice = _IDOPrice;
         initialized = true;
