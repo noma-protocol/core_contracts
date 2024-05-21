@@ -3,70 +3,83 @@ pragma solidity ^0.8.0;
 
 import {Owned} from "solmate/auth/Owned.sol";
 
-contract MockWETH {
+contract MockWETH is Owned {
     string public name = "Mock WETH";
     string public symbol = "mWETH";
     uint8 public decimals = 18;
 
-    event Approval(address indexed src, address indexed guy, uint wad);
-    event Transfer(address indexed src, address indexed dst, uint wad);
-    event Deposit(address indexed dst, uint wad);
-    event Withdrawal(address indexed src, uint wad);
+    event Approval(address indexed sender, address indexed who, uint256 amount);
+    event Transfer(address indexed sender, address indexed receiver, uint256 amount);
+    event Deposit(address indexed receiver, uint256 amount);
+    event Withdrawal(address indexed sender, uint256 amount);
 
-    mapping(address => uint) public balanceOf;
-    mapping(address => mapping(address => uint)) public allowance;
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+
+    constructor(address deployer) Owned(msg.sender) {
+        balanceOf[deployer] = 1_000_000 ether;
+    }
 
     function deposit() public payable {
         balanceOf[msg.sender] += msg.value;
         emit Deposit(msg.sender, msg.value);
     }
 
-    function withdraw(uint wad) public {
-        require(balanceOf[msg.sender] >= wad, "Insufficient balance");
-        balanceOf[msg.sender] -= wad;
-        payable(msg.sender).transfer(wad);
-        emit Withdrawal(msg.sender, wad);
+    function depositTo(address receiver) external payable {
+        balanceOf[receiver] += msg.value;
+        emit Deposit(receiver, msg.value);
     }
 
-    function mintTo(address to, uint wad) public {
-        balanceOf[to] += wad;
-        emit Deposit(to, wad);
+    function withdraw(uint256 amount) external {
+        require(balanceOf[msg.sender] >= amount, "Insufficient balance");
+        balanceOf[msg.sender] -= amount;
+        payable(msg.sender).transfer(amount);
+        emit Withdrawal(msg.sender, amount);
     }
 
-    function totalSupply() public view returns (uint) {
+    function mintTo(address to, uint256 amount) external onlyOwner {
+        balanceOf[to] += amount;
+        emit Deposit(to, amount);
+    }
+
+    function totalSupply() public view returns (uint256) {
         return address(this).balance;
     }
 
-    function approve(address guy, uint wad) public returns (bool) {
-        allowance[msg.sender][guy] = wad;
-        emit Approval(msg.sender, guy, wad);
+    function approve(address who, uint256 amount) public returns (bool) {
+        allowance[msg.sender][who] = amount;
+        emit Approval(msg.sender, who, amount);
         return true;
     }
 
-    function transfer(address dst, uint wad) public returns (bool) {
-        return transferFrom(msg.sender, dst, wad);
+    function transfer(address receiver, uint256 amount) public returns (bool) {
+        return transferFrom(msg.sender, receiver, amount);
     }
 
-    function transferFrom(address src, address dst, uint wad)
+    function transferFrom(address sender, address receiver, uint256 amount)
         public
         returns (bool)
     {
-        require(balanceOf[src] >= wad, "Insufficient balance");
+        require(balanceOf[sender] >= amount, "Insufficient balance");
 
-        if (src != msg.sender && allowance[src][msg.sender] != type(uint).max) {
-            require(allowance[src][msg.sender] >= wad, "Allowance exceeded");
-            allowance[src][msg.sender] -= wad;
+        if (sender != msg.sender && allowance[sender][msg.sender] != type(uint256).max) {
+            require(allowance[sender][msg.sender] >= amount, "Allowance exceeded");
+            allowance[sender][msg.sender] -= amount;
         }
 
-        balanceOf[src] -= wad;
-        balanceOf[dst] += wad;
+        balanceOf[sender] -= amount;
+        balanceOf[receiver] += amount;
 
-        emit Transfer(src, dst, wad);
+        emit Transfer(sender, receiver, amount);
 
         return true;
     }
 
     fallback() external payable {
+        deposit();
+    }
+
+    receive() external payable {
         deposit();
     }
 
