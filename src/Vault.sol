@@ -72,7 +72,7 @@ contract Vault is Owned {
         } 
     }
 
-    constructor(address _pool, address _modelHelper) Owned(msg.sender) {
+    constructor(address owner, address _pool, address _modelHelper) Owned(owner) {
         pool = IUniswapV3Pool(_pool);
         modelHelper = _modelHelper;
         tokenInfo.token0 = pool.token0();
@@ -97,12 +97,6 @@ contract Vault is Owned {
             positions
         );
 
-    }
-
-    function setParameters(address _deployerContract) public onlyOwner {
-        if (initialized) revert AlreadyInitialized();
-
-        deployerContract = _deployerContract;
     }
 
     function shift() public {
@@ -163,6 +157,12 @@ contract Vault is Owned {
         ); 
     }
 
+    function setParameters(address _deployerContract) public onlyOwner {
+        if (initialized) revert AlreadyInitialized();
+
+        deployerContract = _deployerContract;
+    }
+    
     function getPositions() public view
     returns (LiquidityPosition[3] memory positions) {
         positions = [floorPosition, anchorPosition, discoveryPosition];
