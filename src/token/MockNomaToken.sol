@@ -13,9 +13,9 @@ contract MockNomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, U
 
     function initialize(address deployer, uint256 totalSupply) initializer public {
         __ERC20_init("Test Noma", "tNOMA");
-        _mint(deployer, totalSupply);
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
+        _mint(deployer, totalSupply);
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
