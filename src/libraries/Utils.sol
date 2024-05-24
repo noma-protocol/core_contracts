@@ -89,6 +89,19 @@ library Utils {
         return string(bstr);
     }
 
+    function strToUint(string memory s) public pure returns (uint256) {
+       bytes memory b = bytes(s);
+        uint256 result = 0;
+        for (uint i = 0; i < b.length; i++) {
+            if (b[i] >= 0x30 && b[i] <= 0x39) { // 0x30 is '0' and 0x39 is '9'
+                result = result * 10 + (uint8(b[i]) - 0x30);
+            } else {
+                revert("Invalid character in string: non-numeric character encountered");
+            }
+        }
+        return result;
+    }
+
     function int24ToUint256(int24 _value) public pure returns (uint256) {
         require(_value >= 0, "Value is negative");
         return uint256(uint24(_value));
