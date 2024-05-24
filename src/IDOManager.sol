@@ -14,13 +14,21 @@ import {TickMath} from '@uniswap/v3-core/libraries/TickMath.sol';
 
 import {Vault} from "./Vault.sol";
  
-import {IWETH} from "./interfaces/IWETH.sol";
 import {MockNomaToken} from "./token/MockNomaToken.sol";
 import {Conversions} from "./libraries/Conversions.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {feeTier, tickSpacing, LiquidityPosition, LiquidityType, TokenInfo} from "./Types.sol";
 import {Uniswap} from "./libraries/Uniswap.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {MockWETH} from "../src/token/MockWETH.sol";
+
+interface IWETH {
+    function deposit() external payable;
+    function depositTo(address receiver) external payable;
+    function transfer(address to, uint value) external returns (bool);
+    function mintTo(address to, uint256 amount) external;
+}
 
 contract IDOManager is Owned {
 
@@ -29,11 +37,17 @@ contract IDOManager is Owned {
     IUniswapV3Pool public pool;
 
     MockNomaToken private amphorToken;
+    MockWETH private mockWeth;
+
     Vault public vault;
 
     uint256 private totalSupply;
     uint256 private launchSupply;
     address private uniswapFactory;
+
+    address public mockWethAddress;
+    address public implementationAddress;
+    address public proxyAddress;
 
     TokenInfo private  tokenInfo;
     address private modelHelper;
@@ -42,12 +56,13 @@ contract IDOManager is Owned {
     LiquidityPosition private IDOPosition;
 
     constructor(
+        address _deployer,
         address _uniswapFactory, 
         address _modelHelper,
         address _token1,
         uint256 _totalSupply, 
         uint16 _percentageForSale
-    ) Owned(msg.sender) { 
+    ) Owned(_deployer) payable { 
         require(
             _percentageForSale > 0 && 
             _percentageForSale < 50, 
@@ -59,17 +74,48 @@ contract IDOManager is Owned {
 
         // Dev: force desired token order on Uniswap V3
         uint256 nonce = 0;
+        MockNomaToken amphorToken;
+
+        // Encode the initialize function call
+        bytes memory data = abi.encodeWithSelector(
+            amphorToken.initialize.selector,
+            // address(this),  // owner address
+            address(this),  // Deployer address
+            totalSupply     // Initial supply
+        );
+
         do {
-            amphorToken = new MockNomaToken{salt: bytes32(nonce)}();
+            mockWeth = new MockWETH(_deployer);
+            amphorToken = new MockNomaToken{salt: bytes32(nonce)}();            
             nonce++;
-        } while (address(amphorToken) >= _token1);
+        } while (address(amphorToken) >= address(mockWeth));
+
+        // Deploy the proxy contract
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(amphorToken),
+            data
+        );      
         
+        require(address(amphorToken) < address(mockWeth), "invalid token address");
+
+        implementationAddress = address(amphorToken);
+        mockWethAddress = address(mockWeth);
+        proxyAddress = address(proxy);
+
         amphorToken.initialize(address(this), totalSupply);
+        MockNomaToken(address(proxy)).setOwner(_deployer);
+        // amphorToken.transferOwnership(deployer);
+        
         uniswapFactory = _uniswapFactory;
+        
+        uint256 totalSupplyFromContract = amphorToken.totalSupply();
+
+        require(totalSupplyFromContract == totalSupply, "wrong parameters");
+        require(address(proxy) != address(0), "Token deploy failed");
 
         TokenInfo storage tokenInfo = tokenInfo;
-        tokenInfo.token0 = address(amphorToken);
-        tokenInfo.token1 = _token1;
+        tokenInfo.token0 = address(proxy);  
+        tokenInfo.token1 = address(mockWeth); 
         modelHelper = _modelHelper;
 
     }
