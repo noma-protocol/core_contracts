@@ -10,16 +10,17 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 contract MockNomaTokenRestricted is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
     mapping(address => bool) public allowedPools;
 
-    function initialize(address deployer, uint256 totalSupply) initializer public {
+    function initialize(address owner, address deployer, uint256 totalSupply) initializer public {
         __ERC20_init("Test Noma", "tNOMA");
-        __Ownable_init(msg.sender);
+        __Ownable_init(owner);
         __UUPSUpgradeable_init();
+        _mint(deployer, totalSupply);
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     function version() public pure returns (string memory) {
-        return "V2";
+        return "2";
     }
 
     function proxiableUUID() public pure override returns (bytes32) {
