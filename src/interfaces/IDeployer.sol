@@ -19,7 +19,7 @@ interface IDeployer {
         uint256 currentFloorBalance,
         LiquidityPosition memory floorPosition
     ) external  returns (LiquidityPosition memory newPosition);
-    function doDeployPosition(
+    function deployPosition(
         address pool,
         address receiver,
         int24 lowerTick,

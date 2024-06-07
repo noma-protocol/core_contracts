@@ -123,25 +123,6 @@ contract Deployer is Owned {
         emit AnchorDeployed(newPosition);
     }
 
-    function doDeployPosition(
-        address pool,
-        address receiver,
-        int24 lowerTick,
-        int24 upperTick,
-        LiquidityType liquidityType,
-        AmountsToMint memory amounts
-    ) public returns (LiquidityPosition memory newPosition) {
-        return LiquidityDeployer
-        .doDeployPosition(
-            address(pool),
-            receiver,
-            lowerTick,
-            upperTick,
-            liquidityType,
-            amounts
-        );
-    }
-
     function deployDiscovery(uint256 upperDiscoveryPrice) public initialized /*onlyOwner*/ 
     returns (LiquidityPosition memory newPosition, LiquidityType liquidityType) {
 
@@ -158,7 +139,26 @@ contract Deployer is Owned {
         discoveryPosition = newPosition;
         emit DiscoveryDeployed(newPosition);
     }
- 
+
+    function deployPosition(
+        address pool,
+        address receiver,
+        int24 lowerTick,
+        int24 upperTick,
+        LiquidityType liquidityType,
+        AmountsToMint memory amounts
+    ) public returns (LiquidityPosition memory newPosition) {
+        return LiquidityDeployer
+        ._deployPosition(
+            address(pool),
+            receiver,
+            lowerTick,
+            upperTick,
+            liquidityType,
+            amounts
+        );
+    }
+
     function shiftFloor(
         address _pool,
         address receiver,
