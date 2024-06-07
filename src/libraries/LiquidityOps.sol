@@ -20,12 +20,9 @@ import {IDeployer} from "../interfaces/IDeployer.sol";
 import {
     LiquidityPosition, 
     LiquidityType, 
-    DeployLiquidityParameters,
     AmountsToMint,
-    TokenInfo,
     ShiftParameters,
     ProtocolAddresses,
-    VaultData,
     PreShiftParameters
 } from "../Types.sol";
 
@@ -35,14 +32,17 @@ interface IVault {
 
 error InvalidTick();
 error AboveThreshold();
+error BelowThreshold();
 
 library LiquidityOps {
+    
+    int24 constant TICK_SPACING = 60;
 
     function shift(
         ProtocolAddresses memory addresses,
         LiquidityPosition[3] memory positions
     ) internal 
-    onlyNotEmptyPositions(addresses.pool, positions) 
+    // onlyNotEmptyPositions(addresses.pool, positions) 
     returns (
         uint256 currentLiquidityRatio,
         LiquidityPosition[3] memory newPositions
@@ -270,9 +270,12 @@ library LiquidityOps {
         uint256 currentLiquidityRatio = IModelHelper(addresses.modelHelper)
         .getLiquidityRatio(addresses.pool, addresses.vault);
                 
-        (, uint256 anchorToken1Balance, uint256 discoveryToken1Balance) = getVaulData(addresses);
+        (, 
+            uint256 anchorToken1Balance, 
+        ) = getVaulData(addresses);
 
-        if (currentLiquidityRatio <= 120e16) {
+        if (currentLiquidityRatio >= 115e16) {
+            
             // Collect anchor liquidity
             Uniswap.collect(
                 addresses.pool, 
@@ -281,23 +284,56 @@ library LiquidityOps {
                 positions[1].upperTick
             ); 
 
+            Uniswap.collect(
+                addresses.pool, 
+                address(this), 
+                positions[2].lowerTick, 
+                positions[2].upperTick
+            ); 
+
             //Shift anchor position
             newPositions[1] = reDeploy(
                 addresses.pool,
                 addresses.deployer,
                 positions[0].upperTick,                
-                Utils.nearestUsableTick(
-                    TickMath.getTickAtSqrtRatio(sqrtRatioX96)      
-                ),
+                Utils.nearestUsableTick(TickMath.getTickAtSqrtRatio(sqrtRatioX96) + TICK_SPACING),
                 anchorToken1Balance, 
                 LiquidityType.Anchor
-            );  
+            );
 
-            require(
-                newPositions[1].liquidity > 0, 
-                "slide: no liquidity in positions"
-            );           
-        }
+            newPositions[2] = reDeploy(
+                addresses.pool,
+                addresses.deployer,
+                Utils.nearestUsableTick(
+                    Utils.addBipsToTick(
+                        TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
+                        150
+                    )
+                ),
+                Utils.nearestUsableTick(
+                    TickMath.getTickAtSqrtRatio(sqrtRatioX96) + TickMath.getTickAtSqrtRatio(sqrtRatioX96) / 2 
+                ),                
+                0,
+                LiquidityType.Discovery
+            );
+
+            // require(
+            //     newPositions[1].liquidity > 0 && 
+            //     newPositions[2].liquidity > 0, 
+            //     "slide: no liquidity in positions"
+            // );           
+
+            // restore floor
+            newPositions[0] = positions[0];
+
+            IVault(addresses.vault)
+            .updatePositions(
+                newPositions
+            );    
+                    
+        } else {
+            revert BelowThreshold();
+        }  
         
     }
 
@@ -321,7 +357,7 @@ library LiquidityOps {
         ERC20(IUniswapV3Pool(pool).token1()).approve(deployer, amount1ToDeploy > 0 ? amount1ToDeploy : 1);
 
         newPosition = IDeployer(deployer)
-        .doDeployPosition(
+        .deployPosition(
             pool, 
             address(this), 
             lowerTick,
@@ -358,30 +394,30 @@ library LiquidityOps {
         return (circulatingSupply, anchorToken1Balance, discoveryToken1Balance);
     }
 
-    modifier onlyNotEmptyPositions(
-        address pool,
-        LiquidityPosition[3] memory positions
-    ) {
+    // modifier onlyNotEmptyPositions(
+    //     address pool,
+    //     LiquidityPosition[3] memory positions
+    // ) {
 
-        for (uint256 i = 0; i < positions.length; i++) {
+    //     for (uint256 i = 0; i < positions.length; i++) {
 
-            require(
-                positions[i].lowerTick > 0 || 
-                positions[i].upperTick > 0, "invalid position"
-            );    
+    //         require(
+    //             positions[i].lowerTick > 0 || 
+    //             positions[i].upperTick > 0, "invalid position"
+    //         );    
                    
-            bytes32 positionId = keccak256(
-                abi.encodePacked(
-                    address(this), 
-                    positions[i].lowerTick, 
-                    positions[i].upperTick
-                )
-            );
+    //         bytes32 positionId = keccak256(
+    //             abi.encodePacked(
+    //                 address(this), 
+    //                 positions[i].lowerTick, 
+    //                 positions[i].upperTick
+    //             )
+    //         );
 
-            (uint128 liquidity,,,,) = IUniswapV3Pool(pool).positions(positionId);
-            require(liquidity > 0, "onlyNotEmptyPositions");
-        }
-        _;
-    }
+    //         (uint128 liquidity,,,,) = IUniswapV3Pool(pool).positions(positionId);
+    //         require(liquidity > 0, "onlyNotEmptyPositions");
+    //     }
+    //     _;
+    // }
 
 }
