@@ -28,7 +28,7 @@ import {
 
 interface IVault {
     function updatePositions(LiquidityPosition[3] memory newPositions) external;
-    function setFee(uint256 _feesAccumulatedToken0, uint256 _feesAccumulatedToken1) external;
+    function setFees(uint256 _feesAccumulatedToken0, uint256 _feesAccumulatedToken1) external;
 }
 
 error InvalidTick();
@@ -43,7 +43,7 @@ library LiquidityOps {
         ProtocolAddresses memory addresses,
         LiquidityPosition[3] memory positions
     ) internal 
-    // onlyNotEmptyPositions(addresses.pool, positions) 
+    onlyNotEmptyPositions(addresses.pool, positions) 
     returns (
         uint256 currentLiquidityRatio,
         LiquidityPosition[3] memory newPositions
@@ -172,33 +172,33 @@ library LiquidityOps {
        
         if (params.positions[0].liquidity > 0) {
 
-            // uint256 feesPosition0 = Underlying
-            // .computeFeesEarned(
-            //     params.positions[0], 
-            //     address(this), 
-            //     params.pool, 
-            //     false, 
-            //     TickMath.getTickAtSqrtRatio(sqrtRatioX96)
-            // );
+            uint256 feesPosition0 = Underlying
+            .computeFeesEarned(
+                params.positions[0], 
+                address(this), 
+                params.pool, 
+                false, 
+                TickMath.getTickAtSqrtRatio(sqrtRatioX96)
+            );
 
-            // uint256 feesPosition1 = Underlying
-            // .computeFeesEarned(
-            //     params.positions[1], 
-            //     address(this), 
-            //     params.pool, 
-            //     false, 
-            //     TickMath.getTickAtSqrtRatio(sqrtRatioX96)
-            // );
+            uint256 feesPosition1 = Underlying
+            .computeFeesEarned(
+                params.positions[1], 
+                address(this), 
+                params.pool, 
+                false, 
+                TickMath.getTickAtSqrtRatio(sqrtRatioX96)
+            );
 
-            // IVault(address(this)).setFees(
-            //     0, 
-            //     feesPosition0
-            // );
+            IVault(address(this)).setFees(
+                0, 
+                feesPosition0
+            );
 
-            // IVault(address(this)).setFees(
-            //     0, 
-            //     feesPosition1
-            // );
+            IVault(address(this)).setFees(
+                0, 
+                feesPosition1
+            );
 
             // Collect floor liquidity
             Uniswap.collect(
@@ -290,7 +290,9 @@ library LiquidityOps {
     function slide(
         ProtocolAddresses memory addresses,
         LiquidityPosition[3] memory positions
-    ) internal returns (
+    ) internal 
+    onlyNotEmptyPositions(addresses.pool, positions) 
+    returns (
         LiquidityPosition[3] memory newPositions
     ) {
         (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(addresses.pool).slot0();
@@ -305,33 +307,33 @@ library LiquidityOps {
 
         if (currentLiquidityRatio >= 115e16) {
             
-            // uint256 feesPosition0 = Underlying
-            // .computeFeesEarned(
-            //     positions[0], 
-            //     addresses.vault, 
-            //     addresses.pool, 
-            //     false, 
-            //     TickMath.getTickAtSqrtRatio(sqrtRatioX96)
-            // );
+            uint256 feesPosition0 = Underlying
+            .computeFeesEarned(
+                positions[0], 
+                addresses.vault, 
+                addresses.pool, 
+                false, 
+                TickMath.getTickAtSqrtRatio(sqrtRatioX96)
+            );
 
-            // uint256 feesPosition1 = Underlying
-            // .computeFeesEarned(
-            //     positions[1], 
-            //     addresses.vault, 
-            //     addresses.pool, 
-            //     false, 
-            //     TickMath.getTickAtSqrtRatio(sqrtRatioX96)
-            // );
+            uint256 feesPosition1 = Underlying
+            .computeFeesEarned(
+                positions[1], 
+                addresses.vault, 
+                addresses.pool, 
+                false, 
+                TickMath.getTickAtSqrtRatio(sqrtRatioX96)
+            );
 
-            // IVault(addresses.vault).setFees(
-            //     0, 
-            //     feesPosition0
-            // );
+            IVault(addresses.vault).setFees(
+                0, 
+                feesPosition0
+            );
 
-            // IVault(addresses.vault).setFees(
-            //     0, 
-            //     feesPosition1
-            // );
+            IVault(addresses.vault).setFees(
+                0, 
+                feesPosition1
+            );
 
             // Collect anchor liquidity
             Uniswap.collect(
@@ -445,30 +447,30 @@ library LiquidityOps {
         return (circulatingSupply, anchorToken1Balance, discoveryToken1Balance);
     }
 
-    // modifier onlyNotEmptyPositions(
-    //     address pool,
-    //     LiquidityPosition[3] memory positions
-    // ) {
+    modifier onlyNotEmptyPositions(
+        address pool,
+        LiquidityPosition[3] memory positions
+    ) {
 
-    //     for (uint256 i = 0; i < positions.length; i++) {
+        for (uint256 i = 0; i < positions.length; i++) {
 
-    //         require(
-    //             positions[i].lowerTick > 0 || 
-    //             positions[i].upperTick > 0, "invalid position"
-    //         );    
+            require(
+                positions[i].lowerTick > 0 || 
+                positions[i].upperTick > 0, "invalid position"
+            );    
                    
-    //         bytes32 positionId = keccak256(
-    //             abi.encodePacked(
-    //                 address(this), 
-    //                 positions[i].lowerTick, 
-    //                 positions[i].upperTick
-    //             )
-    //         );
+            bytes32 positionId = keccak256(
+                abi.encodePacked(
+                    address(this), 
+                    positions[i].lowerTick, 
+                    positions[i].upperTick
+                )
+            );
 
-    //         (uint128 liquidity,,,,) = IUniswapV3Pool(pool).positions(positionId);
-    //         require(liquidity > 0, "onlyNotEmptyPositions");
-    //     }
-    //     _;
-    // }
+            (uint128 liquidity,,,,) = IUniswapV3Pool(pool).positions(positionId);
+            require(liquidity > 0, "onlyNotEmptyPositions");
+        }
+        _;
+    }
 
 }
