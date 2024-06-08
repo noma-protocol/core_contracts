@@ -31,6 +31,7 @@ library DeployHelper {
             LiquidityType liquidityType
         ) {
     
+        uint256 balanceToken0 = ERC20(pool.token0()).balanceOf(address(this));
         uint256 balanceToken1 = ERC20(pool.token1()).balanceOf(address(this));
         
         (uint160 sqrtRatioX96,,,,,,) = pool.slot0();
@@ -42,7 +43,7 @@ library DeployHelper {
             sqrtRatioX96,
             TickMath.getSqrtRatioAtTick(lowerTick),
             TickMath.getSqrtRatioAtTick(upperTick),
-            10 ether,
+            10000 ether,
             0 //(balanceToken1 * 66) / 100 // % of WETH
         );
 

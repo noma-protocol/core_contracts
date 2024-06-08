@@ -11,6 +11,12 @@ import 'abdk/ABDKMath64x64.sol';
 
 library Conversions {
 
+    uint256 private constant DECIMALS = 18;
+    uint256 private constant ONE = 10 ** DECIMALS;
+
+    int256 private constant LOG2_1E18 = 59794705707972520000;
+    int256 private constant LOG2_1P0001 = 144262291094538;
+
     function computeSingleTick(uint256 price, int24 tickSpacing) 
         internal 
         pure 
@@ -37,9 +43,13 @@ library Conversions {
         // math.log(10**18,2) * 10**18 = 59794705707972520000
         // math.log(1.0001,2) * 10**18 = 144262291094538
         return round(
-            Logarithm.log2(price * 1e18, 1e18, 5e17) - 59794705707972520000, 
-            int(144262291094538) * tickSpacing
+            Logarithm.log2(price * 1e18, 1e18, 5e17) - LOG2_1E18, 
+            int(LOG2_1P0001) * tickSpacing
         ) * tickSpacing;
+    }
+
+    function floor(uint256 number) public pure returns (uint256) {
+        return (number / ONE) * ONE;
     }
 
     function round(int256 _a, int256 _b) internal pure returns(int24) {

@@ -12,7 +12,7 @@ import {Conversions} from "./Conversions.sol";
 import {DecimalMath} from "./DecimalMath.sol";
 
 import {Underlying} from "./Underlying.sol";
-import {ModelHelper} from "../ModelHelper.sol";
+import {ModelHelper} from "../model/Helper.sol";
 import {LiquidityOps} from "./LiquidityOps.sol";
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
 
@@ -24,6 +24,7 @@ import {
 } from "../Types.sol";
 
 library LiquidityDeployer {
+    
     function deployAnchor(
         address pool,
         address receiver,
@@ -73,14 +74,14 @@ library LiquidityDeployer {
             address(this)
         );
 
-        (newPosition) = doDeployPosition(
+        (newPosition) = _deployPosition(
             pool,
             receiver,
             lowerTick,
             upperTick,
             LiquidityType.Anchor,
             AmountsToMint({
-                amount0: 5 ether,
+                amount0: 5_000_000e18,
                 amount1: 0
             })
         );
@@ -120,7 +121,7 @@ library LiquidityDeployer {
             address(this)
         );
 
-        newPosition = doDeployPosition(
+        newPosition = _deployPosition(
             pool,
             receiver,
             lowerTick,
@@ -205,7 +206,7 @@ library LiquidityDeployer {
         return newPosition;
     }
 
-    function doDeployPosition(
+    function _deployPosition(
         address pool,
         address receiver,
         int24 lowerTick,
@@ -225,7 +226,7 @@ library LiquidityDeployer {
         );
 
         if (liquidityType == LiquidityType.Discovery) {
-            require(amounts.amount0 >= 1 ether, "doDeployPosition: amount0 is too low");
+            require(amounts.amount0 >= 1 ether, "_deployPosition: amount0 is too low");
         }
 
         if (liquidity > 0) {
@@ -242,7 +243,7 @@ library LiquidityDeployer {
             revert(
                 string(
                     abi.encodePacked(
-                        "doDeployPosition: liquidity is 0 : ", 
+                        "_deployPosition: liquidity is 0 : ", 
                         Utils._uint2str(uint256(liquidity))
                     )
                 )

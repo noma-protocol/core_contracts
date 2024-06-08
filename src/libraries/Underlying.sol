@@ -10,16 +10,31 @@ import {TickMath} from '@uniswap/v3-core/libraries/TickMath.sol';
 library Underlying {
 
     function computeFeesEarned(
-        address pool,
         LiquidityPosition memory position,
+        address vault,
+        address pool,
         bool isToken0,
-        uint256 feeGrowthInsideLast,
-        int24 tick,
-        uint128 liquidity
-    ) private view returns (uint256 fee) {
+        int24 tick
+    ) internal view returns (uint256 fee) {
         uint256 feeGrowthOutsideLower;
         uint256 feeGrowthOutsideUpper;
         uint256 feeGrowthGlobal;
+      
+        (
+            uint128 liquidity,
+            uint256 feeGrowthInside0Last,
+            uint256 feeGrowthInside1Last,
+            ,
+        ) = IUniswapV3Pool(pool).positions(
+            keccak256(
+            abi.encodePacked(
+                vault, 
+                position.lowerTick, 
+                position.upperTick
+                )
+            )            
+        );
+
         if (isToken0) {
             feeGrowthGlobal = IUniswapV3Pool(pool).feeGrowthGlobal0X128();
             (,, feeGrowthOutsideLower,,,,,) = IUniswapV3Pool(pool).ticks(position.lowerTick);
@@ -48,7 +63,11 @@ library Underlying {
             }
 
             uint256 feeGrowthInside = feeGrowthGlobal - feeGrowthBelow - feeGrowthAbove;
-            fee = FullMath.mulDiv(liquidity, feeGrowthInside - feeGrowthInsideLast, 0x100000000000000000000000000000000);
+            fee = FullMath.mulDiv(
+                liquidity, 
+                feeGrowthInside - (isToken0 ? feeGrowthInside0Last : feeGrowthInside1Last), 
+                0x100000000000000000000000000000000
+            );
         }
     }
 

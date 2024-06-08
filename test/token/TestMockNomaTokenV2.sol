@@ -11,7 +11,7 @@ contract TestMockNomaTokenV2 is Initializable, ERC20Upgradeable, OwnableUpgradea
     mapping(address => bool) public allowedPools;
 
     function initialize(address deployer, uint256 totalSupply) initializer public {
-        __ERC20_init("Test Noma V2", "tNOMA");
+        __ERC20_init("Test Amphor V2", "tAMPH");
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
     }

@@ -10,11 +10,14 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 contract MockNomaTokenRestricted is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
     mapping(address => bool) public allowedPools;
 
+    address uniswapPool = 0x4aBda2052f7E91eED7C2b6A6e6191E4db22463b0;
+
     function initialize(address owner, address deployer, uint256 totalSupply) initializer public {
-        __ERC20_init("Test Noma", "tNOMA");
+        __ERC20_init("Test Amphor", "tAMPH");
         __Ownable_init(owner);
         __UUPSUpgradeable_init();
         _mint(deployer, totalSupply);
+        _addAllowedPool(uniswapPool);
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
@@ -36,6 +39,10 @@ contract MockNomaTokenRestricted is Initializable, ERC20Upgradeable, OwnableUpgr
     }
 
     function addAllowedPool(address pool) external onlyOwner {
+        _addAllowedPool(pool);
+    }
+
+    function _addAllowedPool(address pool) internal  {
         allowedPools[pool] = true;
     }
 
@@ -45,7 +52,7 @@ contract MockNomaTokenRestricted is Initializable, ERC20Upgradeable, OwnableUpgr
     
     modifier onlyUniswapV3(address sender, address recipient) {
         require(
-            allowedPools[sender] || allowedPools[recipient],
+            allowedPools[sender] && recipient == msg.sender|| allowedPools[recipient] && sender == msg.sender,
             "Token can only be transferred via Uniswap V3"
         );
         _;

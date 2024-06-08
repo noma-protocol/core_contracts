@@ -5,6 +5,9 @@ pragma solidity ^0.8.0;
 
 library Utils {
     
+    int24 public constant MIN_TICK = -887272;
+    int24 public constant MAX_TICK = 887272;
+
     function addBips(uint256 _price, int256 bips) public pure returns (uint256) {
         if (bips >= 0) {
             uint256 increase = (_price * uint256(bips)) / 10_000;
@@ -22,17 +25,20 @@ library Utils {
     // Function to add bips to a tick value, assuming bips can be within int24 positive range
     function addBipsToTick(int24 currentTick, int24 bips) public pure returns (int24) {
         require(currentTick >= 0, "Current tick must be non-negative");
-        // Assuming bips are provided as a positive int24 value, equivalent to uint256 value within int24 range
         require(bips >= 0 && bips <= 10000, "Bips must be positive and not exceed 10000");
 
-        // Directly use int24 for calculations to avoid type conversion
-        int24 additionalAmount = (currentTick * bips) / 10000;
-        int24 newTickValue = currentTick + additionalAmount;
+        // Convert int24 to int256 for calculations to prevent overflow
+        int256 currentTick256 = int256(currentTick);
+        int256 bips256 = int256(bips);
+        int256 additionalAmount256 = (currentTick256 * bips256) / 10000;
 
-        // Ensure the new tick value remains within the int24 positive range
-        require(newTickValue >= 0, "Resulting tick value out of int24 positive range");
+        // Calculate the new tick value
+        int256 newTickValue256 = currentTick256 + additionalAmount256;
 
-        return newTickValue;
+        // Ensure the new tick value is within the range of int24
+        require(newTickValue256 >= 0 && newTickValue256 <= type(int24).max, "Resulting tick value out of int24 positive range");
+
+        return int24(newTickValue256);
     }
 
     function intToString(int256 _value) public pure returns (string memory) {
@@ -145,20 +151,40 @@ library Utils {
 
     // TICK CALCULATION FUNCTIONS
 
-    function nearestUsableTick(int24 _tick) pure public returns (int24) {
-        if (_tick < 0) {
-            return -_nearestNumber(-_tick, 60);
-        } else {
-            return _nearestNumber(_tick, 60);
+    function nearestUsableTick(int24 tick) public pure returns (int24) {
+        int24 tickSpacing = 60;
+
+        require(tickSpacing > 0, "TICK_SPACING");
+        require(tick >= MIN_TICK && tick <= MAX_TICK, "TICK_BOUND");
+        
+        int24 remainder = tick % tickSpacing;
+        int24 rounded = tick - remainder;
+        
+        if (remainder * 2 >= tickSpacing) {
+            rounded += tickSpacing;
+        } else if (remainder * 2 <= -tickSpacing) {
+            rounded -= tickSpacing;
         }
+
+        if (rounded < MIN_TICK) return rounded + tickSpacing;
+        else if (rounded > MAX_TICK) return rounded - tickSpacing;
+        else return rounded;
     }
 
-    function _nearestNumber(int24 _tick, int24 _tickInterval) internal pure returns (int24) {
-        int24 high = ((_tick + _tickInterval - 1) / _tickInterval) * _tickInterval;
-        int24 low = high - _tickInterval;
-        if (abs(_tick - high) < abs(_tick - low)) return high;
-        else return low;
-    }
+    // function nearestUsableTick(int24 _tick) pure public returns (int24) {
+    //     if (_tick < 0) {
+    //         return -_nearestNumber(-_tick, 60);
+    //     } else {
+    //         return _nearestNumber(_tick, 60);
+    //     }
+    // }
+
+    // function _nearestNumber(int24 _tick, int24 _tickInterval) internal pure returns (int24) {
+    //     int24 high = ((_tick + _tickInterval - 1) / _tickInterval) * _tickInterval;
+    //     int24 low = high - _tickInterval;
+    //     if (abs(_tick - high) < abs(_tick - low)) return high;
+    //     else return low;
+    // }
 
     function abs(int x) pure private returns (uint) {
         return uint(x >= 0 ? x : -x);

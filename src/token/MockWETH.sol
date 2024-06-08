@@ -37,7 +37,7 @@ contract MockWETH is Owned {
         emit Withdrawal(msg.sender, amount);
     }
 
-    function mintTo(address to, uint256 amount) external onlyOwner {
+    function mintTo(address to, uint256 amount) external /*onlyOwner*/ {
         balanceOf[to] += amount;
         emit Deposit(to, amount);
     }
