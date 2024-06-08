@@ -60,15 +60,6 @@ contract BaseVault /*is Owned*/ {
         } 
     }
 
-    // constructor(address owner, address _pool, address _modelHelper) Owned(owner) {
-    //     _v.pool = IUniswapV3Pool(_pool);
-    //     _v.modelHelper = _modelHelper;
-    //     _v.tokenInfo.token0 = _v.pool.token0();
-    //     _v.tokenInfo.token1 = _v.pool.token1();
-    //     _v.initialized = false;
-    //     _v.lastLiquidityRatio = 0;
-    // }
-
     function initialize(
         address _pool, 
         address _modelHelper
@@ -93,7 +84,7 @@ contract BaseVault /*is Owned*/ {
                 
         _v.initialized = true;
 
-        updatePositions(
+        _updatePositions(
             positions
         );
     }
@@ -133,15 +124,23 @@ contract BaseVault /*is Owned*/ {
     }
 
     function updatePositions(LiquidityPosition[3] memory _positions) public {
+        require(msg.sender == address(this), "invalid caller");
         require(_v.initialized, "not initialized");
-        // TODO: check who is msg.sender w this call
-        // require(msg.sender == address(this), "invalid caller");
-        // require(
-        //     _positions[0].liquidity > 0 &&
-        //     _positions[1].liquidity > 0 && 
-        //     _positions[2].liquidity > 0, 
-        //     "slide: no liquidity in positions"
-        // );           
+        
+        require(
+            _positions[0].liquidity > 0 &&
+            _positions[1].liquidity > 0 && 
+            _positions[2].liquidity > 0, 
+            "updatePositions: no liquidity in positions"
+        );           
+        
+        _v.floorPosition = _positions[0];
+        _v.anchorPosition = _positions[1];
+        _v.discoveryPosition = _positions[2];
+    }
+    
+    function _updatePositions(LiquidityPosition[3] memory _positions) internal {
+        require(_v.initialized, "not initialized");          
         
         _v.floorPosition = _positions[0];
         _v.anchorPosition = _positions[1];
@@ -168,14 +167,15 @@ contract BaseVault /*is Owned*/ {
         _v.deployerContract = _deployerContract;
     }
 
-    // function setFees(
-    //     uint256 _feesAccumulatedToken0, 
-    //     uint256 _feesAccumulatedToken1
-    // ) internal {
+    function setFees(
+        uint256 _feesAccumulatedToken0, 
+        uint256 _feesAccumulatedToken1
+    ) external {
+        require(msg.sender == address(this), "invalid caller");
 
-    //     feesAccumulatorToken0 += _feesAccumulatedToken0;
-    //     feesAccumulatorToken1 += _feesAccumulatedToken1;
-    // }
+        _v.feesAccumulatorToken0 += _feesAccumulatedToken0;
+        _v.feesAccumulatorToken1 += _feesAccumulatedToken1;
+    }
 
     function getPositions() public view
     returns (LiquidityPosition[3] memory positions) {
@@ -201,7 +201,7 @@ contract BaseVault /*is Owned*/ {
     }
 
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](11);
+        bytes4[] memory selectors = new bytes4[](12);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
         selectors[1] = bytes4(keccak256(bytes("pool()")));
         selectors[2] = bytes4(keccak256(bytes("initialize(address,address)")));
@@ -213,6 +213,7 @@ contract BaseVault /*is Owned*/ {
         selectors[8] = bytes4(keccak256(bytes("uniswapV3MintCallback(uint256,uint256,bytes)")));
         selectors[9] = bytes4(keccak256(bytes("getUnderlyingBalances(uint8)")));
         selectors[10] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256)[3])")));
+        selectors[11] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));
         return selectors;
     }
 
