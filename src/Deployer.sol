@@ -24,7 +24,7 @@ import {
 } from "./Types.sol";
 
 interface IVault {
-    function initialize(
+    function initializeLiquidity(
         LiquidityPosition[3] memory positions
     ) external;
 }
@@ -211,7 +211,7 @@ contract Deployer is Owned {
         
         uint256 balanceToken0 = ERC20(token0).balanceOf(address(this));
         ERC20(token0).transfer(vault, balanceToken0);
-        IVault(vault).initialize(positions);
+        IVault(vault).initializeLiquidity(positions);
     }
 
     modifier initialized() {
