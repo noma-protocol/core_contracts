@@ -12,7 +12,7 @@ import {Owned} from "solmate/auth/Owned.sol";
 
 import {TickMath} from '@uniswap/v3-core/libraries/TickMath.sol';
 
-import {Vault} from "./vault/BaseVault.sol";
+import {BaseVault} from "./vault/BaseVault.sol";
  
 import {MockNomaToken} from "./token/MockNomaToken.sol";
 import {Conversions} from "./libraries/Conversions.sol";
@@ -29,12 +29,18 @@ import {OwnershipFacet} from "./facets/OwnershipFacet.sol";
 import {DiamondCutFacet} from "./facets/DiamondCutFacet.sol";
 import {IDiamondCut} from "./interfaces/IDiamondCut.sol";
 import {IFacet} from "./interfaces/IFacet.sol";
+import {IDiamond} from "./interfaces/IDiamond.sol";
 
 interface IWETH {
     function deposit() external payable;
     function depositTo(address receiver) external payable;
     function transfer(address to, uint value) external returns (bool);
     function mintTo(address to, uint256 amount) external;
+}
+
+interface IVaultUpgrade {
+    function doUpgradeStart(address diamond, address _vaultUpgradeFinalize) external;
+    function doUpgradeFinalize(address diamond) external;
 }
 
 contract IDOManager is Owned {
@@ -46,12 +52,13 @@ contract IDOManager is Owned {
     MockNomaToken private amphorToken;
     MockWETH private mockWeth;
 
-    Vault public vault;
+    BaseVault public vault;
 
     uint256 private totalSupply;
     uint256 private launchSupply;
     address private uniswapFactory;
-
+    address private vaultUpgrade;
+    address private vaultUpgradeFinalize;
     address public mockWethAddress;
     address public implementationAddress;
     address public proxyAddress;
@@ -132,7 +139,12 @@ contract IDOManager is Owned {
 
     }
 
-    function initialize(uint256 _initPrice, uint256 _IDOPrice) public onlyOwner {
+    function initialize(
+        uint256 _initPrice, 
+        uint256 _IDOPrice, 
+        address _vaultUpgrade, 
+        address _vaultUpgradeFinalize
+    ) public onlyOwner {
         require(!initialized, "already initialized");
 
         IUniswapV3Factory factory = IUniswapV3Factory(uniswapFactory);
@@ -149,11 +161,15 @@ contract IDOManager is Owned {
                 Conversions.priceToSqrtPriceX96(int256(_initPrice), tickSpacing)
             );
         } 
+        
+        vaultUpgrade = _vaultUpgrade;
+        vaultUpgradeFinalize = _vaultUpgradeFinalize;
 
         address vaultAddress = _preDeploy();
-        vault = Vault(vaultAddress);
+        vault = BaseVault(vaultAddress);
 
-        //new Vault(msg.sender, address(pool), address(modelHelper));
+        IVaultUpgrade(vaultUpgrade).doUpgradeStart(vaultAddress, vaultUpgradeFinalize);
+        vault.initialize(address(pool), modelHelper);
         
         IDOPrice = _IDOPrice;
         initialized = true;
@@ -229,6 +245,7 @@ contract IDOManager is Owned {
 
         //upgrade diamond
         IDiamondCut(address(diamond)).diamondCut(cut, address(0x0), "");
+        IDiamond(address(diamond)).transferOwnership(vaultUpgrade);
 
         //Initialization
         DiamondInit(address(diamond)).init();
