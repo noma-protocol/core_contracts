@@ -7,6 +7,7 @@ import {Owned} from "solmate/auth/Owned.sol";
 import {IWETH} from "../interfaces/IWETH.sol";
 import {LiquidityOps} from "../libraries/LiquidityOps.sol";
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
+import {VaultStorage} from "../libraries/LibAppStorage.sol";
 
 import {
     tickSpacing, 
@@ -30,24 +31,8 @@ interface IVaultsController {
 error AlreadyInitialized();
 error InvalidCaller();
 
-contract Vault is Owned {
-
-    LiquidityPosition private floorPosition;
-    LiquidityPosition private anchorPosition;
-    LiquidityPosition private discoveryPosition;
-
-    TokenInfo private tokenInfo;
-    
-    address private deployerContract;
-    address private modelHelper;
-
-    IUniswapV3Pool public pool;
-
-    bool private initialized; 
-    uint256 private lastLiquidityRatio;
-    
-    // uint256 public feesAccumulatorToken0;
-    // uint256 public feesAccumulatorToken1;
+contract BaseVault /*is Owned*/ {
+    VaultStorage internal _v;
 
     event FloorUpdated(uint256 floorPrice, uint256 floorCapacity);
 
@@ -61,59 +46,70 @@ contract Vault is Owned {
     )
         external
     {
-        require(msg.sender == address(pool), "cc");
+        require(msg.sender == address(_v.pool), "cc");
 
-        uint256 token0Balance = IERC20(tokenInfo.token0).balanceOf(address(this));
-        uint256 token1Balance = IERC20(tokenInfo.token1).balanceOf(address(this));
+        uint256 token0Balance = IERC20(_v.tokenInfo.token0).balanceOf(address(this));
+        uint256 token1Balance = IERC20(_v.tokenInfo.token1).balanceOf(address(this));
 
         if (token0Balance >= amount0Owed) {
-            if (amount0Owed > 0) IERC20(tokenInfo.token0).transfer(msg.sender, amount0Owed);
+            if (amount0Owed > 0) IERC20(_v.tokenInfo.token0).transfer(msg.sender, amount0Owed);
         } 
 
         if (token1Balance >= amount1Owed) {
-            if (amount1Owed > 0) IERC20(tokenInfo.token1).transfer(msg.sender, amount1Owed); 
+            if (amount1Owed > 0) IERC20(_v.tokenInfo.token1).transfer(msg.sender, amount1Owed); 
         } 
     }
 
-    constructor(address owner, address _pool, address _modelHelper) Owned(owner) {
-        pool = IUniswapV3Pool(_pool);
-        modelHelper = _modelHelper;
-        tokenInfo.token0 = pool.token0();
-        tokenInfo.token1 = pool.token1();
-        initialized = false;
-        lastLiquidityRatio = 0;
-    }
+    // constructor(address owner, address _pool, address _modelHelper) Owned(owner) {
+    //     _v.pool = IUniswapV3Pool(_pool);
+    //     _v.modelHelper = _modelHelper;
+    //     _v.tokenInfo.token0 = _v.pool.token0();
+    //     _v.tokenInfo.token1 = _v.pool.token1();
+    //     _v.initialized = false;
+    //     _v.lastLiquidityRatio = 0;
+    // }
 
     function initialize(
+        address _pool, 
+        address _modelHelper
+    ) public {
+        _v.pool = IUniswapV3Pool(_pool);
+        _v.modelHelper = _modelHelper;
+        _v.tokenInfo.token0 = _v.pool.token0();
+        _v.tokenInfo.token1 = _v.pool.token1();
+        _v.initialized = false;
+        _v.lastLiquidityRatio = 0;
+    }
+
+    function initializeLiquidity(
         LiquidityPosition[3] memory positions
     ) public {
-        if (initialized) revert AlreadyInitialized();
-        if (msg.sender != deployerContract) revert InvalidCaller();
+        if (_v.initialized) revert AlreadyInitialized();
+        if (msg.sender != _v.deployerContract) revert InvalidCaller();
 
         require(positions[0].liquidity > 0 && 
                 positions[1].liquidity > 0 && 
                 positions[2].liquidity > 0, "invalid position");
                 
-        initialized = true;
+        _v.initialized = true;
 
         updatePositions(
             positions
         );
-
     }
 
     function shift() public {
-        require(initialized, "not initialized");
+        require(_v.initialized, "not initialized");
 
-        LiquidityPosition[3] memory positions = [floorPosition, anchorPosition, discoveryPosition];
+        LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
 
         LiquidityOps
         .shift(
             ProtocolAddresses({
-                pool: address(pool),
+                pool: address(_v.pool),
                 vault: address(this),
-                deployer: deployerContract,
-                modelHelper: modelHelper
+                deployer: _v.deployerContract,
+                modelHelper: _v.modelHelper
             }),
             positions
         );
@@ -121,23 +117,23 @@ contract Vault is Owned {
     }    
 
     function slide() public  {
-        require(initialized, "not initialized");
+        require(_v.initialized, "not initialized");
 
-        LiquidityPosition[3] memory positions = [floorPosition, anchorPosition, discoveryPosition];
+        LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
         LiquidityOps
         .slide(
             ProtocolAddresses({
-                pool: address(pool),
+                pool: address(_v.pool),
                 vault: address(this),
-                deployer: deployerContract,
-                modelHelper: modelHelper
+                deployer: _v.deployerContract,
+                modelHelper: _v.modelHelper
             }),
             positions
         );
     }
 
     function updatePositions(LiquidityPosition[3] memory _positions) public {
-        require(initialized, "not initialized");
+        require(_v.initialized, "not initialized");
         // TODO: check who is msg.sender w this call
         // require(msg.sender == address(this), "invalid caller");
         // require(
@@ -147,9 +143,9 @@ contract Vault is Owned {
         //     "slide: no liquidity in positions"
         // );           
         
-        floorPosition = _positions[0];
-        anchorPosition = _positions[1];
-        discoveryPosition = _positions[2];
+        _v.floorPosition = _positions[0];
+        _v.anchorPosition = _positions[1];
+        _v.discoveryPosition = _positions[2];
     }
 
         
@@ -158,18 +154,18 @@ contract Vault is Owned {
     ) external view 
     returns (int24, int24, uint256, uint256) {
 
-        return IModelHelper(modelHelper)
+        return IModelHelper(_v.modelHelper)
         .getUnderlyingBalances(
-            address(pool), 
+            address(_v.pool), 
             address(this), 
             liquidityType
         ); 
     }
 
     function setParameters(address _deployerContract) public /*onlyOwner*/ {
-        if (initialized) revert AlreadyInitialized();
+        if (_v.initialized) revert AlreadyInitialized();
 
-        deployerContract = _deployerContract;
+        _v.deployerContract = _deployerContract;
     }
 
     // function setFees(
@@ -183,7 +179,11 @@ contract Vault is Owned {
 
     function getPositions() public view
     returns (LiquidityPosition[3] memory positions) {
-        positions = [floorPosition, anchorPosition, discoveryPosition];
+        positions = [
+            _v.floorPosition, 
+            _v.anchorPosition, 
+            _v.discoveryPosition
+        ];
     }
 
     function getVaultInfo() public view 
@@ -193,12 +193,27 @@ contract Vault is Owned {
         (
             vaultInfo
         ) =
-        IModelHelper(modelHelper).getVaultInfo(address(pool), address(this), tokenInfo);
+        IModelHelper(_v.modelHelper).getVaultInfo(address(_v.pool), address(this), _v.tokenInfo);
+    }
+
+    function pool() public view returns (IUniswapV3Pool) {
+        return _v.pool;
     }
 
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](1);
+        bytes4[] memory selectors = new bytes4[](11);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
+        selectors[1] = bytes4(keccak256(bytes("pool()")));
+        selectors[2] = bytes4(keccak256(bytes("initialize(address,address)")));
+        selectors[3] = bytes4(keccak256(bytes("setParameters(address)")));
+        selectors[4] = bytes4(keccak256(bytes("initializeLiquidity((int24,int24,uint128,uint256)[3])")));
+        selectors[5] = bytes4(keccak256(bytes("getPositions()")));
+        selectors[6] = bytes4(keccak256(bytes("shift()")));
+        selectors[7] = bytes4(keccak256(bytes("slide()")));
+        selectors[8] = bytes4(keccak256(bytes("uniswapV3MintCallback(uint256,uint256,bytes)")));
+        selectors[9] = bytes4(keccak256(bytes("getUnderlyingBalances(uint8)")));
+        selectors[10] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256)[3])")));
         return selectors;
     }
+
 }
