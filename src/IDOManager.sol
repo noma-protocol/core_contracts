@@ -12,7 +12,7 @@ import {Owned} from "solmate/auth/Owned.sol";
 
 import {TickMath} from '@uniswap/v3-core/libraries/TickMath.sol';
 
-import {Vault} from "./Vault.sol";
+import {Vault} from "./vault/BaseVault.sol";
  
 import {MockNomaToken} from "./token/MockNomaToken.sol";
 import {Conversions} from "./libraries/Conversions.sol";
@@ -22,6 +22,13 @@ import {Uniswap} from "./libraries/Uniswap.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {MockWETH} from "../src/token/MockWETH.sol";
+
+import {Diamond} from "./Diamond.sol";
+import {DiamondInit} from "./init/DiamondInit.sol";
+import {OwnershipFacet} from "./facets/OwnershipFacet.sol";
+import {DiamondCutFacet} from "./facets/DiamondCutFacet.sol";
+import {IDiamondCut} from "./interfaces/IDiamondCut.sol";
+import {IFacet} from "./interfaces/IFacet.sol";
 
 interface IWETH {
     function deposit() external payable;
@@ -55,6 +62,11 @@ contract IDOManager is Owned {
 
     LiquidityPosition private IDOPosition;
 
+    Diamond diamond;
+    DiamondCutFacet dCutFacet;
+    OwnershipFacet ownerF;
+    DiamondInit dInit;
+
     constructor(
         address _deployer,
         address _uniswapFactory, 
@@ -62,7 +74,7 @@ contract IDOManager is Owned {
         address _token1,
         uint256 _totalSupply, 
         uint16 _percentageForSale
-    ) Owned(_deployer) payable { 
+    ) Owned(_deployer) { 
         require(
             _percentageForSale > 0 && 
             _percentageForSale < 50, 
@@ -138,7 +150,10 @@ contract IDOManager is Owned {
             );
         } 
 
-        vault = new Vault(msg.sender, address(pool), address(modelHelper));
+        address vaultAddress = _preDeploy();
+        vault = Vault(vaultAddress);
+
+        //new Vault(msg.sender, address(pool), address(modelHelper));
         
         IDOPrice = _IDOPrice;
         initialized = true;
@@ -173,6 +188,51 @@ contract IDOManager is Owned {
         ERC20(tokenInfo.token0).transfer(receiver, totalSupply);
         //ERC20(tokenInfo.token0).transfer(receiver, totalSupply - launchSupply);
         // IDOPosition = LiquidityPosition(lowerTick, upperTick, liquidity, IDOPrice);
+    }
+
+    function _preDeploy()
+        internal
+        returns (address vault)
+    {
+        //deploy facets
+        dCutFacet = new DiamondCutFacet();
+        diamond = new Diamond(address(this), address(dCutFacet));
+        ownerF = new OwnershipFacet();
+        dInit = new DiamondInit();
+
+        //build cut struct
+        IDiamondCut.FacetCut[] memory cut = new IDiamondCut.FacetCut[](3);
+
+        cut[0] = (
+            IDiamondCut.FacetCut({
+                facetAddress: address(ownerF),
+                action: IDiamondCut.FacetCutAction.Add,
+                functionSelectors: IFacet(address(ownerF)).getFunctionSelectors()
+            })
+        );
+
+        cut[1] = (
+            IDiamondCut.FacetCut({
+                facetAddress: address(dInit),
+                action: IDiamondCut.FacetCutAction.Add,
+                functionSelectors: IFacet(address(dInit)).getFunctionSelectors()
+            })
+        );
+
+        cut[2] = (
+            IDiamondCut.FacetCut({
+                facetAddress: address(dCutFacet),
+                action: IDiamondCut.FacetCutAction.Add,
+                functionSelectors: IFacet(address(dCutFacet)).getFunctionSelectors()
+            })
+        );
+
+        //upgrade diamond
+        IDiamondCut(address(diamond)).diamondCut(cut, address(0x0), "");
+
+        //Initialization
+        DiamondInit(address(diamond)).init();
+        vault = address(diamond);
     }
 
     // Test function

@@ -7,9 +7,9 @@ import "forge-std/Script.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 
 import {Deployer} from "../src/Deployer.sol";
-import {Vault} from  "../src/Vault.sol";
-import {NomaToken} from  "../src/token/NomaToken.sol";
-import {ModelHelper} from  "../src/ModelHelper.sol";
+import {Vault} from  "../src/vault/BaseVault.sol";
+import {AmphorToken} from  "../src/token/AmphorToken.sol";
+import {ModelHelper} from  "../src/model/Helper.sol";
 import {Underlying } from  "../src/libraries/Underlying.sol";
 import {LiquidityType, LiquidityPosition} from "../src/Types.sol";
 import {DecimalMath} from "../src/libraries/DecimalMath.sol";
@@ -41,23 +41,22 @@ contract Invariants is Test {
     bytes32 salt = keccak256(bytes(vm.envString("SALT")));
 
     // Constants
-    address WETH = 0x980B62Da83eFf3D4576C647993b0c1D7faf17c73;
+    address WETH = 0xdA07fdA01Fd20c2aaC600067dD87539944926547;
     
     // Protocol addresses
-    address payable idoManager = payable(0xA1f98d493FA64c8Be923dc4A3cdd98B6f5D82f9F);
-    address nomaToken = 0x5F4D2D020bDF4d01fFf90e9B6B8bDa3b287595e8;
-    address deployerContract = 0xD45a7B3a64BE300146f9c9560dEBa8eC38330211;
-    address modelHelperContract = 0x66D5AD70105945D4B551fEE8f6aB60F34E298Aba;
-    address quoterAddress = 0xb27308f9F90d607463e3F2FA3b3e3F7B3F0F2fa3;
+    address payable idoManager = payable(0x755fFe71D79c5D9778ED83C5c775ED2A6F15aa28);
+    address nomaToken = 0xA4907FdC7D04aF3475722f622C6F002a4cA48F24;
+    address deployerContract = 0x63EE25fF279a4948fbd2024A19c522b269E57881;
+    address modelHelperContract = 0xc29D94a7e45299ff976398ddE03Aa5979B023148;
 
-    NomaToken private noma;
+    AmphorToken private noma;
     ModelHelper private modelHelper;
 
     function setUp() public {
         IDOManager managerContract = IDOManager(idoManager);
         require(address(managerContract) != address(0), "Manager contract address is zero");
 
-        noma = NomaToken(nomaToken);
+        noma = AmphorToken(nomaToken);
         require(address(noma) != address(0), "Noma token address is zero");
         
         modelHelper = ModelHelper(modelHelperContract);
@@ -84,11 +83,41 @@ contract Invariants is Test {
         uint256 totalSupply = noma.totalSupply();
         console.log("Total supply is %s", totalSupply);
 
-        assertEq(totalSupply, 100e18, "Total supply is not correct");
+        assertEq(totalSupply, 100_000_000e18, "Total supply is not correct");
 
         vm.stopBroadcast();
     }
 
+    function testCirculatingSupplyMatchesBalances() public {
+        IDOManager managerContract = IDOManager(idoManager);
+        Vault vault = managerContract.vault();
+        address pool = address(vault.pool());
+
+        (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
+        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+        uint8 totalTrades = 2;
+        uint256 tradeAmount = 0.005 ether;
+
+        IWETH(WETH).deposit{ value: 10 ether }();
+        IWETH(WETH).transfer(idoManager, tradeAmount * totalTrades);
+
+        uint256 tokenBalanceBefore = noma.balanceOf(address(this));
+        uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault));
+        console.log("Circulating supply is: ", circulatingSupplyBefore);
+
+        for (uint i = 0; i < totalTrades; i++) {
+            managerContract.buyTokens(spotPrice, tradeAmount, address(this));
+        }
+        
+        uint256 tokenBalanceAfter = noma.balanceOf(address(this));
+        console.log("Token balance after buying is %s", tokenBalanceAfter);
+
+        uint256 circulatingSupplyAfter = modelHelper.getCirculatingSupply(pool, address(vault));
+        console.log("Circulating supply is: ", circulatingSupplyAfter);
+
+        assertEq(tokenBalanceAfter + 3, circulatingSupplyAfter, "Circulating supply does not match bought tokens");
+    }
+    
     function testBuyTokens() public {
         vm.recordLogs();
         vm.startBroadcast(privateKey);
@@ -101,7 +130,7 @@ contract Invariants is Test {
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
         uint256 spotPrice;
 
-        uint8 numTrades = 2;
+        uint8 numTrades = 200;
         uint256 tradeAmount = 0.005 ether;
         
         IWETH(WETH).deposit{ value:  tradeAmount * numTrades}();
@@ -216,36 +245,6 @@ contract Invariants is Test {
         } else {
             revert("No shift triggered");
         }
-    }
-
-    function testCirculatingSupplyMatchesBalances() public {
-        IDOManager managerContract = IDOManager(idoManager);
-        Vault vault = managerContract.vault();
-        address pool = address(vault.pool());
-
-        (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
-        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
-        uint8 totalTrades = 2;
-        uint256 tradeAmount = 0.005 ether;
-
-        IWETH(WETH).deposit{ value: 10 ether }();
-        IWETH(WETH).transfer(idoManager, tradeAmount * totalTrades);
-
-        uint256 tokenBalanceBefore = noma.balanceOf(address(this));
-        uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault));
-        console.log("Circulating supply is: ", circulatingSupplyBefore);
-
-        for (uint i = 0; i < totalTrades; i++) {
-            managerContract.buyTokens(spotPrice, tradeAmount, address(this));
-        }
-        
-        uint256 tokenBalanceAfter = noma.balanceOf(address(this));
-        console.log("Token balance after buying is %s", tokenBalanceAfter);
-
-        uint256 circulatingSupplyAfter = modelHelper.getCirculatingSupply(pool, address(vault));
-        console.log("Circulating supply is: ", circulatingSupplyAfter);
-
-        assertEq(tokenBalanceAfter + 3, circulatingSupplyAfter, "Circulating supply does not match bought tokens");
     }
 
     function testShiftAboveThreshold() public {

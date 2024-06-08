@@ -13,7 +13,6 @@ interface IModelHelper{
     function getPositionCapacity(address pool, address vault, LiquidityPosition memory position) external view returns (uint256 amount0Current);
     function getCirculatingSupply(address pool, address vault) external view returns (uint256 circulatingSupply);
     function getUnderlyingBalances(address pool, address vault, LiquidityType liquidityType) external view returns (int24, int24, uint256, uint256);
-    function estimateNewFloorPrice(address pool, address vault) external view returns (uint256 newFloor);
     function getVaultInfo(address pool, address vault, TokenInfo memory tokenInfo) external view returns (VaultInfo memory vaultInfo);
     function updatePositions(LiquidityPosition[3] memory _positions) external;
 }

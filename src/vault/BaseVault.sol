@@ -4,9 +4,9 @@ pragma solidity ^0.8.0;
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 
 import {Owned} from "solmate/auth/Owned.sol";
-import {IWETH} from "./interfaces/IWETH.sol";
-import {LiquidityOps} from "./libraries/LiquidityOps.sol";
-import {IModelHelper} from "./interfaces/IModelHelper.sol";
+import {IWETH} from "../interfaces/IWETH.sol";
+import {LiquidityOps} from "../libraries/LiquidityOps.sol";
+import {IModelHelper} from "../interfaces/IModelHelper.sol";
 
 import {
     tickSpacing, 
@@ -15,7 +15,7 @@ import {
     TokenInfo,
     ProtocolAddresses,
     VaultInfo
-} from "./Types.sol";
+} from "../Types.sol";
 
 interface IERC20 {
     function balanceOf(address account) external view returns (uint256);
@@ -45,6 +45,9 @@ contract Vault is Owned {
 
     bool private initialized; 
     uint256 private lastLiquidityRatio;
+    
+    // uint256 public feesAccumulatorToken0;
+    // uint256 public feesAccumulatorToken1;
 
     event FloorUpdated(uint256 floorPrice, uint256 floorCapacity);
 
@@ -137,6 +140,12 @@ contract Vault is Owned {
         require(initialized, "not initialized");
         // TODO: check who is msg.sender w this call
         // require(msg.sender == address(this), "invalid caller");
+        // require(
+        //     _positions[0].liquidity > 0 &&
+        //     _positions[1].liquidity > 0 && 
+        //     _positions[2].liquidity > 0, 
+        //     "slide: no liquidity in positions"
+        // );           
         
         floorPosition = _positions[0];
         anchorPosition = _positions[1];
@@ -157,12 +166,21 @@ contract Vault is Owned {
         ); 
     }
 
-    function setParameters(address _deployerContract) public onlyOwner {
+    function setParameters(address _deployerContract) public /*onlyOwner*/ {
         if (initialized) revert AlreadyInitialized();
 
         deployerContract = _deployerContract;
     }
-    
+
+    // function setFees(
+    //     uint256 _feesAccumulatedToken0, 
+    //     uint256 _feesAccumulatedToken1
+    // ) internal {
+
+    //     feesAccumulatorToken0 += _feesAccumulatedToken0;
+    //     feesAccumulatorToken1 += _feesAccumulatedToken1;
+    // }
+
     function getPositions() public view
     returns (LiquidityPosition[3] memory positions) {
         positions = [floorPosition, anchorPosition, discoveryPosition];
@@ -176,5 +194,11 @@ contract Vault is Owned {
             vaultInfo
         ) =
         IModelHelper(modelHelper).getVaultInfo(address(pool), address(this), tokenInfo);
+    }
+
+    function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
+        return selectors;
     }
 }

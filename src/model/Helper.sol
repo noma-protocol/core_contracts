@@ -7,19 +7,19 @@ import {LiquidityAmounts} from "@uniswap/v3-periphery/libraries/LiquidityAmounts
 import {TickMath} from '@uniswap/v3-core/libraries/TickMath.sol';
 import {ERC20} from "solmate/tokens/ERC20.sol";
 
-import {Uniswap} from "./libraries/Uniswap.sol";
-import {Conversions} from "./libraries/Conversions.sol";
-import {DecimalMath} from "./libraries/DecimalMath.sol";
+import {Uniswap} from "../libraries/Uniswap.sol";
+import {Conversions} from "../libraries/Conversions.sol";
+import {DecimalMath} from "../libraries/DecimalMath.sol";
 
-import {Underlying} from "./libraries/Underlying.sol";
-import {Utils} from "./libraries/Utils.sol";
+import {Underlying} from "../libraries/Underlying.sol";
+import {Utils} from "../libraries/Utils.sol";
 
 import {
     LiquidityPosition,
     LiquidityType,
     TokenInfo,
     VaultInfo
-} from "./Types.sol";
+} from "../Types.sol";
 
 error AlreadyInitialized();
 error InvalidCaller();
@@ -136,19 +136,19 @@ contract ModelHelper {
         return totalSupply - (amount0CurrentFloor + amount0CurrentAnchor + amount0CurrentDiscovery + protocolUnusedBalanceToken0);
     } 
 
-    function estimateNewFloorPrice(
+    function getExcessReserveBalance(
         address pool,
-        address vault
-    ) internal view returns (uint256) {
+        address vault,
+        bool isToken0
+    ) public view returns (uint256) {
         LiquidityPosition[3] memory positions = IVault(vault).getPositions();
 
-        uint256 circulatingSupply = getCirculatingSupply(pool, vault);
-        uint256 anchorCapacity = getPositionCapacity(pool, vault, positions[1]);
+        (,,, uint256 amount1CurrentFloor ) = Underlying.getUnderlyingBalances(pool, vault, positions[0]);
+        (,,, uint256 amount1CurrentAnchor) = Underlying.getUnderlyingBalances(pool, vault, positions[1]);
 
-        (
-           ,,, uint256 amount1Current
-        ) = Underlying.getUnderlyingBalances(pool, address(this), positions[0]);
-     
-        return DecimalMath.divideDecimal(amount1Current, circulatingSupply - anchorCapacity);
+        ERC20 token = ERC20(isToken0 ? IUniswapV3Pool(pool).token0() : IUniswapV3Pool(pool).token1());
+        uint256 protocolUnusedBalanceToken1 = token.balanceOf(vault);
+    
+        return protocolUnusedBalanceToken1 - (amount1CurrentFloor + amount1CurrentAnchor);
     }
 }
