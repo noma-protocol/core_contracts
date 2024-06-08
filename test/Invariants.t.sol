@@ -7,7 +7,7 @@ import "forge-std/Script.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 
 import {Deployer} from "../src/Deployer.sol";
-import {Vault} from  "../src/vault/BaseVault.sol";
+import {BaseVault} from  "../src/vault/BaseVault.sol";
 import {AmphorToken} from  "../src/token/AmphorToken.sol";
 import {ModelHelper} from  "../src/model/Helper.sol";
 import {Underlying } from  "../src/libraries/Underlying.sol";
@@ -22,7 +22,7 @@ interface IWETH {
 }
 
 interface IDOManager {
-    function vault() external view returns (Vault);
+    function vault() external view returns (BaseVault);
     function buyTokens(uint256 price, uint256 amount, address receiver) external;
     function sellTokens(uint256 price, uint256 amount, address receiver) external;
 }
@@ -66,7 +66,7 @@ contract Invariants is Test {
     function testCirculatingSupply() public {     
         IDOManager managerContract = IDOManager(idoManager);
 
-        Vault vault = managerContract.vault();
+        BaseVault vault = managerContract.vault();
         address pool = address(vault.pool());
 
         uint256 circulatingSupply = modelHelper.getCirculatingSupply(pool, address(vault));
@@ -90,7 +90,7 @@ contract Invariants is Test {
 
     function testCirculatingSupplyMatchesBalances() public {
         IDOManager managerContract = IDOManager(idoManager);
-        Vault vault = managerContract.vault();
+        BaseVault vault = managerContract.vault();
         address pool = address(vault.pool());
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
@@ -123,7 +123,7 @@ contract Invariants is Test {
         vm.startBroadcast(privateKey);
         
         IDOManager managerContract = IDOManager(idoManager);
-        Vault vault = managerContract.vault();
+        BaseVault vault = managerContract.vault();
 
         address pool = address(vault.pool());
 
@@ -160,7 +160,7 @@ contract Invariants is Test {
 
         IDOManager managerContract = IDOManager(idoManager);
 
-        Vault vault = managerContract.vault();
+        BaseVault vault = managerContract.vault();
         address pool = address(vault.pool());
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
@@ -207,7 +207,7 @@ contract Invariants is Test {
 
     function testLargePurchaseTriggerShift() public {
         IDOManager managerContract = IDOManager(idoManager);
-        Vault vault = managerContract.vault();
+        BaseVault vault = managerContract.vault();
         address pool = address(vault.pool());
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
@@ -249,7 +249,7 @@ contract Invariants is Test {
 
     function testShiftAboveThreshold() public {
         IDOManager managerContract = IDOManager(idoManager);
-        Vault vault = managerContract.vault();
+        BaseVault vault = managerContract.vault();
 
         address pool = address(vault.pool());        
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
@@ -281,7 +281,7 @@ contract Invariants is Test {
     
     function testShiftBelowThreshold() public {
         IDOManager managerContract = IDOManager(idoManager);
-        Vault vault = managerContract.vault();
+        BaseVault vault = managerContract.vault();
 
         address pool = address(vault.pool());        
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
@@ -319,7 +319,7 @@ contract Invariants is Test {
     
     function testSlide() public {
         IDOManager managerContract = IDOManager(idoManager);
-        Vault vault = managerContract.vault();
+        BaseVault vault = managerContract.vault();
         address pool = address(vault.pool());
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
@@ -387,7 +387,7 @@ contract Invariants is Test {
 
     function solvencyInvariant() public view {
         IDOManager managerContract = IDOManager(idoManager);
-        Vault vault = managerContract.vault();
+        BaseVault vault = managerContract.vault();
         address pool = address(vault.pool());
 
         // To guarantee solvency, Noma ensures that capacity > circulating supply each liquidity is deployed.
