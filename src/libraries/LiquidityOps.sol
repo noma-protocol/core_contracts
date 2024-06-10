@@ -151,12 +151,7 @@ library LiquidityOps {
             })
         );
 
-        // IModelHelper(modelHelper)
-        // .updatePositions(
-        //     newPositions
-        // );
-
-        IVault(params.addresses.vault)
+        IVault(address(this))
         .updatePositions(
             newPositions
         );
@@ -172,32 +167,21 @@ library LiquidityOps {
        
         if (params.positions[0].liquidity > 0) {
 
-            uint256 feesPosition0 = Underlying
-            .computeFeesEarned(
-                params.positions[0], 
-                address(this), 
-                params.pool, 
-                false, 
-                TickMath.getTickAtSqrtRatio(sqrtRatioX96)
-            );
+            (
+                uint256 feesPosition0Token0,
+                uint256 feesPosition0Token1, 
+                uint256 feesPosition1Token0, 
+                uint256 feesPosition1Token1
+             ) = _calculateFees(params.pool, params.positions);
 
-            uint256 feesPosition1 = Underlying
-            .computeFeesEarned(
-                params.positions[1], 
-                address(this), 
-                params.pool, 
-                false, 
-                TickMath.getTickAtSqrtRatio(sqrtRatioX96)
+            IVault(address(this)).setFees(
+                feesPosition0Token0, 
+                feesPosition0Token1
             );
 
             IVault(address(this)).setFees(
-                0, 
-                feesPosition0
-            );
-
-            IVault(address(this)).setFees(
-                0, 
-                feesPosition1
+                feesPosition1Token0, 
+                feesPosition1Token1
             );
 
             // Collect floor liquidity
@@ -307,32 +291,21 @@ library LiquidityOps {
 
         if (currentLiquidityRatio >= 115e16) {
             
-            uint256 feesPosition0 = Underlying
-            .computeFeesEarned(
-                positions[0], 
-                addresses.vault, 
-                addresses.pool, 
-                false, 
-                TickMath.getTickAtSqrtRatio(sqrtRatioX96)
+            (
+                uint256 feesPosition0Token0,
+                uint256 feesPosition0Token1, 
+                uint256 feesPosition1Token0, 
+                uint256 feesPosition1Token1
+             ) = _calculateFees(addresses.pool, positions);
+
+            IVault(address(this)).setFees(
+                feesPosition0Token0, 
+                feesPosition0Token1
             );
 
-            uint256 feesPosition1 = Underlying
-            .computeFeesEarned(
-                positions[1], 
-                addresses.vault, 
-                addresses.pool, 
-                false, 
-                TickMath.getTickAtSqrtRatio(sqrtRatioX96)
-            );
-
-            IVault(addresses.vault).setFees(
-                0, 
-                feesPosition0
-            );
-
-            IVault(addresses.vault).setFees(
-                0, 
-                feesPosition1
+            IVault(address(this)).setFees(
+                feesPosition1Token0, 
+                feesPosition1Token1
             );
 
             // Collect anchor liquidity
@@ -379,7 +352,7 @@ library LiquidityOps {
             // restore floor
             newPositions[0] = positions[0];
 
-            IVault(addresses.vault)
+            IVault(address(this))
             .updatePositions(
                 newPositions
             );    
@@ -445,6 +418,57 @@ library LiquidityOps {
         );
         
         return (circulatingSupply, anchorToken1Balance, discoveryToken1Balance);
+    }
+
+    function _calculateFees(
+        address pool, 
+        LiquidityPosition[3] memory positions
+    ) internal view returns (
+        uint256 feesPosition0Token0, 
+        uint256 feesPosition0Token1, 
+        uint256 feesPosition1Token0, 
+        uint256 feesPosition1Token1
+    ) {
+
+        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
+
+        feesPosition0Token0 = Underlying
+        .computeFeesEarned(
+            positions[0], 
+            address(this), 
+            pool, 
+            true, 
+            TickMath.getTickAtSqrtRatio(sqrtRatioX96)
+        );
+
+        feesPosition1Token0 = Underlying
+        .computeFeesEarned(
+            positions[1], 
+            address(this), 
+            pool, 
+            true, 
+            TickMath.getTickAtSqrtRatio(sqrtRatioX96)
+        );
+
+        feesPosition0Token1 = Underlying
+        .computeFeesEarned(
+            positions[0], 
+            address(this), 
+            pool, 
+            false, 
+            TickMath.getTickAtSqrtRatio(sqrtRatioX96)
+        );
+
+        feesPosition1Token1 = Underlying
+        .computeFeesEarned(
+            positions[1], 
+            address(this), 
+            pool, 
+            false, 
+            TickMath.getTickAtSqrtRatio(sqrtRatioX96)
+        );
+
+        return (feesPosition0Token0, feesPosition0Token1, feesPosition1Token0, feesPosition1Token1);
     }
 
     modifier onlyNotEmptyPositions(
