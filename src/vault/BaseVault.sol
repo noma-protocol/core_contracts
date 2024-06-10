@@ -204,12 +204,8 @@ contract BaseVault /*is Owned*/ {
         return (_v.feesAccumulatorToken0, _v.feesAccumulatorToken1);
     }
 
-    function testMe() public view returns (uint256) {
-        return 1337 ether;
-    }
-
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](14);
+        bytes4[] memory selectors = new bytes4[](13);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
         selectors[1] = bytes4(keccak256(bytes("pool()")));
         selectors[2] = bytes4(keccak256(bytes("initialize(address,address)")));
@@ -223,7 +219,6 @@ contract BaseVault /*is Owned*/ {
         selectors[10] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256)[3])")));
         selectors[11] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));
         selectors[12] = bytes4(keccak256(bytes("getAccumulatedFees()")));
-        selectors[13] = bytes4(keccak256(bytes("testMe()")));
         return selectors;
     }
 
