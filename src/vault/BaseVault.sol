@@ -208,12 +208,22 @@ contract BaseVault is OwnableUninitialized {
         return (_v.feesAccumulatorToken0, _v.feesAccumulatorToken1);
     }
 
+    function getExcessReserveToken1() external view returns (uint256) {
+        bool isToken0 = false;
+        return IModelHelper(_v.modelHelper)
+        .getExcessReserveBalance(
+            address(_v.pool), 
+            address(this), 
+            isToken0
+        );
+    }
+
     function setStakingContract(address _stakingContract) external onlyManager {
         _v.stakingContract = _stakingContract;
     }
 
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](14);
+        bytes4[] memory selectors = new bytes4[](15);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
         selectors[1] = bytes4(keccak256(bytes("pool()")));
         selectors[2] = bytes4(keccak256(bytes("initialize(address,address,address,address)")));
@@ -228,6 +238,7 @@ contract BaseVault is OwnableUninitialized {
         selectors[11] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));
         selectors[12] = bytes4(keccak256(bytes("getAccumulatedFees()")));
         selectors[13] = bytes4(keccak256(bytes("setStakingContract(address)")));
+        selectors[14] = bytes4(keccak256(bytes("getExcessReserveToken1()")));
         return selectors;
     }
 
