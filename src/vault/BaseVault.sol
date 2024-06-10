@@ -2,8 +2,8 @@
 pragma solidity ^0.8.0;
 
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
+import {OwnableUninitialized} from "../abstract/OwnableUninitialized.sol";
 
-import {Owned} from "solmate/auth/Owned.sol";
 import {IWETH} from "../interfaces/IWETH.sol";
 import {LiquidityOps} from "../libraries/LiquidityOps.sol";
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
@@ -31,7 +31,7 @@ interface IVaultsController {
 error AlreadyInitialized();
 error InvalidCaller();
 
-contract BaseVault /*is Owned*/ {
+contract BaseVault is OwnableUninitialized {
     VaultStorage internal _v;
 
     event FloorUpdated(uint256 floorPrice, uint256 floorCapacity);
@@ -61,8 +61,10 @@ contract BaseVault /*is Owned*/ {
     }
 
     function initialize(
+        address _deployer,
         address _pool, 
-        address _modelHelper
+        address _modelHelper,
+        address _stakingContract
     ) public {
         _v.pool = IUniswapV3Pool(_pool);
         _v.modelHelper = _modelHelper;
@@ -70,6 +72,8 @@ contract BaseVault /*is Owned*/ {
         _v.tokenInfo.token1 = _v.pool.token1();
         _v.initialized = false;
         _v.lastLiquidityRatio = 0;
+        _v.stakingContract = _stakingContract;
+        OwnableUninitialized(_deployer);
     }
 
     function initializeLiquidity(
@@ -204,11 +208,15 @@ contract BaseVault /*is Owned*/ {
         return (_v.feesAccumulatorToken0, _v.feesAccumulatorToken1);
     }
 
+    function setStakingContract(address _stakingContract) external onlyManager {
+        _v.stakingContract = _stakingContract;
+    }
+
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](13);
+        bytes4[] memory selectors = new bytes4[](14);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
         selectors[1] = bytes4(keccak256(bytes("pool()")));
-        selectors[2] = bytes4(keccak256(bytes("initialize(address,address)")));
+        selectors[2] = bytes4(keccak256(bytes("initialize(address,address,address,address)")));
         selectors[3] = bytes4(keccak256(bytes("setParameters(address)")));
         selectors[4] = bytes4(keccak256(bytes("initializeLiquidity((int24,int24,uint128,uint256)[3])")));
         selectors[5] = bytes4(keccak256(bytes("getPositions()")));
@@ -219,6 +227,7 @@ contract BaseVault /*is Owned*/ {
         selectors[10] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256)[3])")));
         selectors[11] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));
         selectors[12] = bytes4(keccak256(bytes("getAccumulatedFees()")));
+        selectors[13] = bytes4(keccak256(bytes("setStakingContract(address)")));
         return selectors;
     }
 
