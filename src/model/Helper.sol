@@ -26,6 +26,7 @@ error InvalidCaller();
 
 interface IVault {
     function getPositions() external view returns (LiquidityPosition[3] memory);
+    function getAccumulatedFees() external view returns (uint256, uint256);
 }
 
 contract ModelHelper {
@@ -141,14 +142,12 @@ contract ModelHelper {
         address vault,
         bool isToken0
     ) public view returns (uint256) {
-        LiquidityPosition[3] memory positions = IVault(vault).getPositions();
-
-        (,,, uint256 amount1CurrentFloor ) = Underlying.getUnderlyingBalances(pool, vault, positions[0]);
-        (,,, uint256 amount1CurrentAnchor) = Underlying.getUnderlyingBalances(pool, vault, positions[1]);
-
         ERC20 token = ERC20(isToken0 ? IUniswapV3Pool(pool).token0() : IUniswapV3Pool(pool).token1());
-        uint256 protocolUnusedBalanceToken1 = token.balanceOf(vault);
+        uint256 protocolUnusedBalance = token.balanceOf(vault);
     
-        return protocolUnusedBalanceToken1 - (amount1CurrentFloor + amount1CurrentAnchor);
+        (uint256 accumulatedFeesToken0, uint256 accumulatedFeesToken1) = IVault(vault).getAccumulatedFees();
+        uint256 fees = isToken0 ? accumulatedFeesToken0 : accumulatedFeesToken1;
+
+        return protocolUnusedBalance - fees;
     }
 }
