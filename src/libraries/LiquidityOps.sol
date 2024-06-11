@@ -37,7 +37,6 @@ error BelowThreshold();
 
 library LiquidityOps {
     
-    int24 constant TICK_SPACING = 60;
 
     function shift(
         ProtocolAddresses memory addresses,
@@ -126,15 +125,6 @@ library LiquidityOps {
                     params.anchorCapacity,
                     _positions
                 );
-
-        // revert(
-        //     string(
-        //         abi.encodePacked(
-        //             "Nothing to skim : ", 
-        //             Utils._uint2str(uint256(newFloorPrice))
-        //         )
-        //     )
-        // );
 
         (newPositions) =
         shiftPositions(
@@ -328,7 +318,7 @@ library LiquidityOps {
                 addresses.pool,
                 addresses.deployer,
                 positions[0].upperTick,                
-                Utils.nearestUsableTick(TickMath.getTickAtSqrtRatio(sqrtRatioX96) + TICK_SPACING),
+                Utils.nearestUsableTick(TickMath.getTickAtSqrtRatio(sqrtRatioX96) + Utils.TICK_SPACING),
                 anchorToken1Balance, 
                 LiquidityType.Anchor
             );
