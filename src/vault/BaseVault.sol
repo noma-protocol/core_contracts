@@ -18,14 +18,18 @@ import {
     VaultInfo
 } from "../Types.sol";
 
+import "../libraries/DecimalMath.sol";
+// import "../libraries/Conversions.sol";
+
 interface IERC20 {
     function balanceOf(address account) external view returns (uint256);
     function transfer(address recipient, uint256 amount) external returns (bool);
+    function mint(address receiver, uint256 amount) external;
+    function approve(address spender, uint256 amount) external;
 }
 
-interface IVaultsController {
-    function shift(ProtocolAddresses memory _parameters, address vault) external;
-    function slide(ProtocolAddresses memory _parameters, address vault) external;
+interface IExtVault {
+    function mintAndDistributeRewards(address _vault) external;
 }
 
 error AlreadyInitialized();
@@ -64,7 +68,8 @@ contract BaseVault is OwnableUninitialized {
         address _deployer,
         address _pool, 
         address _modelHelper,
-        address _stakingContract
+        address _stakingContract,
+        address _proxyAddress
     ) public {
         _v.pool = IUniswapV3Pool(_pool);
         _v.modelHelper = _modelHelper;
@@ -73,6 +78,7 @@ contract BaseVault is OwnableUninitialized {
         _v.initialized = false;
         _v.lastLiquidityRatio = 0;
         _v.stakingContract = _stakingContract;
+        _v.proxyAddress = _proxyAddress;
         OwnableUninitialized(_deployer);
     }
 
@@ -109,6 +115,7 @@ contract BaseVault is OwnableUninitialized {
             positions
         );
 
+        IExtVault(address(this)).mintAndDistributeRewards(address(this));
     }    
 
     function slide() public  {
@@ -165,10 +172,15 @@ contract BaseVault is OwnableUninitialized {
         ); 
     }
 
-    function setParameters(address _deployerContract) public /*onlyOwner*/ {
+    function setParameters(
+        address _deployerContract, 
+        address _stakingRewards
+    ) public 
+    /*onlyOwner*/ {
         if (_v.initialized) revert AlreadyInitialized();
 
         _v.deployerContract = _deployerContract;
+        _v.stakingContract = _stakingRewards;
     }
 
     function setFees(
@@ -226,8 +238,8 @@ contract BaseVault is OwnableUninitialized {
         bytes4[] memory selectors = new bytes4[](15);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
         selectors[1] = bytes4(keccak256(bytes("pool()")));
-        selectors[2] = bytes4(keccak256(bytes("initialize(address,address,address,address)")));
-        selectors[3] = bytes4(keccak256(bytes("setParameters(address)")));
+        selectors[2] = bytes4(keccak256(bytes("initialize(address,address,address,address,address)")));
+        selectors[3] = bytes4(keccak256(bytes("setParameters(address,address)")));
         selectors[4] = bytes4(keccak256(bytes("initializeLiquidity((int24,int24,uint128,uint256)[3])")));
         selectors[5] = bytes4(keccak256(bytes("getPositions()")));
         selectors[6] = bytes4(keccak256(bytes("shift()")));
