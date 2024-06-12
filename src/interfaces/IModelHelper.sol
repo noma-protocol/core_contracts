@@ -16,4 +16,5 @@ interface IModelHelper{
     function getVaultInfo(address pool, address vault, TokenInfo memory tokenInfo) external view returns (VaultInfo memory vaultInfo);
     function updatePositions(LiquidityPosition[3] memory _positions) external;
     function getExcessReserveBalance(address pool, address vault, bool isToken0) external view returns (uint256);
+    function getIntrinsicMinimumValue(address _vault) external returns (uint256);
 }

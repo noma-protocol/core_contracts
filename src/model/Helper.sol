@@ -150,4 +150,13 @@ contract ModelHelper {
 
         return protocolUnusedBalance - fees;
     }
+
+    function getIntrinsicMinimumValue(address _vault) public view returns (uint256) {
+        LiquidityPosition[3] memory positions = IVault(_vault).getPositions();
+
+        int24 lowerTick = positions[0].lowerTick;
+        uint160 sqrtPriceX96 = Conversions.tickToSqrtPriceX96(lowerTick);
+
+        return Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+    }
 }
