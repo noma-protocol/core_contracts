@@ -29,7 +29,7 @@ interface IERC20 {
 }
 
 interface IExtVault {
-    function mintAndDistributeRewards(address _vault) external;
+    function mintAndDistributeRewards(ProtocolAddresses memory) external;
 }
 
 error AlreadyInitialized();
@@ -104,18 +104,19 @@ contract BaseVault is OwnableUninitialized {
 
         LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
 
-        LiquidityOps
-        .shift(
-            ProtocolAddresses({
-                pool: address(_v.pool),
-                vault: address(this),
-                deployer: _v.deployerContract,
-                modelHelper: _v.modelHelper
-            }),
+        ProtocolAddresses memory addresses = ProtocolAddresses({
+            pool: address(_v.pool),
+            vault: address(this),
+            deployer: _v.deployerContract,
+            modelHelper: _v.modelHelper
+        });
+
+        LiquidityOps.shift(
+            addresses,
             positions
         );
 
-        IExtVault(address(this)).mintAndDistributeRewards(address(this));
+        IExtVault(address(this)).mintAndDistributeRewards(addresses);
     }    
 
     function slide() public  {
