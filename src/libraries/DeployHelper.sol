@@ -30,21 +30,17 @@ library DeployHelper {
             LiquidityPosition memory newPosition,
             LiquidityType liquidityType
         ) {
-    
-        uint256 balanceToken0 = ERC20(pool.token0()).balanceOf(address(this));
-        uint256 balanceToken1 = ERC20(pool.token1()).balanceOf(address(this));
-        
-        (uint160 sqrtRatioX96,,,,,,) = pool.slot0();
-        // (int24 lowerTick, int24 upperTick) = Conversions.computeSingleTick(_floorPrice, tickSpacing);
+            
+        (uint160 sqrtRatioX96,,,,,,) = pool.slot0();        
         int24 lowerTick = TickMath.getTickAtSqrtRatio(Conversions.priceToSqrtPriceX96(int256(_floorPrice), tickSpacing));
-        int24 upperTick = TickMath.getTickAtSqrtRatio(Conversions.priceToSqrtPriceX96(int256(1.0202003198939318e18), tickSpacing));
+        int24 upperTick = lowerTick + tickSpacing;
         
         uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
             sqrtRatioX96,
             TickMath.getSqrtRatioAtTick(lowerTick),
             TickMath.getSqrtRatioAtTick(upperTick),
-            10000 ether,
-            0 //(balanceToken1 * 66) / 100 // % of WETH
+            375000 ether,
+            0 
         );
 
         if (liquidity > 0) {
