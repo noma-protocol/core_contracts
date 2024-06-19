@@ -265,7 +265,7 @@ library LiquidityDeployer {
         uint256 circulatingSupply,
         uint256 anchorCapacity,
         LiquidityPosition[3] memory positions
-    ) internal view returns (uint256) {
+    ) internal pure returns (uint256) {
         require(
             positions[0].liquidity > 0 &&
             positions[1].liquidity > 0 &&  
