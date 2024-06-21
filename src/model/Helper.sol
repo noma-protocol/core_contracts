@@ -27,6 +27,7 @@ error InvalidCaller();
 interface IVault {
     function getPositions() external view returns (LiquidityPosition[3] memory);
     function getAccumulatedFees() external view returns (uint256, uint256);
+    function getCollateralAmount() external view returns (uint256);
 }
 
 contract ModelHelper {
@@ -55,7 +56,8 @@ contract ModelHelper {
     function getPositionCapacity(
         address pool,
         address vault,
-        LiquidityPosition memory position
+        LiquidityPosition memory position,
+        LiquidityType liquidityType
     ) public view returns (uint256 amount0Current) {
 
         (
@@ -78,6 +80,14 @@ contract ModelHelper {
                 liquidity
             );
         }
+
+        if (liquidityType == LiquidityType.Floor) {
+            uint256 vaultCollateral = IVault(vault).getCollateralAmount();
+            amount0Current = amount0Current + vaultCollateral;
+
+        }
+
+        return amount0Current;
     } 
 
     function getUnderlyingBalances(
@@ -115,8 +125,8 @@ contract ModelHelper {
         vaultInfo.liquidityRatio = getLiquidityRatio(pool, vault);
         vaultInfo.circulatingSupply = getCirculatingSupply(pool, vault);
         vaultInfo.spotPriceX96 = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
-        vaultInfo.anchorCapacity = getPositionCapacity(pool, vault, positions[1]);
-        vaultInfo.floorCapacity = getPositionCapacity(pool, vault, positions[0]);
+        vaultInfo.anchorCapacity = getPositionCapacity(pool, vault, positions[1], LiquidityType.Anchor);
+        vaultInfo.floorCapacity = getPositionCapacity(pool, vault, positions[0], LiquidityType.Floor);
         vaultInfo.token0 = tokenInfo.token0;
         vaultInfo.token1 = tokenInfo.token1;
     }   
@@ -136,6 +146,18 @@ contract ModelHelper {
     
         return totalSupply - (amount0CurrentFloor + amount0CurrentAnchor + amount0CurrentDiscovery + protocolUnusedBalanceToken0);
     } 
+
+    function getTotalSupply(
+        address pool,
+        bool isToken0
+    ) public view returns (uint256) {
+      return ERC20(
+        address(
+            isToken0 ? 
+            IUniswapV3Pool(pool).token0() :
+            IUniswapV3Pool(pool).token1()
+        )).totalSupply();
+    }
 
     function getExcessReserveBalance(
         address pool,
