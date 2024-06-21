@@ -1,4 +1,5 @@
 
+import "./Conversions.sol";
 
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
@@ -7,6 +8,12 @@ library Utils {
     
     int24 public constant MIN_TICK = -887272;
     int24 public constant MAX_TICK = 887272;
+    int24 public constant TICK_SPACING = 60;
+
+    function calculateLoanFees(uint256 amount) public view returns (uint256) {
+        uint256 fee = (amount * 3) / 100;
+        return fee;
+    }
 
     function addBips(uint256 _price, int256 bips) public pure returns (uint256) {
         if (bips >= 0) {
@@ -19,26 +26,28 @@ library Utils {
             } else {
                 return _price - decrease;
             }
-        }
+        } 
     }
 
-    // Function to add bips to a tick value, assuming bips can be within int24 positive range
+    // Function to add bips to a tick value
     function addBipsToTick(int24 currentTick, int24 bips) public pure returns (int24) {
-        require(currentTick >= 0, "Current tick must be non-negative");
-        require(bips >= 0 && bips <= 10000, "Bips must be positive and not exceed 10000");
 
-        // Convert int24 to int256 for calculations to prevent overflow
-        int256 currentTick256 = int256(currentTick);
-        int256 bips256 = int256(bips);
-        int256 additionalAmount256 = (currentTick256 * bips256) / 10000;
+        uint256 tickToPrice = Conversions
+        .sqrtPriceX96ToPrice(
+            Conversions.tickToSqrtPriceX96(currentTick), 
+            18
+        );
 
-        // Calculate the new tick value
-        int256 newTickValue256 = currentTick256 + additionalAmount256;
+        uint256 newPrice = addBips(tickToPrice, bips);
+        int24 newTickValue = Conversions
+        .priceToTick(
+            int256(newPrice), 
+            TICK_SPACING
+        );
 
-        // Ensure the new tick value is within the range of int24
-        require(newTickValue256 >= 0 && newTickValue256 <= type(int24).max, "Resulting tick value out of int24 positive range");
-
-        return int24(newTickValue256);
+        // Ensure the new tick value is within the range of int24 and within Uniswap's tick range
+        require(newTickValue >= MIN_TICK && newTickValue <= MAX_TICK, "Resulting tick value out of range");
+        return newTickValue;
     }
 
     function intToString(int256 _value) public pure returns (string memory) {
