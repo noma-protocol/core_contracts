@@ -73,6 +73,11 @@ contract BorrowVault is BaseVault {
         // Requires approval
         IERC20(_v.pool.token0()).transferFrom(who, address(this), collateralAmount);
         
+        uint256 fees = Utils.calculateLoanFees(borrowAmount);
+
+        // Requires approval
+        IERC20(_v.pool.token1()).transferFrom(who, address(this), fees);
+
         _v.collateralAmount += collateralAmount;
 
         IERC20(_v.pool.token0()).transfer(_v.escrowContract, collateralAmount);
@@ -100,6 +105,7 @@ contract BorrowVault is BaseVault {
         LoanPosition memory loanPosition = LoanPosition({
             borrowAmount: borrowAmount,
             collateralAmount: collateralAmount,
+            fees: fees,
             expiry: block.timestamp + 30 days,
             duration: duration
         });
