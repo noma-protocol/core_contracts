@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 
 import { IUniswapV3Pool } from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { TokenInfo, LiquidityPosition } from "../Types.sol";
+import { TokenInfo, LiquidityPosition, LoanPosition } from "../Types.sol";
 /**
  * @notice Storage structure for token-related information.
  */
@@ -25,15 +25,24 @@ struct VaultStorage {
     LiquidityPosition  anchorPosition;
     LiquidityPosition  discoveryPosition;
 
+    mapping(address => LoanPosition) loanPositions;
+    mapping(address => uint256) totalLoansPerUser;
+
+    uint256 totalLoans;
+
     TokenInfo tokenInfo;
     
     address deployerContract;
     address modelHelper;
+    address stakingContract;
+    address proxyAddress;
+    address escrowContract;
 
     IUniswapV3Pool pool;
 
     uint256 feesAccumulatorToken0;
     uint256 feesAccumulatorToken1;
+    uint256 collateralAmount;
 
     bool initialized; 
     uint256 lastLiquidityRatio;

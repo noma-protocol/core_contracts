@@ -86,3 +86,11 @@ struct PreShiftParameters {
     uint256 anchorToken1Balance;
     uint256 discoveryToken1Balance;
 }
+
+struct LoanPosition {
+    uint256 borrowAmount;
+    uint256 collateralAmount;
+    uint256 fees;
+    uint256 expiry;
+    int256 duration;
+}
