@@ -18,8 +18,7 @@ import {
     VaultInfo
 } from "../Types.sol";
 
-import "../libraries/DecimalMath.sol";
-// import "../libraries/Conversions.sol";
+import "../libraries/DecimalMath.sol"; 
 
 interface IERC20 {
     function balanceOf(address account) external view returns (uint256);
@@ -30,6 +29,10 @@ interface IERC20 {
 
 interface IExtVault {
     function mintAndDistributeRewards(ProtocolAddresses memory) external;
+}
+
+interface IBorrowVault {
+    function borrowFromFloor(address who, uint256 collateralAmount, uint256 borrowAmount, int256 duration) external;
 }
 
 error AlreadyInitialized();
@@ -69,7 +72,8 @@ contract BaseVault is OwnableUninitialized {
         address _pool, 
         address _modelHelper,
         address _stakingContract,
-        address _proxyAddress
+        address _proxyAddress,
+        address _escrowContract
     ) public {
         _v.pool = IUniswapV3Pool(_pool);
         _v.modelHelper = _modelHelper;
@@ -79,6 +83,7 @@ contract BaseVault is OwnableUninitialized {
         _v.lastLiquidityRatio = 0;
         _v.stakingContract = _stakingContract;
         _v.proxyAddress = _proxyAddress;
+        _v.escrowContract = _escrowContract;
         OwnableUninitialized(_deployer);
     }
 
@@ -99,42 +104,6 @@ contract BaseVault is OwnableUninitialized {
         );
     }
 
-    function shift() public {
-        require(_v.initialized, "not initialized");
-
-        LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
-
-        ProtocolAddresses memory addresses = ProtocolAddresses({
-            pool: address(_v.pool),
-            vault: address(this),
-            deployer: _v.deployerContract,
-            modelHelper: _v.modelHelper
-        });
-
-        LiquidityOps.shift(
-            addresses,
-            positions
-        );
-
-        IExtVault(address(this)).mintAndDistributeRewards(addresses);
-    }    
-
-    function slide() public  {
-        require(_v.initialized, "not initialized");
-
-        LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
-        LiquidityOps
-        .slide(
-            ProtocolAddresses({
-                pool: address(_v.pool),
-                vault: address(this),
-                deployer: _v.deployerContract,
-                modelHelper: _v.modelHelper
-            }),
-            positions
-        );
-    }
-
     function updatePositions(LiquidityPosition[3] memory _positions) public {
         require(msg.sender == address(this), "invalid caller");
         require(_v.initialized, "not initialized");
@@ -146,20 +115,60 @@ contract BaseVault is OwnableUninitialized {
             "updatePositions: no liquidity in positions"
         );           
         
-        _v.floorPosition = _positions[0];
-        _v.anchorPosition = _positions[1];
-        _v.discoveryPosition = _positions[2];
+        _updatePositions(_positions);
     }
     
     function _updatePositions(LiquidityPosition[3] memory _positions) internal {
-        require(_v.initialized, "not initialized");          
         
         _v.floorPosition = _positions[0];
         _v.anchorPosition = _positions[1];
         _v.discoveryPosition = _positions[2];
     }
 
-        
+    function borrow(
+        uint256 collateralAmount, 
+        uint256 borrowAmount
+    ) external {
+        IBorrowVault(address(this))
+        .borrowFromFloor(
+            msg.sender,
+            collateralAmount, 
+            borrowAmount,
+            30 days
+        );
+    }
+
+    function calcDynamicAmount(
+        address pool, 
+        address modelHelper,
+        bool isBurn
+    ) 
+    external 
+    view 
+    returns (uint256) {
+        require(msg.sender == address(this), "unathorized");
+
+        uint256 currentLiquidityRatio = IModelHelper(modelHelper)
+        .getLiquidityRatio(pool, address(this));
+
+        uint256 circulatingSupply = IModelHelper(modelHelper)
+        .getCirculatingSupply(
+            pool,
+            address(this)
+        );
+
+        uint256 result = DecimalMath
+        .multiplyDecimal(
+            circulatingSupply, 
+            isBurn ? currentLiquidityRatio - 1e18 : 
+            1e18 - currentLiquidityRatio
+        ); 
+
+        result = isBurn ? result / 100 : result;
+
+        return result;  
+    }
+
     function getUnderlyingBalances(
         LiquidityType liquidityType
     ) external view 
@@ -213,6 +222,10 @@ contract BaseVault is OwnableUninitialized {
         IModelHelper(_v.modelHelper).getVaultInfo(address(_v.pool), address(this), _v.tokenInfo);
     }
 
+    function getCollateralAmount() public view returns (uint256) {
+        return _v.collateralAmount;
+    }
+
     function pool() public view returns (IUniswapV3Pool) {
         return _v.pool;
     }
@@ -236,22 +249,23 @@ contract BaseVault is OwnableUninitialized {
     }
 
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](15);
+        bytes4[] memory selectors = new bytes4[](16);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
         selectors[1] = bytes4(keccak256(bytes("pool()")));
-        selectors[2] = bytes4(keccak256(bytes("initialize(address,address,address,address,address)")));
+        selectors[2] = bytes4(keccak256(bytes("initialize(address,address,address,address,address,address)")));
         selectors[3] = bytes4(keccak256(bytes("setParameters(address,address)")));
         selectors[4] = bytes4(keccak256(bytes("initializeLiquidity((int24,int24,uint128,uint256)[3])")));
         selectors[5] = bytes4(keccak256(bytes("getPositions()")));
-        selectors[6] = bytes4(keccak256(bytes("shift()")));
-        selectors[7] = bytes4(keccak256(bytes("slide()")));
-        selectors[8] = bytes4(keccak256(bytes("uniswapV3MintCallback(uint256,uint256,bytes)")));
-        selectors[9] = bytes4(keccak256(bytes("getUnderlyingBalances(uint8)")));
-        selectors[10] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256)[3])")));
-        selectors[11] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));
-        selectors[12] = bytes4(keccak256(bytes("getAccumulatedFees()")));
-        selectors[13] = bytes4(keccak256(bytes("setStakingContract(address)")));
-        selectors[14] = bytes4(keccak256(bytes("getExcessReserveToken1()")));
+        selectors[6] = bytes4(keccak256(bytes("uniswapV3MintCallback(uint256,uint256,bytes)")));
+        selectors[7] = bytes4(keccak256(bytes("getUnderlyingBalances(uint8)")));
+        selectors[8] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256)[3])")));
+        selectors[9] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));
+        selectors[10] = bytes4(keccak256(bytes("getAccumulatedFees()")));
+        selectors[11] = bytes4(keccak256(bytes("setStakingContract(address)")));
+        selectors[12] = bytes4(keccak256(bytes("getExcessReserveToken1()")));
+        selectors[13] = bytes4(keccak256(bytes("borrow(uint256,uint256)")));
+        selectors[14] = bytes4(keccak256(bytes("calcDynamicAmount(address,address,bool)")));
+        selectors[15] = bytes4(keccak256(bytes("getCollateralAmount()")));
         return selectors;
     }
 
