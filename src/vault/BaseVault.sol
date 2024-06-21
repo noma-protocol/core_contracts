@@ -32,7 +32,7 @@ interface IExtVault {
 }
 
 interface IBorrowVault {
-    function borrowFromFloor(address who, uint256 collateralAmount, uint256 borrowAmount, int256 duration) external;
+    function borrowFromFloor(address who, uint256 borrowAmount, int256 duration) external;
 }
 
 error AlreadyInitialized();
@@ -126,13 +126,11 @@ contract BaseVault is OwnableUninitialized {
     }
 
     function borrow(
-        uint256 collateralAmount, 
         uint256 borrowAmount
     ) external {
         IBorrowVault(address(this))
         .borrowFromFloor(
             msg.sender,
-            collateralAmount, 
             borrowAmount,
             30 days
         );
@@ -263,7 +261,7 @@ contract BaseVault is OwnableUninitialized {
         selectors[10] = bytes4(keccak256(bytes("getAccumulatedFees()")));
         selectors[11] = bytes4(keccak256(bytes("setStakingContract(address)")));
         selectors[12] = bytes4(keccak256(bytes("getExcessReserveToken1()")));
-        selectors[13] = bytes4(keccak256(bytes("borrow(uint256,uint256)")));
+        selectors[13] = bytes4(keccak256(bytes("borrow(uint256)")));
         selectors[14] = bytes4(keccak256(bytes("calcDynamicAmount(address,address,bool)")));
         selectors[15] = bytes4(keccak256(bytes("getCollateralAmount()")));
         return selectors;
