@@ -39,27 +39,29 @@ interface IVault {
 
 contract BorrowVault is BaseVault {
 
-    function _getCollateralValue(
-        uint256 amount
+    function _getCollateralAmount(
+        uint256 borrowAmount
     ) internal view returns (uint256) {
 
         uint256 intrinsicMinimumValue = IModelHelper(_v.modelHelper)
-        .getIntrinsicMinimumValue(address(this)) * 1e18;
-
-        return intrinsicMinimumValue * amount;
+        .getIntrinsicMinimumValue(address(this));
+         
+        return DecimalMath.divideDecimal(borrowAmount, intrinsicMinimumValue);
     }
     
     function borrowFromFloor(
         address who,
-        uint256 collateralAmount,
         uint256 borrowAmount,
         int256 duration
     ) public onlyVault {
 
-        require(borrowAmount > 0 && collateralAmount > 0, "Amounts must be greater than 0");
-        uint256 collateralValue = _getCollateralValue(collateralAmount);
+        require(borrowAmount > 0, "Amounts must be greater than 0");
+        uint256 collateralAmount = _getCollateralAmount(borrowAmount);
+        
+        require(collateralAmount > 0, "Collateral must be greater than 0");
 
-        require(collateralValue >= borrowAmount, "Insufficient collateral");
+        // Requires approval
+        IERC20(_v.pool.token0()).transferFrom(who, address(this), collateralAmount);  
 
         (,,, uint256 floorToken1Balance)  = IModelHelper(_v.modelHelper)
         .getUnderlyingBalances(
@@ -69,10 +71,7 @@ contract BorrowVault is BaseVault {
         );
 
         require(floorToken1Balance >= borrowAmount, "Insufficient floor balance");
-        
-        // Requires approval
-        IERC20(_v.pool.token0()).transferFrom(who, address(this), collateralAmount);
-        
+
         uint256 fees = Utils.calculateLoanFees(borrowAmount);
 
         // Requires approval
@@ -98,7 +97,7 @@ contract BorrowVault is BaseVault {
             _v.floorPosition
         );
 
-        IERC20(_v.pool.token0()).transfer(who, borrowAmount);
+        IERC20(_v.pool.token1()).transfer(who, borrowAmount);
 
         uint256 totalLoans = _v.totalLoansPerUser[who];
 
@@ -127,7 +126,7 @@ contract BorrowVault is BaseVault {
 
     function getFunctionSelectors() external pure  override returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](1);
-        selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,uint256)")));      
+        selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,int256)")));      
         return selectors;
     }
 }
