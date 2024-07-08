@@ -37,6 +37,7 @@ interface IVault {
 contract StakeVault is BaseVault {
 
     function mintAndDistributeRewards(ProtocolAddresses memory addresses) public {
+        require(msg.sender == address(this), "StakeVault: unauthorized");
 
         LiquidityPosition[3] memory positions = [
             _v.floorPosition, 

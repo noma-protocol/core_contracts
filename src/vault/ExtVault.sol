@@ -29,9 +29,9 @@ interface IStakingRewards {
     function notifyRewardAmount(uint256 reward) external;
 }
 
-interface IVault {
-    function updatePositions(LiquidityPosition[3] memory newPositions) external;
-    function setFees(uint256 _feesAccumulatedToken0, uint256 _feesAccumulatedToken1) external;
+
+interface IStakingVault {
+    function mintAndDistributeRewards(ProtocolAddresses memory addresses) external;
 }
 
 contract ExtVault is BaseVault {
@@ -53,7 +53,7 @@ contract ExtVault is BaseVault {
             positions
         );
 
-        // IExtVault(address(this)).mintAndDistributeRewards(addresses);
+        IStakingVault(address(this)).mintAndDistributeRewards(addresses);
     }    
 
     function slide() public  {

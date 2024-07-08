@@ -40,6 +40,8 @@ contract LendingVault is BaseVault {
     uint256 constant PER_DIEM_FEE = 27; // 0.027%
     uint256 constant FEE_DIVISOR = 100000;
 
+    address[] public loanAddresses;
+
     function _getCollateralAmount(uint256 borrowAmount) internal view returns (uint256) {
         uint256 intrinsicMinimumValue = IModelHelper(_v.modelHelper).getIntrinsicMinimumValue(address(this));
         return DecimalMath.divideDecimal(borrowAmount, intrinsicMinimumValue);
@@ -72,12 +74,13 @@ contract LendingVault is BaseVault {
             borrowAmount: borrowAmount,
             collateralAmount: collateralAmount,
             fees: loanFees,
-            expiry: block.timestamp + (duration * 1 days),
+            expiry: block.timestamp + uint256(duration * 1 days),
             duration: duration
         });
 
         _v.loanPositions[who] = loanPosition;
         _v.totalLoansPerUser[who] = totalLoans++;
+        loanAddresses.push(who);
 
         IVault(address(this)).updatePositions([_v.floorPosition, _v.anchorPosition, _v.discoveryPosition]);
     }
@@ -97,6 +100,7 @@ contract LendingVault is BaseVault {
                 IERC20(_v.pool.token0()).transfer(who, excess);
             }
             delete _v.loanPositions[who];
+            _removeLoanAddress(who);
         } else {
             loan.borrowAmount -= paybackAmount;
         }
@@ -117,13 +121,13 @@ contract LendingVault is BaseVault {
     }
 
     function defaultLoans() public onlyVault {
-        // Iterate over all loans and default the expired ones
-        for (uint256 i = 0; i < _v.loanPositions.length; i++) {
-            address who = _v.loanPositions[i].who;
+        for (uint256 i = 0; i < loanAddresses.length; i++) {
+            address who = loanAddresses[i];
             LoanPosition storage loan = _v.loanPositions[who];
             if (block.timestamp > loan.expiry) {
                 _seizeCollateral(who);
                 delete _v.loanPositions[who];
+                _removeLoanAddress(who);
             }
         }
     }
@@ -135,17 +139,27 @@ contract LendingVault is BaseVault {
         _v.collateralAmount -= collateralAmount;
     }
 
+    function _removeLoanAddress(address who) internal {
+        for (uint256 i = 0; i < loanAddresses.length; i++) {
+            if (loanAddresses[i] == who) {
+                loanAddresses[i] = loanAddresses[loanAddresses.length - 1];
+                loanAddresses.pop();
+                break;
+            }
+        }
+    }
+
     modifier onlyVault() {
-        require(msg.sender == address(this), "BorrowVault: only vault");
+        require(msg.sender == address(this), "LendingVault: only vault");
         _;
     }
 
     function getFunctionSelectors() external pure override returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](1);
+        bytes4[] memory selectors = new bytes4[](4);
         selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,int256)")));    
-        selectors[1] = bytes4(kekkak256(butes("paybackLoan(address,uint256)")));
-        selectors[2] = bytes4(kekkak256(butes("rollLoan(address)")));
-        selectors[3] = bytes4(kekkak256(butes("defaultLoans()")));
+        selectors[1] = bytes4(keccak256(bytes("paybackLoan(address,uint256)")));
+        selectors[2] = bytes4(keccak256(bytes("rollLoan(address)")));
+        selectors[3] = bytes4(keccak256(bytes("defaultLoans()")));
         return selectors;
     }
 }
