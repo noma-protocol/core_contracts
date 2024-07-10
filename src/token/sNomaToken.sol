@@ -22,7 +22,7 @@ contract sNomaToken is ERC20 {
     constructor(address _initializer, address _nomaToken) ERC20("Staked Noma", "sNOMA") {
         nomaToken = IERC20(_nomaToken);
         initializer = _initializer;
-        scalingFactor = 1e18; // Initial scaling factor set to 1.0 in 18 decimals
+        scalingFactor = 1e18; 
     }
 
     function initialize(address _stakingContract) external {
@@ -35,7 +35,6 @@ contract sNomaToken is ERC20 {
     function rebase(uint256 profit) external {
         uint256 totalSupply = totalSupply();
         if (totalSupply == 0) {
-            // Handle case where total supply is zero to avoid division by zero
             scalingFactor += profit * 1e18;
         } else {
             uint256 rebaseAmount = profit * 1e18 / totalSupply;
