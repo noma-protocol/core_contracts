@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import "../src/staking/RebaseToken.sol";
-import "../src/staking/sStaking.sol";
+import "../src/staking/Staking.sol";
 
 import {MockNomaToken} from "../src/token/MockNomaToken.sol";
 
