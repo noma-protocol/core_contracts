@@ -3,11 +3,9 @@ pragma solidity ^0.8.23;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "../interfaces/IsNomaToken.sol";
 
-
-contract sStaking is Ownable {
+contract Staking {
     using SafeERC20 for IERC20;
     using SafeERC20 for IsNomaToken;
 
@@ -17,40 +15,103 @@ contract sStaking is Ownable {
         uint256 distribute; // amount
     }
 
-    IERC20 public immutable NOMA;
-    IsNomaToken public immutable sNOMA;
+    IERC20 public NOMA;
+    IsNomaToken public sNOMA;
+    
+    address public authority;
+    address public vault;
 
     Epoch public epoch;
 
-    constructor(
+    mapping(uint256 => Epoch) public epochs;
+    uint256 public totalEpochs;
+
+    constructor(    
         address _noma,
         address _sNoma,
         address _authority
-    ) Ownable(_authority) {
+    ) {
+        NOMA = IERC20(_noma);
+        sNOMA = IsNomaToken(_sNoma);
+        authority = _authority;
+        
+        // Initialize first epoch with distribute 0
+        epoch = Epoch({
+            number: 1,
+            end: 0,
+            distribute: 0
+        });
+
+        epochs[totalEpochs] = epoch;
+        totalEpochs++;
+    }
+
+    function setup(address _vault, address _noma, address _sNoma) external onlyAuthority {
         require(_noma != address(0), "Zero address: NOMA");
         NOMA = IERC20(_noma);
         require(_sNoma != address(0), "Zero address: sNOMA");
         sNOMA = IsNomaToken(_sNoma);
-
-        epoch = Epoch({
-            number: 1,
-            end: 0,
-            distribute: 100e18
-        });
+        require(_vault != address(0), "Zero address: vault");
+        vault = _vault;
     }
 
     function stake(
         address _to,
         uint256 _amount
     ) external {
-        NOMA.safeTransferFrom(msg.sender, address(this), _amount);
+        require(msg.sender == _to, "invalid caller");
+        require(_amount > 0 && _to != address(0), "Stake: invalid parameters");
+        NOMA.safeTransferFrom(_to, address(this), _amount);
         sNOMA.mint(_to, _amount);
     }
 
-    function unStake(
-        uint256 _amount
+    function unstake(
+        address _from
     ) external {
-        sNOMA.safeTransferFrom(msg.sender, address(this), _amount);
-        NOMA.transfer(msg.sender, _amount);
+        require(msg.sender == _from, "invalid caller");
+        require(_from != address(0), "Unstake: invalid parameters");
+        uint256 balance = sNOMA.balanceOf(_from);
+        sNOMA.safeTransferFrom(_from, address(this), balance);
+        NOMA.safeTransfer(_from, balance);
+    }
+
+    function notifyRewardAmount(uint256 _reward) external onlyVault {
+        require(_reward < type(uint256).max, "invalid reward");
+        
+        _reward = totalEpochs == 1 ? epoch.distribute : _reward;
+        
+        // Save current epoch with the reward distributed
+        if (totalEpochs > 1) {
+            require(_reward > 0, "epoch > 1, invalid reward");
+            epoch.distribute = _reward;
+        }
+
+        epoch.end = block.timestamp;
+        epochs[totalEpochs] = epoch;
+
+        // Start new epoch
+        epoch = Epoch({
+            number: totalEpochs,
+            end: 0,
+            distribute: 0
+        });
+
+        if (totalEpochs > 1 && _reward > 0) {
+            // Requires approval
+            NOMA.transferFrom(msg.sender, address(this), _reward);
+            sNOMA.rebase(_reward, epoch.number);            
+        }            
+        
+        totalEpochs++;
+    }
+
+    modifier onlyAuthority() {
+        require(msg.sender == authority, "Caller is not the authority");
+        _;
+    }
+
+    modifier onlyVault() {
+        require(msg.sender == vault, "Caller is not the vault");
+        _;
     }
 }
