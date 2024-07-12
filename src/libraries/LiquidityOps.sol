@@ -53,7 +53,7 @@ library LiquidityOps {
         currentLiquidityRatio = IModelHelper(addresses.modelHelper)
         .getLiquidityRatio(addresses.pool, addresses.vault);
         
-        (uint256 circulatingSupply, uint256 anchorToken1Balance, uint256 discoveryToken1Balance) = getVaulData(addresses);
+        (uint256 circulatingSupply, uint256 anchorToken1Balance, uint256 discoveryToken1Balance, uint256 discoveryToken0Balance) = getVaulData(addresses);
 
         if (currentLiquidityRatio <= 98e16) {
             
@@ -81,7 +81,8 @@ library LiquidityOps {
                     .getPositionCapacity(
                         addresses.pool, 
                         addresses.vault, 
-                        positions[1]
+                        positions[1],
+                        LiquidityType.Anchor
                     );
 
                     newPositions = preShiftPositions(
@@ -92,7 +93,8 @@ library LiquidityOps {
                             anchorCapacity: anchorCapacity,
                             floorToken1Balance: floorToken1Balance,
                             anchorToken1Balance: anchorToken1Balance,
-                            discoveryToken1Balance: discoveryToken1Balance
+                            discoveryToken1Balance: discoveryToken1Balance,
+                            discoveryToken0Balance: discoveryToken0Balance
                         }),
                         positions
                     );
@@ -137,6 +139,7 @@ library LiquidityOps {
                 floorToken1Balance: params.floorToken1Balance,
                 anchorToken1Balance: params.anchorToken1Balance,
                 discoveryToken1Balance: params.discoveryToken1Balance,
+                discoveryToken0Balance: params.discoveryToken0Balance,
                 positions: _positions
             })
         );
@@ -152,7 +155,7 @@ library LiquidityOps {
     ) internal returns (
         LiquidityPosition[3] memory newPositions
     ) {
-
+        require(params.discoveryToken0Balance > 0, "invalid params");
         (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(params.pool).slot0();
        
         if (params.positions[0].liquidity > 0) {
@@ -228,8 +231,9 @@ library LiquidityOps {
                 params.pool,
                 params.deployer,
                 newPositions[0].upperTick,                
-                Utils.nearestUsableTick(
-                    TickMath.getTickAtSqrtRatio(sqrtRatioX96)      
+                Utils.addBipsToTick(
+                    TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
+                    50
                 ),
                 (params.anchorToken1Balance + params.discoveryToken1Balance) - params.toSkim, 
                 LiquidityType.Anchor
@@ -238,12 +242,11 @@ library LiquidityOps {
             newPositions[2] = reDeploy(
                 params.pool,
                 params.deployer, 
-                Utils.nearestUsableTick(
-                    Utils.addBipsToTick(newPositions[1].upperTick, 150)
-                ),
-                Utils.nearestUsableTick(
-                    TickMath.getTickAtSqrtRatio(sqrtRatioX96) * 3     
-                ),                
+                newPositions[1].upperTick,
+                Utils.addBipsToTick(
+                    TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
+                    25000
+                ),           
                 0,
                 LiquidityType.Discovery 
             );   
@@ -275,9 +278,7 @@ library LiquidityOps {
         uint256 currentLiquidityRatio = IModelHelper(addresses.modelHelper)
         .getLiquidityRatio(addresses.pool, addresses.vault);
                 
-        (, 
-            uint256 anchorToken1Balance, 
-        ) = getVaulData(addresses);
+        (, uint256 anchorToken1Balance,, ) = getVaulData(addresses);
 
         if (currentLiquidityRatio >= 115e16) {
             
@@ -318,7 +319,10 @@ library LiquidityOps {
                 addresses.pool,
                 addresses.deployer,
                 positions[0].upperTick,                
-                Utils.nearestUsableTick(TickMath.getTickAtSqrtRatio(sqrtRatioX96) + Utils.TICK_SPACING),
+                Utils.addBipsToTick(
+                    TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
+                    30
+                ),
                 anchorToken1Balance, 
                 LiquidityType.Anchor
             );
@@ -326,15 +330,11 @@ library LiquidityOps {
             newPositions[2] = reDeploy(
                 addresses.pool,
                 addresses.deployer,
-                Utils.nearestUsableTick(
-                    Utils.addBipsToTick(
-                        TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                        150
-                    )
-                ),
-                Utils.nearestUsableTick(
-                    TickMath.getTickAtSqrtRatio(sqrtRatioX96) + TickMath.getTickAtSqrtRatio(sqrtRatioX96) / 2 
-                ),                
+                newPositions[1].upperTick,
+                Utils.addBipsToTick(
+                    TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
+                    10000
+                ),              
                 0,
                 LiquidityType.Discovery
             );
@@ -386,7 +386,7 @@ library LiquidityOps {
         );     
     }
 
-    function getVaulData(ProtocolAddresses memory addresses) internal view returns (uint256, uint256, uint256) {
+    function getVaulData(ProtocolAddresses memory addresses) internal view returns (uint256, uint256, uint256, uint256) {
         (,,, uint256 anchorToken1Balance) = IModelHelper(addresses.modelHelper)
         .getUnderlyingBalances(
             addresses.pool, 
@@ -394,7 +394,7 @@ library LiquidityOps {
             LiquidityType.Anchor
         );
 
-        (,,, uint256 discoveryToken1Balance) = IModelHelper(addresses.modelHelper)
+        (,, uint256 discoveryToken0Balance, uint256 discoveryToken1Balance) = IModelHelper(addresses.modelHelper)
         .getUnderlyingBalances(
             addresses.pool, 
             address(this), 
@@ -407,7 +407,7 @@ library LiquidityOps {
             addresses.vault
         );
         
-        return (circulatingSupply, anchorToken1Balance, discoveryToken1Balance);
+        return (circulatingSupply, anchorToken1Balance, discoveryToken1Balance, discoveryToken0Balance);
     }
 
     function _calculateFees(
@@ -467,11 +467,6 @@ library LiquidityOps {
     ) {
 
         for (uint256 i = 0; i < positions.length; i++) {
-
-            require(
-                positions[i].lowerTick > 0 || 
-                positions[i].upperTick > 0, "invalid position"
-            );    
                    
             bytes32 positionId = keccak256(
                 abi.encodePacked(
