@@ -64,7 +64,7 @@ contract IDOManager is Owned {
     address public proxyAddress;
 
     TokenInfo private  tokenInfo;
-    address private modelHelper;
+    address public modelHelper;
     uint256 private IDOPrice;
 
     LiquidityPosition private IDOPosition;
@@ -143,7 +143,9 @@ contract IDOManager is Owned {
         uint256 _initPrice, 
         uint256 _IDOPrice, 
         address _vaultUpgrade, 
-        address _vaultUpgradeFinalize
+        address _vaultUpgradeFinalize,
+        address _escrowContract,
+        address _stakingContract
     ) public onlyOwner {
         require(!initialized, "already initialized");
 
@@ -169,7 +171,7 @@ contract IDOManager is Owned {
         vault = BaseVault(vaultAddress);
 
         IVaultUpgrade(vaultUpgrade).doUpgradeStart(vaultAddress, vaultUpgradeFinalize);
-        vault.initialize(address(pool), modelHelper);
+        vault.initialize(owner, address(pool), modelHelper, address(0), proxyAddress, address(0));
         
         IDOPrice = _IDOPrice;
         initialized = true;
