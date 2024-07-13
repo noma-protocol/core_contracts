@@ -59,7 +59,8 @@ library LiquidityDeployer {
 
         require(floorPosition.upperTick <= lowerAnchorTick, "some msg 1");
 
-        (int24 lowerTick, int24 upperTick) = Conversions.computeRangeTicks(
+        (int24 lowerTick, int24 upperTick) = Conversions
+        .computeRangeTicks(
             lowerAnchorPrice + lowerAnchorPrice * 1 / 100,
             upperAnchorPrice,
             deployParams.tickSpacing
@@ -258,6 +259,29 @@ library LiquidityDeployer {
         });    
     }
 
+    function reDeployFloor(
+        address pool,
+        address deployer,
+        uint256 amount1ToDeploy,
+        LiquidityPosition memory floorPosition
+    ) internal returns (LiquidityPosition memory newPosition) {
+        // Ensuring valid tick range
+        require(floorPosition.upperTick > floorPosition.lowerTick, "invalid ticks");
+
+        // Deploying the new liquidity position
+        newPosition = _deployPosition(
+            pool, 
+            address(this), 
+            floorPosition.lowerTick,
+            floorPosition.upperTick,
+            LiquidityType.Floor, 
+            AmountsToMint({
+                amount0: 0,
+                amount1: amount1ToDeploy
+            })
+        );
+    }
+
     function computeNewFloorPrice(
         address pool,
         uint256 toSkim,
@@ -293,4 +317,5 @@ library LiquidityDeployer {
             );            
         }
     }
+    
 }

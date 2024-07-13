@@ -233,7 +233,7 @@ library LiquidityOps {
                 newPositions[0].upperTick,                
                 Utils.addBipsToTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                    50
+                    1
                 ),
                 (params.anchorToken1Balance + params.discoveryToken1Balance) - params.toSkim, 
                 LiquidityType.Anchor
@@ -385,7 +385,7 @@ library LiquidityOps {
             })
         );     
     }
-
+    
     function getVaulData(ProtocolAddresses memory addresses) internal view returns (uint256, uint256, uint256, uint256) {
         (,,, uint256 anchorToken1Balance) = IModelHelper(addresses.modelHelper)
         .getUnderlyingBalances(
