@@ -34,7 +34,21 @@ interface IVault {
     function setFees(uint256 _feesAccumulatedToken0, uint256 _feesAccumulatedToken1) external;
 }
 
-contract StakeVault is BaseVault {
+contract StakingVault is BaseVault {
+    uint256 public constant BASE_VALUE = 100e18;
+
+    function calculateMintAmount(int256 currentLiquidityRatio, uint256 excessTokens) public pure returns (uint256) {
+        // Ensure currentLiquidityRatio is within reasonable bounds for overflow protection
+        require(currentLiquidityRatio >= -1e18 && currentLiquidityRatio <= 1e18 * 10, "currentLiquidityRatio out of range");
+
+        // Calculate the adjusted ratio
+        uint256 adjustedRatio = BASE_VALUE - uint256(currentLiquidityRatio);
+
+        // Calculate the mint amount based on adjusted ratio and excess tokens
+        uint256 mintAmount = (adjustedRatio * excessTokens) / 1e18;
+
+        return mintAmount;
+    }
 
     function mintAndDistributeRewards(ProtocolAddresses memory addresses) public {
         require(msg.sender == address(this), "StakeVault: unauthorized");
@@ -55,12 +69,14 @@ contract StakeVault is BaseVault {
         uint256 currentLiquidityRatio = IModelHelper(_v.modelHelper)
         .getLiquidityRatio(address(_v.pool), addresses.vault);
         
-        uint256 minAmountToMint = excessReservesToken1 * 0.1e18;
+        // uint256 minAmountToMint = excessReservesToken1 * 0.1e18;
 
-        uint256 toMint = (
-            excessReservesToken1 * 
-            (100e18 - currentLiquidityRatio) / 1000
-        ) + minAmountToMint;
+        // uint256 toMint = (
+        //     excessReservesToken1 * 
+        //     (100e18 - currentLiquidityRatio) / 1000
+        // ) + minAmountToMint;
+
+        uint256 toMint = calculateMintAmount(int256(currentLiquidityRatio), excessReservesToken1);
 
         uint256 intrinsicMinimumValue = IModelHelper(_v.modelHelper)
         .getIntrinsicMinimumValue(addresses.vault) * 1e18;
@@ -70,22 +86,23 @@ contract StakeVault is BaseVault {
         IERC20(_v.tokenInfo.token0).mint(address(this), toMintScaled);
         IERC20(_v.tokenInfo.token0).approve(_v.stakingContract, toMintScaled);
 
-        // if (
-        //     Conversions.sqrtPriceX96ToPrice(
-        //         Conversions.tickToSqrtPriceX96(positions[0].lowerTick),
-        //         18
-        //     ) > 1e18
-        // ) {
-        //     revert(
-        //         string(
-        //             abi.encodePacked(
-        //                     "mintAndDistributeRewards: ", 
-        //                     Utils._uint2str(uint256(toMint)
-        //                 )
-        //             )
-        //         )
-        //     );   
-        // }
+        uint256 floorPrice = 
+            Conversions.sqrtPriceX96ToPrice(
+                Conversions.tickToSqrtPriceX96(positions[0].upperTick),
+                18
+            );
+
+        if (floorPrice > 1e18) {
+            revert(
+                string(
+                    abi.encodePacked(
+                            "mintAndDistributeRewards: ", 
+                            Utils._uint2str(uint256(floorPrice)
+                        )
+                    )
+                )
+            );   
+        }
 
         // Call notifyRewardAmount 
         IStakingRewards(_v.stakingContract).notifyRewardAmount(toMintScaled);  
@@ -118,7 +135,7 @@ contract StakeVault is BaseVault {
             );
 
             (
-                uint256 circulatingSupply,, 
+                uint256 circulatingSupply,,,
             ) = LiquidityOps.getVaulData(addresses);
 
             uint256 newFloorPrice = IDeployer(addresses.deployer)
@@ -157,10 +174,8 @@ contract StakeVault is BaseVault {
     ) internal {
         (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(addresses.pool).slot0();
         
-        (
-            ,
-            uint256 anchorToken1Balance, 
-            uint256 discoveryToken1Balance
+        ( , uint256 anchorToken1Balance, 
+            uint256 discoveryToken1Balance,
         ) = LiquidityOps.getVaulData(addresses);
 
         // Collect floor liquidity
