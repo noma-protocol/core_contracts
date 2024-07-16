@@ -31,8 +31,9 @@ interface IExtVault {
     function mintAndDistributeRewards(ProtocolAddresses memory) external;
 }
 
-interface IBorrowVault {
+interface ILendingVault {
     function borrowFromFloor(address who, uint256 borrowAmount, int256 duration) external;
+    function paybackLoan(address who) external;
 }
 
 error AlreadyInitialized();
@@ -126,13 +127,23 @@ contract BaseVault is OwnableUninitialized {
     }
 
     function borrow(
+        address who,
         uint256 borrowAmount
     ) external {
-        IBorrowVault(address(this))
+        ILendingVault(address(this))
         .borrowFromFloor(
-            msg.sender,
+            who,
             borrowAmount,
             30 days
+        );
+    }
+
+    function payback(
+        address who
+    ) external {
+        ILendingVault(address(this))
+        .paybackLoan(
+            who
         );
     }
 
@@ -247,7 +258,7 @@ contract BaseVault is OwnableUninitialized {
     }
 
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](16);
+        bytes4[] memory selectors = new bytes4[](17);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
         selectors[1] = bytes4(keccak256(bytes("pool()")));
         selectors[2] = bytes4(keccak256(bytes("initialize(address,address,address,address,address,address)")));
@@ -261,9 +272,10 @@ contract BaseVault is OwnableUninitialized {
         selectors[10] = bytes4(keccak256(bytes("getAccumulatedFees()")));
         selectors[11] = bytes4(keccak256(bytes("setStakingContract(address)")));
         selectors[12] = bytes4(keccak256(bytes("getExcessReserveToken1()")));
-        selectors[13] = bytes4(keccak256(bytes("borrow(uint256)")));
+        selectors[13] = bytes4(keccak256(bytes("borrow(address,uint256)")));
         selectors[14] = bytes4(keccak256(bytes("calcDynamicAmount(address,address,bool)")));
         selectors[15] = bytes4(keccak256(bytes("getCollateralAmount()")));
+        selectors[16] = bytes4(keccak256(bytes("payback(address)")));
         return selectors;
     }
 
