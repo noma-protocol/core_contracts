@@ -49,20 +49,21 @@ contract LendingVault is BaseVault {
     
     function borrowFromFloor(address who, uint256 borrowAmount, int256 duration) public onlyVault {
         require(borrowAmount > 0, "Amounts must be greater than 0");
-        require(_v.loanPositions[who].borrowAmount == 0, "Existing loan found");
+        // require(_v.loanPositions[who].borrowAmount == 0, "Existing loan found");
         
         uint256 collateralAmount = _getCollateralAmount(borrowAmount);
         require(collateralAmount > 0, "Collateral must be greater than 0");
 
-        (,,, uint256 floorToken1Balance) = IModelHelper(_v.modelHelper).getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
+        (,,, uint256 floorToken1Balance) = IModelHelper(_v.modelHelper)
+        .getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
+
         require(floorToken1Balance >= borrowAmount, "Insufficient floor balance");
 
         IERC20(_v.pool.token0()).transferFrom(who, address(this), collateralAmount);  
-        uint256 loanFees = calculateLoanFees(borrowAmount, duration);
-        IERC20(_v.pool.token1()).transferFrom(who, address(this), loanFees);
+        // uint256 loanFees = calculateLoanFees(borrowAmount, duration);
+        // IERC20(_v.pool.token1()).transferFrom(who, address(this), loanFees);
 
         _v.collateralAmount += collateralAmount;
-        IERC20(_v.pool.token0()).transfer(_v.escrowContract, collateralAmount);
 
         Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick);         
         LiquidityPosition memory newPosition = LiquidityDeployer.reDeployFloor(address(_v.pool), address(this), floorToken1Balance - borrowAmount, _v.floorPosition);
@@ -73,8 +74,8 @@ contract LendingVault is BaseVault {
         LoanPosition memory loanPosition = LoanPosition({
             borrowAmount: borrowAmount,
             collateralAmount: collateralAmount,
-            fees: loanFees,
-            expiry: block.timestamp + uint256(duration * 1 days),
+            fees: 0,
+            expiry: block.timestamp + uint256(duration),
             duration: duration
         });
 
@@ -89,22 +90,15 @@ contract LendingVault is BaseVault {
         return (borrowAmount * PER_DIEM_FEE * uint256(duration)) / FEE_DIVISOR;
     }
 
-    function paybackLoan(address who, uint256 paybackAmount) public onlyVault {
+    function paybackLoan(address who) public onlyVault {
         LoanPosition storage loan = _v.loanPositions[who];
         require(loan.borrowAmount > 0, "No active loan");
-        require(paybackAmount > 0, "Payback amount must be greater than 0");
 
-        if (paybackAmount >= loan.borrowAmount) {
-            uint256 excess = paybackAmount - loan.borrowAmount;
-            if (excess > 0) {
-                IERC20(_v.pool.token0()).transfer(who, excess);
-            }
-            delete _v.loanPositions[who];
-            _removeLoanAddress(who);
-        } else {
-            loan.borrowAmount -= paybackAmount;
-        }
-        IERC20(_v.pool.token0()).transferFrom(who, address(this), paybackAmount);
+        IERC20(_v.pool.token1()).transferFrom(who, address(this), loan.borrowAmount);
+        IERC20(_v.pool.token0()).transfer(who, loan.collateralAmount);
+
+        delete _v.loanPositions[who];
+        _removeLoanAddress(who);
     }
 
     function rollLoan(address who) public onlyVault {
@@ -157,7 +151,7 @@ contract LendingVault is BaseVault {
     function getFunctionSelectors() external pure override returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](4);
         selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,int256)")));    
-        selectors[1] = bytes4(keccak256(bytes("paybackLoan(address,uint256)")));
+        selectors[1] = bytes4(keccak256(bytes("paybackLoan(address)")));
         selectors[2] = bytes4(keccak256(bytes("rollLoan(address)")));
         selectors[3] = bytes4(keccak256(bytes("defaultLoans()")));
         return selectors;
