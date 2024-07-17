@@ -116,8 +116,14 @@ contract LendingVault is BaseVault {
 
         LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
 
-        Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick);         
-        LiquidityPosition memory newPosition = LiquidityDeployer.reDeployFloor(address(_v.pool), address(this), floorToken1Balance - newBorrowAmount, positions);
+        Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick);      
+           
+        LiquidityPosition memory newPosition = LiquidityDeployer.reDeployFloor(
+            address(_v.pool), 
+            address(this), 
+            floorToken1Balance - newBorrowAmount, 
+            positions
+        );
 
         IERC20(_v.pool.token1()).transfer(who, newBorrowAmount - newFees);        
     }
