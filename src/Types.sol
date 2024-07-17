@@ -56,7 +56,8 @@ struct ShiftParameters {
     address modelHelper;
     uint256 floorToken1Balance;
     uint256 anchorToken1Balance;
-    uint256 discoveryToken1Balance;    
+    uint256 discoveryToken1Balance; 
+    uint256 discoveryToken0Balance;   
     LiquidityPosition[3] positions;
 }
 
@@ -85,6 +86,7 @@ struct PreShiftParameters {
     uint256 floorToken1Balance;
     uint256 anchorToken1Balance;
     uint256 discoveryToken1Balance;
+    uint256 discoveryToken0Balance;
 }
 
 struct LoanPosition {
@@ -92,5 +94,5 @@ struct LoanPosition {
     uint256 collateralAmount;
     uint256 fees;
     uint256 expiry;
-    int256 duration;
+    uint256 duration;
 }
