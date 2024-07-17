@@ -4,6 +4,9 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {LiquidityPosition} from "../Types.sol";
 
 interface IVault  {
+    function getPositions() external view returns (LiquidityPosition[3] memory);
+    function shift() external;
+    function slide() external;
     function borrow(address who, uint256 borrowAmount) external;
     function pool() external returns (IUniswapV3Pool);
     function payback(address who) external;
