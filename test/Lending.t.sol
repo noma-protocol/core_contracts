@@ -39,6 +39,7 @@ contract LendingVaultTest is Test {
     address vaultAddress;
 
     uint256 MAX_INT = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
+    uint256 SECONDS_IN_DAY = 86400;
 
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address deployer = vm.envAddress("DEPLOYER");
@@ -71,7 +72,7 @@ contract LendingVaultTest is Test {
 
     function testBorrow() public {
         uint256 borrowAmount = 1 ether;
-        int256 duration = 30 days;
+        uint256 duration = 30 days;
 
 
         vm.prank(deployer);
@@ -85,7 +86,9 @@ contract LendingVaultTest is Test {
         vm.prank(deployer);
         vault.borrow(deployer, borrowAmount);
 
-        assertEq(token1.balanceOf(deployer) - balanceBeforeToken1, borrowAmount);
+        uint256 fees = calculateLoanFees(borrowAmount, duration);
+
+        assertEq(token1.balanceOf(deployer) - balanceBeforeToken1, borrowAmount - fees);
         assertLt(token0.balanceOf(deployer), balanceBeforeToken0);
     }
 
@@ -203,5 +206,11 @@ contract LendingVaultTest is Test {
 
         return DecimalMath.divideDecimal(floorBalance, circulatingSupply > anchorCapacity ? circulatingSupply - anchorCapacity : circulatingSupply);
     }
+
+    function calculateLoanFees(uint256 borrowAmount, uint256 duration) public view returns (uint256 fees) {
+        uint256 percentage = 27; // 0.027% 
+        uint256 scaledPercentage = percentage * 10**12; 
+        fees = (borrowAmount * scaledPercentage * (duration / SECONDS_IN_DAY)) / (100 * 10**18);
+    }    
 
 }
