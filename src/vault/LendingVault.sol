@@ -30,28 +30,26 @@ interface IStakingRewards {
     function notifyRewardAmount(uint256 reward) external;
 }
 
-interface IVault {
-    function updatePositions(LiquidityPosition[3] memory newPositions) external;
-    function setFees(uint256 _feesAccumulatedToken0, uint256 _feesAccumulatedToken1) external;
-}
-
 contract LendingVault is BaseVault {
     
-    uint256 constant PER_DIEM_FEE = 27; // 0.027%
-    uint256 constant FEE_DIVISOR = 100000;
+    uint256 public constant SECONDS_IN_DAY = 86400;
 
-    address[] public loanAddresses;
-
-    function _getCollateralAmount(uint256 borrowAmount) internal view returns (uint256) {
+    function _getCollateralAmount(uint256 borrowAmount) internal view returns (uint256, uint256) {
         uint256 intrinsicMinimumValue = IModelHelper(_v.modelHelper).getIntrinsicMinimumValue(address(this));
-        return DecimalMath.divideDecimal(borrowAmount, intrinsicMinimumValue);
+        return (DecimalMath.divideDecimal(borrowAmount, intrinsicMinimumValue), intrinsicMinimumValue);
     }
-    
-    function borrowFromFloor(address who, uint256 borrowAmount, int256 duration) public onlyVault {
+
+    function calculateLoanFees(uint256 borrowAmount, uint256 duration) internal pure returns (uint256 fees) {
+        uint256 percentage = 27; // 0.027% 
+        uint256 scaledPercentage = percentage * 10**12; 
+        fees = (borrowAmount * scaledPercentage * (duration / SECONDS_IN_DAY)) / (100 * 10**18);
+    }    
+
+    function borrowFromFloor(address who, uint256 borrowAmount, uint256 duration) public onlyVault {
         require(borrowAmount > 0, "Amounts must be greater than 0");
         // require(_v.loanPositions[who].borrowAmount == 0, "Existing loan found");
         
-        uint256 collateralAmount = _getCollateralAmount(borrowAmount);
+        (uint256 collateralAmount,) = _getCollateralAmount(borrowAmount);
         require(collateralAmount > 0, "Collateral must be greater than 0");
 
         (,,, uint256 floorToken1Balance) = IModelHelper(_v.modelHelper)
@@ -60,35 +58,33 @@ contract LendingVault is BaseVault {
         require(floorToken1Balance >= borrowAmount, "Insufficient floor balance");
 
         IERC20(_v.pool.token0()).transferFrom(who, address(this), collateralAmount);  
-        // uint256 loanFees = calculateLoanFees(borrowAmount, duration);
-        // IERC20(_v.pool.token1()).transferFrom(who, address(this), loanFees);
+        uint256 loanFees = calculateLoanFees(borrowAmount, duration);
 
         _v.collateralAmount += collateralAmount;
+        
+        LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
 
         Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick);         
-        LiquidityPosition memory newPosition = LiquidityDeployer.reDeployFloor(address(_v.pool), address(this), floorToken1Balance - borrowAmount, _v.floorPosition);
-
-        IERC20(_v.pool.token1()).transfer(who, borrowAmount);
+        LiquidityPosition memory newPosition = LiquidityDeployer.reDeployFloor(address(_v.pool), address(this), floorToken1Balance - borrowAmount, positions);
+        
+        IERC20(_v.pool.token1()).transfer(who, borrowAmount - loanFees);
 
         uint256 totalLoans = _v.totalLoansPerUser[who];
         LoanPosition memory loanPosition = LoanPosition({
             borrowAmount: borrowAmount,
             collateralAmount: collateralAmount,
-            fees: 0,
+            fees: loanFees,
             expiry: block.timestamp + uint256(duration),
             duration: duration
         });
 
         _v.loanPositions[who] = loanPosition;
         _v.totalLoansPerUser[who] = totalLoans++;
-        loanAddresses.push(who);
+        _v.loanAddresses.push(who);
 
         IVault(address(this)).updatePositions([_v.floorPosition, _v.anchorPosition, _v.discoveryPosition]);
     }
 
-    function calculateLoanFees(uint256 borrowAmount, int256 duration) internal pure returns (uint256) {
-        return (borrowAmount * PER_DIEM_FEE * uint256(duration)) / FEE_DIVISOR;
-    }
 
     function paybackLoan(address who) public onlyVault {
         LoanPosition storage loan = _v.loanPositions[who];
@@ -106,17 +102,29 @@ contract LendingVault is BaseVault {
         require(loan.borrowAmount > 0, "No active loan");
         require(block.timestamp < loan.expiry, "Loan expired");
 
-        uint256 newBorrowAmount = loan.borrowAmount;
-        uint256 newFees = calculateLoanFees(newBorrowAmount, loan.duration);
-        
-        IERC20(_v.pool.token1()).transferFrom(who, address(this), newFees);
-        loan.fees += newFees;
-        loan.expiry = block.timestamp + 30 days;
+        uint256 newCollateralValue = DecimalMath.multiplyDecimal(
+            loan.collateralAmount, 
+            IModelHelper(_v.modelHelper).getIntrinsicMinimumValue(address(this))
+        );
+
+        require(newCollateralValue > loan.borrowAmount, "Can't roll loan");
+        uint256 newBorrowAmount = newCollateralValue - loan.borrowAmount;
+        uint256 newFees = calculateLoanFees(newBorrowAmount, loan.expiry - block.timestamp);
+
+        (,,, uint256 floorToken1Balance) = IModelHelper(_v.modelHelper)
+        .getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
+
+        LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
+
+        Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick);         
+        LiquidityPosition memory newPosition = LiquidityDeployer.reDeployFloor(address(_v.pool), address(this), floorToken1Balance - newBorrowAmount, positions);
+
+        IERC20(_v.pool.token1()).transfer(who, newBorrowAmount - newFees);        
     }
 
     function defaultLoans() public onlyVault {
-        for (uint256 i = 0; i < loanAddresses.length; i++) {
-            address who = loanAddresses[i];
+        for (uint256 i = 0; i < _v.loanAddresses.length; i++) {
+            address who = _v.loanAddresses[i];
             LoanPosition storage loan = _v.loanPositions[who];
             if (block.timestamp > loan.expiry) {
                 _seizeCollateral(who);
@@ -134,10 +142,10 @@ contract LendingVault is BaseVault {
     }
 
     function _removeLoanAddress(address who) internal {
-        for (uint256 i = 0; i < loanAddresses.length; i++) {
-            if (loanAddresses[i] == who) {
-                loanAddresses[i] = loanAddresses[loanAddresses.length - 1];
-                loanAddresses.pop();
+        for (uint256 i = 0; i < _v.loanAddresses.length; i++) {
+            if (_v.loanAddresses[i] == who) {
+                _v.loanAddresses[i] = _v.loanAddresses[_v.loanAddresses.length - 1];
+                _v.loanAddresses.pop();
                 break;
             }
         }
@@ -150,7 +158,7 @@ contract LendingVault is BaseVault {
 
     function getFunctionSelectors() external pure override returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](4);
-        selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,int256)")));    
+        selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,uint256)")));    
         selectors[1] = bytes4(keccak256(bytes("paybackLoan(address)")));
         selectors[2] = bytes4(keccak256(bytes("rollLoan(address)")));
         selectors[3] = bytes4(keccak256(bytes("defaultLoans()")));
