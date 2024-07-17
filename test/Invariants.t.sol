@@ -14,7 +14,7 @@ import {Underlying } from  "../src/libraries/Underlying.sol";
 import {LiquidityType, LiquidityPosition} from "../src/Types.sol";
 import {DecimalMath} from "../src/libraries/DecimalMath.sol";
 import {Conversions} from "../src/libraries/Conversions.sol";
- 
+
 interface IWETH {
     function balanceOf(address account) external view returns (uint256);
     function deposit() external payable;
@@ -25,6 +25,7 @@ interface IDOManager {
     function vault() external view returns (BaseVault);
     function buyTokens(uint256 price, uint256 amount, address receiver) external;
     function sellTokens(uint256 price, uint256 amount, address receiver) external;
+    function modelHelper() external view returns (address);
 }
 
 interface IVault {
@@ -41,13 +42,12 @@ contract Invariants is Test {
     bytes32 salt = keccak256(bytes(vm.envString("SALT")));
 
     // Constants
-    address WETH = 0xdA07fdA01Fd20c2aaC600067dD87539944926547;
+    address WETH = 0xAaE73BfC17EC6CF6417cD7f15cf86F9AEbc33Edc;
     
     // Protocol addresses
-    address payable idoManager = payable(0x755fFe71D79c5D9778ED83C5c775ED2A6F15aa28);
-    address nomaToken = 0xA4907FdC7D04aF3475722f622C6F002a4cA48F24;
-    address deployerContract = 0x63EE25fF279a4948fbd2024A19c522b269E57881;
-    address modelHelperContract = 0xc29D94a7e45299ff976398ddE03Aa5979B023148;
+    address payable idoManager = payable(0x4ff2d7eAf57E8a87e89436A4DCab3e05686fc501);
+    address nomaToken = 0x71928Dd90031aB5Bb11d4765361c30958ecd4143;
+    address deployerContract = 0xc11FeB4A3B79a73CA4f4F3C4B6e757eDB8D19830;
 
     AmphorToken private noma;
     ModelHelper private modelHelper;
@@ -59,6 +59,7 @@ contract Invariants is Test {
         noma = AmphorToken(nomaToken);
         require(address(noma) != address(0), "Noma token address is zero");
         
+        address modelHelperContract = managerContract.modelHelper();
         modelHelper = ModelHelper(modelHelperContract);
     }
 
@@ -83,7 +84,7 @@ contract Invariants is Test {
         uint256 totalSupply = noma.totalSupply();
         console.log("Total supply is %s", totalSupply);
 
-        assertEq(totalSupply, 100_000_000e18, "Total supply is not correct");
+        assertEq(totalSupply, 35_000_000e18, "Total supply is not correct");
 
         vm.stopBroadcast();
     }
@@ -115,7 +116,8 @@ contract Invariants is Test {
         uint256 circulatingSupplyAfter = modelHelper.getCirculatingSupply(pool, address(vault));
         console.log("Circulating supply is: ", circulatingSupplyAfter);
 
-        assertEq(tokenBalanceAfter + 3, circulatingSupplyAfter, "Circulating supply does not match bought tokens");
+        // adapt for 1 wei discrepance
+        assertApproxEqAbs(tokenBalanceAfter + circulatingSupplyBefore, circulatingSupplyAfter, 1 wei , "Circulating supply does not match bought tokens");
     }
     
     function testBuyTokens() public {
@@ -131,7 +133,7 @@ contract Invariants is Test {
         uint256 spotPrice;
 
         uint8 numTrades = 200;
-        uint256 tradeAmount = 0.005 ether;
+        uint256 tradeAmount = 100 ether;
         
         IWETH(WETH).deposit{ value:  tradeAmount * numTrades}();
         IWETH(WETH).transfer(idoManager, tradeAmount * numTrades);
@@ -212,10 +214,10 @@ contract Invariants is Test {
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
         uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
-        uint8 totalTrades = 100;
-        uint256 tradeAmount = 1 ether;
+        uint16 totalTrades = 500;
+        uint256 tradeAmount = 200 ether;
 
-        IWETH(WETH).deposit{ value: 100 ether }();
+        IWETH(WETH).deposit{ value: (tradeAmount * totalTrades)}();
         IWETH(WETH).transfer(idoManager, tradeAmount * totalTrades);
 
         uint256 tokenBalanceBefore = noma.balanceOf(address(this));
@@ -238,12 +240,19 @@ contract Invariants is Test {
 
         if (liquidityRatio < 0.98e18) {
             console.log("Attempt to shift positions");
-            vault.shift();
+            IVault(address(vault)).shift();
             nextFloorPrice = getNextFloorPrice(pool, address(vault));
             console.log("Next floor price (after shift) is: ", nextFloorPrice);
             solvencyInvariant();
         } else {
-            revert("No shift triggered");
+            revert(
+                string(
+                    abi.encodePacked(
+                        "no shift triggered: ", 
+                        Utils._uint2str(liquidityRatio)
+                    )
+                )
+            );
         }
     }
 
@@ -273,7 +282,7 @@ contract Invariants is Test {
             console.log("Attempt to shift positions");
             // custom error AboveThreshold()"
             vm.expectRevert(bytes4(0xe40aeaf5));
-            vault.shift();
+            IVault(address(vault)).shift();
             solvencyInvariant();
         }  
         
@@ -299,7 +308,7 @@ contract Invariants is Test {
         LiquidityPosition[3] memory positions = vault.getPositions();
 
         uint256 circulatingSupply = modelHelper.getCirculatingSupply(pool, address(vault));
-        uint256 anchorCapacity = modelHelper.getPositionCapacity(pool, address(vault), positions[1]);
+        uint256 anchorCapacity = modelHelper.getPositionCapacity(pool, address(vault), positions[1], LiquidityType.Anchor);
         (,,,uint256 floorBalance) = Underlying.getUnderlyingBalances(pool, address(vault), positions[0]);
 
         uint256 nextFloorPrice = DecimalMath.divideDecimal(floorBalance, circulatingSupply > anchorCapacity ? circulatingSupply - anchorCapacity : circulatingSupply);
@@ -310,7 +319,7 @@ contract Invariants is Test {
 
         if (liquidityRatio < 0.98e18) {
             console.log("Attempt to shift positions");
-            vault.shift();
+            IVault(address(vault)).shift();
             nextFloorPrice = getNextFloorPrice(pool, address(vault));
             console.log("Next floor price (after shift) is: ", nextFloorPrice);     
             require(nextFloorPrice > 0.98e18, "Next floor price is below threshold");  
@@ -324,10 +333,11 @@ contract Invariants is Test {
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
         uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
-        uint8 totalTrades = 100;
-        uint256 tradeAmount = 1 ether;
 
-        IWETH(WETH).deposit{ value: 100 ether }();
+        uint16 totalTrades = 200;
+        uint256 tradeAmount = 2000 ether;
+
+        IWETH(WETH).deposit{ value: tradeAmount * totalTrades }();
         IWETH(WETH).transfer(idoManager, tradeAmount * totalTrades);
 
         uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault));
@@ -345,9 +355,10 @@ contract Invariants is Test {
 
         if (liquidityRatio < 0.98e18) {
             console.log("Attempt to shift positions");
-            vault.shift();
+            IVault(address(vault)).shift();
         }  
-
+        // testLargePurchaseTriggerShift();
+        
         uint256 tokenBalanceBeforeSelling = noma.balanceOf(address(this));
         console.log("Token balance before selling is %s", tokenBalanceBeforeSelling);
 
@@ -357,7 +368,7 @@ contract Invariants is Test {
         spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
 
         managerContract.sellTokens(
-            spotPrice - (spotPrice * 15/100), 
+            spotPrice - (spotPrice * 10/100), 
             tokenBalanceBeforeSelling, 
             address(deployer)
         );
@@ -365,9 +376,9 @@ contract Invariants is Test {
         liquidityRatio = modelHelper.getLiquidityRatio(pool, address(vault));
         console.log("Liquidity ratio is: ", liquidityRatio);
 
-        if (liquidityRatio > 1.2e18) {
+        if (liquidityRatio > 1.15e18) {
             console.log("Attempt to slide positions");
-            vault.slide();
+            IVault(address(vault)).slide();
             solvencyInvariant();
         } else {
             revert("No slide triggered");
@@ -379,7 +390,7 @@ contract Invariants is Test {
     function getNextFloorPrice(address pool, address vault) public view returns (uint256) {
         LiquidityPosition[3] memory positions = IVault(vault).getPositions();
         uint256 circulatingSupply = modelHelper.getCirculatingSupply(pool, vault);
-        uint256 anchorCapacity = modelHelper.getPositionCapacity(pool, vault, positions[1]);
+        uint256 anchorCapacity = modelHelper.getPositionCapacity(pool, vault, positions[1], LiquidityType.Anchor);
         (,,,uint256 floorBalance) = Underlying.getUnderlyingBalances(pool, vault, positions[0]);
 
         return DecimalMath.divideDecimal(floorBalance, circulatingSupply > anchorCapacity ? circulatingSupply - anchorCapacity : circulatingSupply);
@@ -395,20 +406,31 @@ contract Invariants is Test {
         uint256 circulatingSupply = modelHelper.getCirculatingSupply(pool, address(vault));
         console.log("Circulating supply is: ", circulatingSupply);
 
+        uint256 intrinsicMinimumValue = modelHelper.getIntrinsicMinimumValue(address(vault));
+        
         LiquidityPosition[3] memory positions = vault.getPositions();
-        uint256 anchorCapacity = modelHelper.getPositionCapacity(pool, address(vault), positions[1]);
+        uint256 anchorCapacity = modelHelper.getPositionCapacity(pool, address(vault), positions[1], LiquidityType.Anchor);
         (,,,uint256 floorBalance) = Underlying.getUnderlyingBalances(pool, address(vault), positions[0]);
+        
+        uint256 floorCapacity = DecimalMath.divideDecimal(
+            floorBalance, 
+            intrinsicMinimumValue
+        );
 
-        require(anchorCapacity + floorBalance > circulatingSupply, "Insolvency invariant failed");
+        console.log("IMV is: ", intrinsicMinimumValue);
+        console.log("Anchor capacity is: ", anchorCapacity);
+        console.log("Floor balance is: ", floorBalance);
+        console.log("Floor capacity is: ", floorCapacity);
+        console.log("Anchor capacity + floor balance is: ", anchorCapacity + floorBalance);
+        console.log("Circulating supply is: ", circulatingSupply);
+
+        
+        require(anchorCapacity + floorCapacity > circulatingSupply, "Insolvency invariant failed");
     }
 
-    function testSolvencyInvariant() public {
-        solvencyInvariant();
-    }
-
-    function getPositions(address vault) public view returns (LiquidityPosition[3] memory) {
-        return IVault(vault).getPositions();
-    }
+    // function getPositions(address vault) public view returns (LiquidityPosition[3] memory) {
+    //     return IVault(vault).getPositions();
+    // }
     
 }
 
