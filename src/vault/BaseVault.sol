@@ -32,8 +32,9 @@ interface IExtVault {
 }
 
 interface ILendingVault {
-    function borrowFromFloor(address who, uint256 borrowAmount, int256 duration) external;
+    function borrowFromFloor(address who, uint256 borrowAmount, uint256 duration) external;
     function paybackLoan(address who) external;
+    function rollLoan(address who) external;
 }
 
 error AlreadyInitialized();
@@ -143,6 +144,15 @@ contract BaseVault is OwnableUninitialized {
     ) external {
         ILendingVault(address(this))
         .paybackLoan(
+            who
+        );
+    }
+
+    function roll(
+        address who
+    ) external {
+        ILendingVault(address(this))
+        .rollLoan(
             who
         );
     }
@@ -258,7 +268,7 @@ contract BaseVault is OwnableUninitialized {
     }
 
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](17);
+        bytes4[] memory selectors = new bytes4[](18);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
         selectors[1] = bytes4(keccak256(bytes("pool()")));
         selectors[2] = bytes4(keccak256(bytes("initialize(address,address,address,address,address,address)")));
@@ -276,6 +286,7 @@ contract BaseVault is OwnableUninitialized {
         selectors[14] = bytes4(keccak256(bytes("calcDynamicAmount(address,address,bool)")));
         selectors[15] = bytes4(keccak256(bytes("getCollateralAmount()")));
         selectors[16] = bytes4(keccak256(bytes("payback(address)")));
+        selectors[17] = bytes4(keccak256(bytes("roll(address)")));
         return selectors;
     }
 
