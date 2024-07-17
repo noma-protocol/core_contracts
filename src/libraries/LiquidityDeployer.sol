@@ -15,6 +15,7 @@ import {Underlying} from "./Underlying.sol";
 import {ModelHelper} from "../model/Helper.sol";
 import {LiquidityOps} from "./LiquidityOps.sol";
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
+import "../interfaces/IVault.sol";
 
 import {
     LiquidityPosition, 
@@ -263,23 +264,34 @@ library LiquidityDeployer {
         address pool,
         address deployer,
         uint256 amount1ToDeploy,
-        LiquidityPosition memory floorPosition
+        LiquidityPosition[3] memory positions
     ) internal returns (LiquidityPosition memory newPosition) {
         // Ensuring valid tick range
-        require(floorPosition.upperTick > floorPosition.lowerTick, "invalid ticks");
+        require(positions[0].upperTick > positions[0].lowerTick, "invalid ticks");
 
         // Deploying the new liquidity position
         newPosition = _deployPosition(
             pool, 
             address(this), 
-            floorPosition.lowerTick,
-            floorPosition.upperTick,
+            positions[0].lowerTick,
+            positions[0].upperTick,
             LiquidityType.Floor, 
             AmountsToMint({
                 amount0: 0,
                 amount1: amount1ToDeploy
             })
         );
+
+        LiquidityPosition[3] memory newPositions = [
+            newPosition, 
+            positions[1], 
+            positions[2]
+        ];
+
+        IVault(address(this))
+        .updatePositions(
+            newPositions
+        );            
     }
 
     function computeNewFloorPrice(
