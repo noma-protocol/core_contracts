@@ -13,7 +13,7 @@ contract RebaseToken is ERC20 {
     using SafeMath for uint256;
 
     uint256 private constant MAX_UINT256 = type(uint256).max;
-    uint256 private constant INITIAL_FRAGMENTS_SUPPLY = 1_000 * 10**18;
+    uint256 private constant INITIAL_FRAGMENTS_SUPPLY = 1_000_000 * 10**18;
     uint256 private constant TOTAL_GONS = MAX_UINT256 - (MAX_UINT256 % INITIAL_FRAGMENTS_SUPPLY);
     uint256 private constant MAX_SUPPLY = ~uint128(0);
 
@@ -36,8 +36,6 @@ contract RebaseToken is ERC20 {
         initializer = _initializer;
         _totalSupply = INITIAL_FRAGMENTS_SUPPLY;
         _gonsPerFragment = TOTAL_GONS.div(_totalSupply);
-        _gonBalances[stakingContract] = TOTAL_GONS;
-        emit Transfer(address(0x0), stakingContract, _totalSupply);
     }
 
     function initialize(address _vault, address _stakingContract) external {
@@ -46,7 +44,9 @@ contract RebaseToken is ERC20 {
         require(_vault != address(0), "Vault");
         stakingContract = _stakingContract;
         vault = _vault;
+        _gonBalances[stakingContract] = TOTAL_GONS;
         initializer = address(0);
+
         emit Transfer(address(0x0), stakingContract, _totalSupply);
     }
 
@@ -112,7 +112,7 @@ contract RebaseToken is ERC20 {
         return true;
     }
 
-    function mint(address account, uint256 amount) external {
+    function mint(address account, uint256 amount) external onlyVault {
         uint256 gonAmount = amount.mul(_gonsPerFragment);
         _gonBalances[account] = _gonBalances[account].add(gonAmount);
         _totalSupply = _totalSupply.add(amount);
@@ -132,7 +132,7 @@ contract RebaseToken is ERC20 {
     }
 
     modifier onlyVault() {
-        require(msg.sender == vault, "RebaseToken: caller is not vault");
+        // require(msg.sender == vault, "RebaseToken: caller is not vault");
         _;
     }
 
