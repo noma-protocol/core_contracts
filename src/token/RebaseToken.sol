@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import "../libraries/SafeMath.sol";
 import "../types/ERC20Permit.sol";
 
-contract GonsToken is ERC20Permit {
+contract RebaseToken is ERC20Permit {
     // PLEASE READ BEFORE CHANGING ANY ACCOUNTING OR MATH
     // Anytime there is division, there is a risk of numerical instability from rounding errors. In
     // order to minimize this risk, we adhere to the following guidelines:
@@ -269,6 +269,10 @@ contract GonsToken is ERC20Permit {
         }
         emit Approval(msg.sender, spender, _allowedFragments[msg.sender][spender]);
         return true;
+    }
+
+    function balanceForGons(uint256 gons) public view returns (uint256) {
+        return gons.div(_gonsPerFragment);
     }
 
     function circulatingSupply() public view returns (uint256) {
