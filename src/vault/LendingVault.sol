@@ -39,7 +39,7 @@ contract LendingVault is BaseVault {
         return (DecimalMath.divideDecimal(borrowAmount, intrinsicMinimumValue), intrinsicMinimumValue);
     }
 
-    function calculateLoanFees(uint256 borrowAmount, uint256 duration) internal pure returns (uint256 fees) {
+    function calculateLoanFees(uint256 borrowAmount, uint256 duration) public pure returns (uint256 fees) {
         uint256 percentage = 27; // 0.027% 
         uint256 scaledPercentage = percentage * 10**12; 
         fees = (borrowAmount * scaledPercentage * (duration / SECONDS_IN_DAY)) / (100 * 10**18);
