@@ -81,9 +81,7 @@ contract RebaseToken is ERC20Permit {
     * @dev Notifies Fragments contract about a new rebase cycle.
     * @param supplyDelta The number of new fragment tokens to add into circulation via expansion.
     */
-    function rebase(uint256 supplyDelta)
-        public
-    {
+    function rebase(uint256 supplyDelta) public onlyStakingContract {
         if (supplyDelta == 0) {
             emit LogRebase(_totalSupply);
         }
@@ -116,7 +114,7 @@ contract RebaseToken is ERC20Permit {
     * @param value The amount of token to be burned.
     * @return A boolean that indicates if the operation was successful.
     */
-    function burnFor(address from, uint256 value) public returns (bool) {
+    function burnFor(address from, uint256 value) public onlyStakingContract returns (bool) {
         require(from != address(0), "ERC20: burn from the zero address");
         require(value <= balanceOf(from), "ERC20: burn amount exceeds balance");
         require(value <= allowance(from, msg.sender), "ERC20: burn amount exceeds allowance");
@@ -281,5 +279,10 @@ contract RebaseToken is ERC20Permit {
 
     function circulatingSupply() public view returns (uint256) {
         return balanceOf(address(this)) - balanceOf(address(0));
+    }
+
+    modifier onlyStakingContract() {
+        require(msg.sender == stakingContract, "Only staking contract can call this function");
+        _;
     }
 }
