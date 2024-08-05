@@ -270,6 +270,10 @@ contract RebaseToken is ERC20Permit {
         emit Approval(msg.sender, spender, _allowedFragments[msg.sender][spender]);
         return true;
     }
+    
+    function gonsForBalance(uint256 amount) public view returns (uint256) {
+        return amount.mul(_gonsPerFragment);
+    }
 
     function balanceForGons(uint256 gons) public view returns (uint256) {
         return gons.div(_gonsPerFragment);
