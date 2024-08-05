@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import "../libraries/SafeMath.sol";
 import "../types/ERC20Permit.sol";
 
-contract RebaseToken is ERC20Permit {
+contract GonsToken is ERC20Permit {
     // PLEASE READ BEFORE CHANGING ANY ACCOUNTING OR MATH
     // Anytime there is division, there is a risk of numerical instability from rounding errors. In
     // order to minimize this risk, we adhere to the following guidelines:
@@ -110,8 +110,26 @@ contract RebaseToken is ERC20Permit {
         emit LogRebase(_totalSupply);
     }
 
-    function testMeNow(uint256 supplyDelta) public {
-        
+    /**
+    * @dev Burns a specific amount of tokens from the target address and decrements allowance.
+    * @param from The address which you want to burn tokens from.
+    * @param value The amount of token to be burned.
+    * @return A boolean that indicates if the operation was successful.
+    */
+    function burnFor(address from, uint256 value) public returns (bool) {
+        require(from != address(0), "ERC20: burn from the zero address");
+        require(value <= balanceOf(from), "ERC20: burn amount exceeds balance");
+        require(value <= allowance(from, msg.sender), "ERC20: burn amount exceeds allowance");
+
+        uint256 gonValue = value.mul(_gonsPerFragment);
+        _gonBalances[from] = _gonBalances[from].sub(gonValue);
+        _totalSupply = _totalSupply.sub(value);
+        _gonsPerFragment = TOTAL_GONS.div(_totalSupply);
+
+        _allowedFragments[from][msg.sender] = _allowedFragments[from][msg.sender].sub(value);
+
+        emit Transfer(from, address(0), value);
+        return true;
     }
 
     /**
@@ -188,8 +206,8 @@ contract RebaseToken is ERC20Permit {
         uint256 gonValue = value.mul(_gonsPerFragment);
         _gonBalances[from] = _gonBalances[from].sub(gonValue);
         _gonBalances[to] = _gonBalances[to].add(gonValue);
-        emit Transfer(from, to, value);
 
+        emit Transfer(from, to, value);
         return true;
     }
 

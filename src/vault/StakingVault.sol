@@ -38,14 +38,13 @@ contract StakingVault is BaseVault {
     uint256 public constant BASE_VALUE = 100e18;
 
     function calculateMintAmount(int256 currentLiquidityRatio, uint256 excessTokens) public pure returns (uint256) {
-        // Ensure currentLiquidityRatio is within reasonable bounds for overflow protection
         require(currentLiquidityRatio >= -1e18 && currentLiquidityRatio <= 1e18 * 10, "currentLiquidityRatio out of range");
 
-        // Calculate the adjusted ratio
-        uint256 adjustedRatio = BASE_VALUE - uint256(currentLiquidityRatio);
+        uint256 BASE_VALUE = 100e18;
+        uint256 SCALING_FACTOR = 1e12; // New scaling factor
 
-        // Calculate the mint amount based on adjusted ratio and excess tokens
-        uint256 mintAmount = (adjustedRatio * excessTokens) / 1e18;
+        uint256 adjustedRatio = BASE_VALUE - uint256(currentLiquidityRatio);
+        uint256 mintAmount = (adjustedRatio * excessTokens * SCALING_FACTOR) / 1e18;
 
         return mintAmount;
     }
@@ -83,26 +82,39 @@ contract StakingVault is BaseVault {
 
         uint256 toMintScaled = DecimalMath.divideDecimal(toMint, intrinsicMinimumValue);
         
-        IERC20(_v.tokenInfo.token0).mint(address(this), toMintScaled);
-        IERC20(_v.tokenInfo.token0).approve(_v.stakingContract, toMintScaled);
 
-        uint256 floorPrice = 
-            Conversions.sqrtPriceX96ToPrice(
-                Conversions.tickToSqrtPriceX96(positions[0].upperTick),
-                18
-            );
+        // uint256 floorPrice = 
+        //     Conversions.sqrtPriceX96ToPrice(
+        //         Conversions.tickToSqrtPriceX96(positions[0].upperTick),
+        //         18
+        //     );
 
-        if (floorPrice > 1e18) {
-            revert(
-                string(
-                    abi.encodePacked(
-                            "mintAndDistributeRewards: ", 
-                            Utils._uint2str(uint256(floorPrice)
-                        )
-                    )
-                )
-            );   
+        // if (floorPrice > 1e18) {
+        //     revert(
+        //         string(
+        //             abi.encodePacked(
+        //                     "mintAndDistributeRewards: ", 
+        //                     Utils._uint2str(uint256(floorPrice)
+        //                 )
+        //             )
+        //         )
+        //     );   
+        // }
+        if (toMintScaled == 0) {
+            return;
+        } else {
+            // revert(
+            //     string(
+            //         abi.encodePacked(
+            //                 "mintAndDistributeRewards: ", 
+            //                 Utils._uint2str(uint256(toMintScaled)
+            //             )
+            //         )
+            //     )
+            // );              
         }
+        IERC20(_v.tokenInfo.token0).approve(_v.stakingContract, toMintScaled);
+        IERC20(_v.tokenInfo.token0).mint(_v.stakingContract, toMintScaled);
 
         // Call notifyRewardAmount 
         IStakingRewards(_v.stakingContract).notifyRewardAmount(toMintScaled);  
