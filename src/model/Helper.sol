@@ -30,12 +30,26 @@ interface IVault {
     function getCollateralAmount() external view returns (uint256);
 }
 
+interface IStakingContract {
+    function totalStaked() external view returns (uint256);
+}
+
 contract ModelHelper {
 
     bool private initialized;
-    address private deployerContract;
+    address private stakingContract;
+    address private initializer;
+    
+    constructor() {
+        initializer = msg.sender;
+    }
 
-    constructor() {}
+    function initialize(address _stakingContract) public onlyInitializer {
+        require(!initialized, "Already initialized");
+
+        stakingContract = _stakingContract;
+        initialized = true;
+    }
 
     function getLiquidityRatio(
         address pool,
@@ -135,16 +149,34 @@ contract ModelHelper {
         address pool,
         address vault
     ) public view returns (uint256) {
+        
         LiquidityPosition[3] memory positions = IVault(vault).getPositions();
         uint256 totalSupply = ERC20(address(IUniswapV3Pool(pool).token0())).totalSupply();
 
-        (,,uint256 amount0CurrentFloor, ) = Underlying.getUnderlyingBalances(pool, vault, positions[0]);
-        (,,uint256 amount0CurrentAnchor, ) = Underlying.getUnderlyingBalances(pool, vault, positions[1]);
-        (,,uint256 amount0CurrentDiscovery, ) = Underlying.getUnderlyingBalances(pool, vault, positions[2]);
+        (,, uint256 amount0CurrentFloor,) = Underlying.getUnderlyingBalances(pool, vault, positions[0]);
+        (,, uint256 amount0CurrentAnchor,) = Underlying.getUnderlyingBalances(pool, vault, positions[1]);
+        (,, uint256 amount0CurrentDiscovery,) = Underlying.getUnderlyingBalances(pool, vault, positions[2]);
 
         uint256 protocolUnusedBalanceToken0 = ERC20(address(IUniswapV3Pool(pool).token0())).balanceOf(vault);
-    
-        return totalSupply - (amount0CurrentFloor + amount0CurrentAnchor + amount0CurrentDiscovery + protocolUnusedBalanceToken0);
+
+        uint256 totalNomaStaked = IStakingContract(stakingContract).totalStaked();
+        uint256 nomaMintedToStakingRewards = 0;
+        
+        if (totalNomaStaked > 0) {
+            nomaMintedToStakingRewards = 
+            totalNomaStaked - 
+            ERC20(address(IUniswapV3Pool(pool).token0())).balanceOf(stakingContract);
+        }
+
+        return (
+            (totalSupply + nomaMintedToStakingRewards) - 
+            (
+                amount0CurrentFloor + 
+                amount0CurrentAnchor + 
+                amount0CurrentDiscovery + 
+                protocolUnusedBalanceToken0
+            )
+        );
     } 
 
     function getTotalSupply(
@@ -180,5 +212,10 @@ contract ModelHelper {
         uint160 sqrtPriceX96 = Conversions.tickToSqrtPriceX96(lowerTick);
 
         return Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+    }
+    
+    modifier onlyInitializer() {
+        require(msg.sender == initializer, "Invalid caller");
+        _;
     }
 }
