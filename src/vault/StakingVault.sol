@@ -78,17 +78,7 @@ contract StakingVault is BaseVault {
         
         if (toMintConverted == 0) {
             return;
-        } else {
-            // revert(
-            //     string(
-            //         abi.encodePacked(
-            //                 "mintAndDistributeRewards: ", 
-            //                 Utils._uint2str(uint256(toMintScaledToken1)
-            //             )
-            //         )
-            //     )
-            // );              
-        }
+        } 
 
         IERC20(_v.tokenInfo.token0).approve(_v.stakingContract, toMintConverted);
         IERC20(_v.tokenInfo.token0).mint(_v.stakingContract, toMintConverted);
@@ -148,7 +138,7 @@ contract StakingVault is BaseVault {
                 ), 
             18);
             
-            // Bump floor if necessary 102e16
+            // Bump floor if necessary
             if (newFloorPrice > currentFloorPrice) {
                 _shiftPositions(
                     positions, 
@@ -157,10 +147,7 @@ contract StakingVault is BaseVault {
                     toMint, 
                     floorToken1Balance
                 );
-
-            } else {
-                
-            }
+            }  
         }        
     }
 
