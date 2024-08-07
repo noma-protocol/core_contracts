@@ -11,6 +11,7 @@ import "../libraries/Conversions.sol";
 import "../libraries/DecimalMath.sol";
 import "../libraries/Utils.sol";
 import "../libraries/Uniswap.sol";
+import "../libraries/LiquidityDeployer.sol";
 
 import {
     LiquidityPosition, 
@@ -29,10 +30,10 @@ interface IStakingRewards {
     function notifyRewardAmount(uint256 reward) external;
 }
 
-interface IVault {
-    function updatePositions(LiquidityPosition[3] memory newPositions) external;
-    function setFees(uint256 _feesAccumulatedToken0, uint256 _feesAccumulatedToken1) external;
-}
+// interface IVault {
+//     function updatePositions(LiquidityPosition[3] memory newPositions) external;
+//     function setFees(uint256 _feesAccumulatedToken0, uint256 _feesAccumulatedToken1) external;
+// }
 
 contract StakingVault is BaseVault {
     uint256 public constant BASE_VALUE = 100e18;
@@ -68,59 +69,38 @@ contract StakingVault is BaseVault {
         uint256 currentLiquidityRatio = IModelHelper(_v.modelHelper)
         .getLiquidityRatio(address(_v.pool), addresses.vault);
         
-        // uint256 minAmountToMint = excessReservesToken1 * 0.1e18;
-
-        // uint256 toMint = (
-        //     excessReservesToken1 * 
-        //     (100e18 - currentLiquidityRatio) / 1000
-        // ) + minAmountToMint;
-
-        uint256 toMint = calculateMintAmount(int256(currentLiquidityRatio), excessReservesToken1);
+        uint256 toMintScaledToken1 = calculateMintAmount(int256(currentLiquidityRatio), excessReservesToken1);
 
         uint256 intrinsicMinimumValue = IModelHelper(_v.modelHelper)
         .getIntrinsicMinimumValue(addresses.vault) * 1e18;
 
-        uint256 toMintScaled = DecimalMath.divideDecimal(toMint, intrinsicMinimumValue);
+        uint256 toMintConverted = DecimalMath.divideDecimal(toMintScaledToken1, intrinsicMinimumValue);
         
-
-        // uint256 floorPrice = 
-        //     Conversions.sqrtPriceX96ToPrice(
-        //         Conversions.tickToSqrtPriceX96(positions[0].upperTick),
-        //         18
-        //     );
-
-        // if (floorPrice > 1e18) {
-        //     revert(
-        //         string(
-        //             abi.encodePacked(
-        //                     "mintAndDistributeRewards: ", 
-        //                     Utils._uint2str(uint256(floorPrice)
-        //                 )
-        //             )
-        //         )
-        //     );   
-        // }
-        if (toMintScaled == 0) {
+        if (toMintConverted == 0) {
             return;
         } else {
             // revert(
             //     string(
             //         abi.encodePacked(
             //                 "mintAndDistributeRewards: ", 
-            //                 Utils._uint2str(uint256(toMintScaled)
+            //                 Utils._uint2str(uint256(toMintScaledToken1)
             //             )
             //         )
             //     )
             // );              
         }
-        IERC20(_v.tokenInfo.token0).approve(_v.stakingContract, toMintScaled);
-        IERC20(_v.tokenInfo.token0).mint(_v.stakingContract, toMintScaled);
+
+        IERC20(_v.tokenInfo.token0).approve(_v.stakingContract, toMintConverted);
+        IERC20(_v.tokenInfo.token0).mint(_v.stakingContract, toMintConverted);
+
+        // Update total minted (NOMA)
+        _v.totalMinted += toMintConverted;
 
         // Call notifyRewardAmount 
-        IStakingRewards(_v.stakingContract).notifyRewardAmount(toMintScaled);  
+        IStakingRewards(_v.stakingContract).notifyRewardAmount(toMintConverted);  
 
         // Send tokens to Floor
-        _sendToken1ToFloor(positions, addresses, toMintScaled, intrinsicMinimumValue);
+        _sendToken1ToFloor(positions, addresses, toMintConverted, intrinsicMinimumValue);
     }
 
     function _sendToken1ToFloor(
@@ -160,8 +140,16 @@ contract StakingVault is BaseVault {
                 positions
             );
 
-            // Bump floor if necessary
-            if (newFloorPrice > 102e16) {
+            uint256 currentFloorPrice = Conversions
+            .sqrtPriceX96ToPrice(
+                Conversions
+                .tickToSqrtPriceX96(
+                    positions[0].upperTick
+                ), 
+            18);
+            
+            // Bump floor if necessary 102e16
+            if (newFloorPrice > currentFloorPrice) {
                 _shiftPositions(
                     positions, 
                     addresses, 
@@ -169,8 +157,7 @@ contract StakingVault is BaseVault {
                     toMint, 
                     floorToken1Balance
                 );
-                // newPositions[1] = positions[1];
-                // newPositions[2] = positions[2];
+
             } else {
                 
             }
