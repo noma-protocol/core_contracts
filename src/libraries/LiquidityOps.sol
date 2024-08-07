@@ -148,6 +148,9 @@ library LiquidityOps {
         .updatePositions(
             newPositions
         );
+
+        IModelHelper(modelHelper)
+        .enforceSolvencyInvariant(address(this));        
     }
 
     function shiftPositions(
@@ -287,7 +290,7 @@ library LiquidityOps {
                 uint256 feesPosition0Token1, 
                 uint256 feesPosition1Token0, 
                 uint256 feesPosition1Token1
-             ) = _calculateFees(addresses.pool, positions);
+            ) = _calculateFees(addresses.pool, positions);
 
             IVault(address(this)).setFees(
                 feesPosition0Token0, 
@@ -346,7 +349,10 @@ library LiquidityOps {
             .updatePositions(
                 newPositions
             );    
-                    
+
+            IModelHelper(addresses.modelHelper)
+            .enforceSolvencyInvariant(address(this));   
+
         } else {
             revert BelowThreshold();
         }  
