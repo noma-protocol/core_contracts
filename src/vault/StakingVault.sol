@@ -30,11 +30,6 @@ interface IStakingRewards {
     function notifyRewardAmount(uint256 reward) external;
 }
 
-// interface IVault {
-//     function updatePositions(LiquidityPosition[3] memory newPositions) external;
-//     function setFees(uint256 _feesAccumulatedToken0, uint256 _feesAccumulatedToken1) external;
-// }
-
 contract StakingVault is BaseVault {
     uint256 public constant BASE_VALUE = 100e18;
 
@@ -78,7 +73,7 @@ contract StakingVault is BaseVault {
         
         if (toMintConverted == 0) {
             return;
-        } 
+        }
 
         IERC20(_v.tokenInfo.token0).approve(_v.stakingContract, toMintConverted);
         IERC20(_v.tokenInfo.token0).mint(_v.stakingContract, toMintConverted);
