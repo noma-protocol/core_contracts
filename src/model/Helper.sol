@@ -13,6 +13,7 @@ import {DecimalMath} from "../libraries/DecimalMath.sol";
 
 import {Underlying} from "../libraries/Underlying.sol";
 import {Utils} from "../libraries/Utils.sol";
+import {VaultStorage} from "../libraries/LibAppStorage.sol";
 
 import {
     LiquidityPosition,
@@ -28,6 +29,7 @@ interface IVault {
     function getPositions() external view returns (LiquidityPosition[3] memory);
     function getAccumulatedFees() external view returns (uint256, uint256);
     function getCollateralAmount() external view returns (uint256);
+    function pool() external view returns (IUniswapV3Pool);
 }
 
 interface IStakingContract {
@@ -35,6 +37,7 @@ interface IStakingContract {
 }
 
 contract ModelHelper {
+    VaultStorage internal _v;
 
     bool private initialized;
     address private stakingContract;
@@ -153,23 +156,14 @@ contract ModelHelper {
         LiquidityPosition[3] memory positions = IVault(vault).getPositions();
         uint256 totalSupply = ERC20(address(IUniswapV3Pool(pool).token0())).totalSupply();
 
-        (,, uint256 amount0CurrentFloor,) = Underlying.getUnderlyingBalances(pool, vault, positions[0]);
-        (,, uint256 amount0CurrentAnchor,) = Underlying.getUnderlyingBalances(pool, vault, positions[1]);
-        (,, uint256 amount0CurrentDiscovery,) = Underlying.getUnderlyingBalances(pool, vault, positions[2]);
+        (,, uint256 amount0CurrentFloor, ) = Underlying.getUnderlyingBalances(pool, vault, positions[0]);
+        (,, uint256 amount0CurrentAnchor, ) = Underlying.getUnderlyingBalances(pool, vault, positions[1]);
+        (,, uint256 amount0CurrentDiscovery, ) = Underlying.getUnderlyingBalances(pool, vault, positions[2]);
 
         uint256 protocolUnusedBalanceToken0 = ERC20(address(IUniswapV3Pool(pool).token0())).balanceOf(vault);
-
-        uint256 totalNomaStaked = IStakingContract(stakingContract).totalStaked();
-        uint256 nomaMintedToStakingRewards = 0;
         
-        if (totalNomaStaked > 0) {
-            nomaMintedToStakingRewards = 
-            totalNomaStaked - 
-            ERC20(address(IUniswapV3Pool(pool).token0())).balanceOf(stakingContract);
-        }
-
         return (
-            (totalSupply + nomaMintedToStakingRewards) - 
+            (totalSupply) - 
             (
                 amount0CurrentFloor + 
                 amount0CurrentAnchor + 
@@ -213,7 +207,27 @@ contract ModelHelper {
 
         return Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
     }
-    
+
+    function enforceSolvencyInvariant(address _vault) public view {
+        address pool = address(IVault(_vault).pool());
+
+        uint256 circulatingSupply = getCirculatingSupply(pool, _vault);
+        uint256 intrinsicMinimumValue = getIntrinsicMinimumValue(_vault);
+        
+        LiquidityPosition[3] memory positions = IVault(_vault).getPositions();
+        uint256 anchorCapacity = getPositionCapacity(pool, _vault, positions[1], LiquidityType.Anchor);
+        (,,,uint256 floorBalance) = getUnderlyingBalances(pool, _vault, LiquidityType.Floor);
+        
+        uint256 floorCapacity = DecimalMath
+        .divideDecimal(
+            floorBalance, 
+            intrinsicMinimumValue
+        );
+
+        // To guarantee solvency, Noma ensures that capacity > circulating supply each liquidity is deployed.
+        require(anchorCapacity + floorCapacity > circulatingSupply, "Insolvency invariant failed");
+    }
+
     modifier onlyInitializer() {
         require(msg.sender == initializer, "Invalid caller");
         _;
