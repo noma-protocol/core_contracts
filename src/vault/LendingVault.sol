@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import {BaseVault} from "./BaseVault.sol";
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
 import {LiquidityOps} from "../libraries/LiquidityOps.sol";
+
 import "../libraries/Conversions.sol";
 import "../libraries/DecimalMath.sol";
 import "../libraries/Utils.sol";
@@ -83,8 +84,10 @@ contract LendingVault is BaseVault {
         _v.loanAddresses.push(who);
 
         IVault(address(this)).updatePositions([_v.floorPosition, _v.anchorPosition, _v.discoveryPosition]);
+        
+        IModelHelper(_v.modelHelper)
+        .enforceSolvencyInvariant(address(this));           
     }
-
 
     function paybackLoan(address who) public onlyVault {
         LoanPosition storage loan = _v.loanPositions[who];
@@ -115,7 +118,6 @@ contract LendingVault is BaseVault {
         .getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
 
         LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
-
         Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick);      
            
         LiquidityPosition memory newPosition = LiquidityDeployer.reDeployFloor(
@@ -125,7 +127,10 @@ contract LendingVault is BaseVault {
             positions
         );
 
-        IERC20(_v.pool.token1()).transfer(who, newBorrowAmount - newFees);        
+        IERC20(_v.pool.token1()).transfer(who, newBorrowAmount - newFees);     
+        IVault(address(this)).updatePositions([_v.floorPosition, _v.anchorPosition, _v.discoveryPosition]);
+
+        // enforce insolvency invariant
     }
 
     function defaultLoans() public onlyVault {

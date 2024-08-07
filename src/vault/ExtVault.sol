@@ -29,7 +29,6 @@ interface IStakingRewards {
     function notifyRewardAmount(uint256 reward) external;
 }
 
-
 interface IStakingVault {
     function mintAndDistributeRewards(ProtocolAddresses memory addresses) external;
 }
@@ -39,8 +38,12 @@ contract ExtVault is BaseVault {
     function shift() public {
         require(_v.initialized, "not initialized");
 
-        LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
-
+        LiquidityPosition[3] memory positions = [
+            _v.floorPosition, 
+            _v.anchorPosition, 
+            _v.discoveryPosition
+        ];
+        
         ProtocolAddresses memory addresses = ProtocolAddresses({
             pool: address(_v.pool),
             vault: address(this),
@@ -59,7 +62,12 @@ contract ExtVault is BaseVault {
     function slide() public  {
         require(_v.initialized, "not initialized");
 
-        LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
+        LiquidityPosition[3] memory positions = [
+            _v.floorPosition, 
+            _v.anchorPosition, 
+            _v.discoveryPosition
+        ];
+
         LiquidityOps
         .slide(
             ProtocolAddresses({

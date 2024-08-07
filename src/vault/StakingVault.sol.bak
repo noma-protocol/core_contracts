@@ -30,6 +30,11 @@ interface IStakingRewards {
     function notifyRewardAmount(uint256 reward) external;
 }
 
+// interface IVault {
+//     function updatePositions(LiquidityPosition[3] memory newPositions) external;
+//     function setFees(uint256 _feesAccumulatedToken0, uint256 _feesAccumulatedToken1) external;
+// }
+
 contract StakingVault is BaseVault {
     uint256 public constant BASE_VALUE = 100e18;
 
@@ -73,7 +78,17 @@ contract StakingVault is BaseVault {
         
         if (toMintConverted == 0) {
             return;
-        } 
+        } else {
+            // revert(
+            //     string(
+            //         abi.encodePacked(
+            //                 "mintAndDistributeRewards: ", 
+            //                 Utils._uint2str(uint256(toMintScaledToken1)
+            //             )
+            //         )
+            //     )
+            // );              
+        }
 
         IERC20(_v.tokenInfo.token0).approve(_v.stakingContract, toMintConverted);
         IERC20(_v.tokenInfo.token0).mint(_v.stakingContract, toMintConverted);
@@ -81,12 +96,121 @@ contract StakingVault is BaseVault {
         // Update total minted (NOMA)
         _v.totalMinted += toMintConverted;
 
+        // Deploy extra ETH to floor and shift
+        // _deployLiquidity(
+        //     positions,
+        //     addresses,
+        //     toMintScaledToken1
+        // );
+
         // Call notifyRewardAmount 
         IStakingRewards(_v.stakingContract).notifyRewardAmount(toMintConverted);  
 
         // Send tokens to Floor
         _sendToken1ToFloor(positions, addresses, toMintConverted, intrinsicMinimumValue);
     }
+
+    // function _deployLiquidity(
+    //     LiquidityPosition[3] memory positions,
+    //     ProtocolAddresses memory addresses, 
+    //     uint256 mintValue
+    // ) internal {
+        
+    //     (,,, uint256 floorToken1Balance) = IModelHelper(_v.modelHelper)
+    //     .getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
+
+    //     uint256 anchorCapacity = IModelHelper(_v.modelHelper)
+    //     .getPositionCapacity(
+    //         address(_v.pool), 
+    //         address(this), 
+    //         positions[1],
+    //         LiquidityType.Anchor
+    //     );
+
+    //     (uint256 circulatingSupply,  uint256 anchorToken1Balance, uint256 discoveryToken1Balance, ) = LiquidityOps.getVaulData(addresses);
+
+    //     uint256 newFloorPrice = IDeployer(_v.deployerContract)
+    //             .computeNewFloorPrice(
+    //                 address(_v.pool),
+    //                 mintValue,
+    //                 floorToken1Balance,
+    //                 circulatingSupply,
+    //                 anchorCapacity,
+    //                 positions
+    //             );
+
+    //     LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
+    //     Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick); 
+
+    //     _shiftFloor(
+    //         positions,
+    //         addresses,
+    //         mintValue,
+    //         newFloorPrice,
+    //         floorToken1Balance,
+    //         anchorToken1Balance,
+    //         discoveryToken1Balance
+    //     );
+        
+    // }
+
+    // function _shiftFloor(
+    //     LiquidityPosition[3] memory positions,
+    //     ProtocolAddresses memory addresses, 
+    //     uint256 mintValue,
+    //     uint256 newFloorPrice,
+    //     uint256 floorToken1Balance,
+    //     uint256 anchorToken1Balance,
+    //     uint256 discoveryToken1Balance
+    // ) internal {
+    //     LiquidityPosition[3] memory newPositions;
+
+    //     newPositions[0] = IDeployer(_v.deployerContract) 
+    //     .shiftFloor(
+    //         address(_v.pool), 
+    //         address(this), 
+    //         Conversions
+    //         .sqrtPriceX96ToPrice(
+    //             Conversions
+    //             .tickToSqrtPriceX96(
+    //                 positions[0].upperTick
+    //             ), 
+    //         18), 
+    //         newFloorPrice,
+    //         floorToken1Balance + mintValue,
+    //         floorToken1Balance,
+    //         positions[0]
+    //     );
+        
+    //     (uint160 sqrtRatioX96,,,,,,) = _v.pool.slot0();
+
+    //     // Deploy new anchor position
+    //     newPositions[1] = LiquidityOps.reDeploy(
+    //         address(_v.pool), 
+    //         _v.deployerContract,
+    //         newPositions[0].upperTick,                
+    //         Utils.addBipsToTick(
+    //             TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
+    //             1
+    //         ),
+    //         anchorToken1Balance + discoveryToken1Balance, 
+    //         LiquidityType.Anchor
+    //     );
+
+    //     newPositions[2] = LiquidityOps.reDeploy(
+    //         address(_v.pool), 
+    //         _v.deployerContract, 
+    //         newPositions[1].upperTick,
+    //         Utils.addBipsToTick(
+    //             TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
+    //             25000
+    //         ),           
+    //         0,
+    //         LiquidityType.Discovery 
+    //     );  
+        
+    //     IVault(addresses.vault).updatePositions(newPositions);  
+    // }
 
     function _sendToken1ToFloor(
         LiquidityPosition[3] memory positions, 
@@ -133,7 +257,7 @@ contract StakingVault is BaseVault {
                 ), 
             18);
             
-            // Bump floor if necessary
+            // Bump floor if necessary 102e16
             if (newFloorPrice > currentFloorPrice) {
                 _shiftPositions(
                     positions, 
@@ -142,7 +266,10 @@ contract StakingVault is BaseVault {
                     toMint, 
                     floorToken1Balance
                 );
-            }  
+
+            } else {
+                
+            }
         }        
     }
 
@@ -237,11 +364,11 @@ contract StakingVault is BaseVault {
 
             IVault(addresses.vault).updatePositions(positions);  
 
-            IModelHelper(_v.modelHelper)
-            .enforceSolvencyInvariant(address(this));   
         }
       
     }
+
+
 
     function getFunctionSelectors() external pure  override returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](1);
