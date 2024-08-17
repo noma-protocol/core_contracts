@@ -67,42 +67,39 @@ library LiquidityOps {
                 )
             );
 
-            if (toSkim >= (anchorToken1Balance * 2 / 1000)) {
-                if (circulatingSupply > 0) {
+            if (circulatingSupply > 0) {
+            
+                (,,, uint256 floorToken1Balance) = IModelHelper(addresses.modelHelper)
+                .getUnderlyingBalances(
+                    addresses.pool, 
+                    address(this), 
+                    LiquidityType.Floor
+                );
+
+                uint256 anchorCapacity = IModelHelper(addresses.modelHelper)
+                .getPositionCapacity(
+                    addresses.pool, 
+                    addresses.vault, 
+                    positions[1],
+                    LiquidityType.Anchor
+                );
+
+                newPositions = preShiftPositions(
+                    PreShiftParameters({
+                        addresses: addresses,
+                        toSkim: toSkim,
+                        circulatingSupply : circulatingSupply,
+                        anchorCapacity: anchorCapacity,
+                        floorToken1Balance: floorToken1Balance,
+                        anchorToken1Balance: anchorToken1Balance,
+                        discoveryToken1Balance: discoveryToken1Balance,
+                        discoveryToken0Balance: discoveryToken0Balance
+                    }),
+                    positions
+                );
                 
-                    (,,, uint256 floorToken1Balance) = IModelHelper(addresses.modelHelper)
-                    .getUnderlyingBalances(
-                        addresses.pool, 
-                        address(this), 
-                        LiquidityType.Floor
-                    );
-
-                    uint256 anchorCapacity = IModelHelper(addresses.modelHelper)
-                    .getPositionCapacity(
-                        addresses.pool, 
-                        addresses.vault, 
-                        positions[1],
-                        LiquidityType.Anchor
-                    );
-
-                    newPositions = preShiftPositions(
-                        PreShiftParameters({
-                            addresses: addresses,
-                            toSkim: toSkim,
-                            circulatingSupply : circulatingSupply,
-                            anchorCapacity: anchorCapacity,
-                            floorToken1Balance: floorToken1Balance,
-                            anchorToken1Balance: anchorToken1Balance,
-                            discoveryToken1Balance: discoveryToken1Balance,
-                            discoveryToken0Balance: discoveryToken0Balance
-                        }),
-                        positions
-                    );
-                    
-                    return (currentLiquidityRatio, newPositions);
-                }
-
-            } 
+                return (currentLiquidityRatio, newPositions);
+            }
 
         } else {
             revert AboveThreshold();
@@ -147,8 +144,8 @@ library LiquidityOps {
         IVault(address(this))
         .updatePositions(
             newPositions
-        );
-     
+        ); 
+        
     }
 
     function shiftPositions(
