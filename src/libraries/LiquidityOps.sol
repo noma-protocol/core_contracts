@@ -148,9 +148,7 @@ library LiquidityOps {
         .updatePositions(
             newPositions
         );
-
-        IModelHelper(modelHelper)
-        .enforceSolvencyInvariant(address(this));        
+     
     }
 
     function shiftPositions(
