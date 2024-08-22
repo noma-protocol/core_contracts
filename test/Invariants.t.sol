@@ -8,12 +8,15 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 
 import {Deployer} from "../src/Deployer.sol";
 import {BaseVault} from  "../src/vault/BaseVault.sol";
-import {AmphorToken} from  "../src/token/AmphorToken.sol";
+import {MockNomaToken} from  "../src/token/MockNomaToken.sol";
 import {ModelHelper} from  "../src/model/Helper.sol";
 import {Underlying } from  "../src/libraries/Underlying.sol";
-import {LiquidityType, LiquidityPosition} from "../src/Types.sol";
+import {LiquidityType, LiquidityPosition} from "../src/types/Types.sol";
 import {DecimalMath} from "../src/libraries/DecimalMath.sol";
 import {Conversions} from "../src/libraries/Conversions.sol";
+import {Utils} from "../src/libraries/Utils.sol";
+import "../src/staking/Gons.sol";
+import "../src/staking/Staking.sol";
 
 interface IWETH {
     function balanceOf(address account) external view returns (uint256);
@@ -47,22 +50,33 @@ contract Invariants is Test {
     // Protocol addresses
     address payable idoManager = payable(0x4ff2d7eAf57E8a87e89436A4DCab3e05686fc501);
     address nomaToken = 0x71928Dd90031aB5Bb11d4765361c30958ecd4143;
-    address deployerContract = 0xc11FeB4A3B79a73CA4f4F3C4B6e757eDB8D19830;
+    address sNomaToken = 0x18Bb36A90984B43e8c5c07F461720394bA533134;
+    address deployerContract = 0x5EAC2ffAF4242b7099852EB96F585aBEdc37Cbe1;
+    address stakingContract = 0xeB0beC62AA5AB0e1dBEcDd8ae4CE70DAC36C1db3;
 
-    AmphorToken private noma;
+    MockNomaToken private NOMA;
+    GonsToken sNOMA;
+
     ModelHelper private modelHelper;
+    Staking staking;
 
     function setUp() public {
+        
         IDOManager managerContract = IDOManager(idoManager);
         require(address(managerContract) != address(0), "Manager contract address is zero");
 
-        noma = AmphorToken(nomaToken);
-        require(address(noma) != address(0), "Noma token address is zero");
+        NOMA = MockNomaToken(nomaToken);
+        require(address(NOMA) != address(0), "Noma token address is zero");
+
+        sNOMA = GonsToken(sNomaToken);
+        require(address(sNOMA) != address(0), "sNoma token address is zero");
+
+        staking = Staking(stakingContract);
+        require(address(staking) != address(0), "Staking contract address is zero");
         
         address modelHelperContract = managerContract.modelHelper();
         modelHelper = ModelHelper(modelHelperContract);
     }
-
 
     function testCirculatingSupply() public {     
         IDOManager managerContract = IDOManager(idoManager);
@@ -81,11 +95,10 @@ contract Invariants is Test {
         vm.recordLogs();
         vm.startBroadcast(privateKey);
 
-        uint256 totalSupply = noma.totalSupply();
+        uint256 totalSupply = NOMA.totalSupply();
         console.log("Total supply is %s", totalSupply);
 
-        assertEq(totalSupply, 35_000_000e18, "Total supply is not correct");
-
+        require(totalSupply >= 35_000_000e18, "Total supply is less than expected");
         vm.stopBroadcast();
     }
 
@@ -102,7 +115,7 @@ contract Invariants is Test {
         IWETH(WETH).deposit{ value: 10 ether }();
         IWETH(WETH).transfer(idoManager, tradeAmount * totalTrades);
 
-        uint256 tokenBalanceBefore = noma.balanceOf(address(this));
+        uint256 tokenBalanceBefore = NOMA.balanceOf(address(this));
         uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault));
         console.log("Circulating supply is: ", circulatingSupplyBefore);
 
@@ -110,7 +123,7 @@ contract Invariants is Test {
             managerContract.buyTokens(spotPrice, tradeAmount, address(this));
         }
         
-        uint256 tokenBalanceAfter = noma.balanceOf(address(this));
+        uint256 tokenBalanceAfter = NOMA.balanceOf(address(this));
         console.log("Token balance after buying is %s", tokenBalanceAfter);
 
         uint256 circulatingSupplyAfter = modelHelper.getCirculatingSupply(pool, address(vault));
@@ -119,7 +132,50 @@ contract Invariants is Test {
         // adapt for 1 wei discrepance
         assertApproxEqAbs(tokenBalanceAfter + circulatingSupplyBefore, circulatingSupplyAfter, 1 wei , "Circulating supply does not match bought tokens");
     }
-    
+
+    // function testInvariantWithStakeUnstakeAndRebases() public {
+    //     vm.startBroadcast(privateKey);
+
+    //     staking.stake(deployer, 1_000e18);
+        
+    //     vm.prank(vault);
+    //     staking.notifyRewardAmount(0);
+
+    //     // Simulate multiple rebases
+    //     uint256 rewardAmount = 1000e18;
+    //     for (uint i = 0; i < 10; i++) {
+    //         NOMA.mint(address(staking), rewardAmount);
+    //         vm.prank(vault);
+    //         staking.notifyRewardAmount(rewardAmount);
+    //     }
+
+    //     // All users unstake
+    //     for (uint i = 0; i < NUM_USERS; i++) {
+    //         uint256 sNOMABalanceBefore = sNOMA.balanceOf(users[i]);
+    //         uint256 NOMABalanceBefore = NOMA.balanceOf(users[i]);
+
+    //         vm.prank(users[i]);
+    //         sNOMA.approve(address(staking), type(uint256).max);
+    //         staking.unstake(users[i]);
+
+    //         assertEq(sNOMA.balanceOf(users[i]), 0, "sNOMA balance should be 0 after unstake");
+    //         assertEq(NOMA.balanceOf(users[i]), NOMABalanceBefore + sNOMABalanceBefore, "NOMA balance incorrect after unstake");
+    //     }
+
+    //     // Check if staking contract has enough NOMA to cover all unstakes
+    //     uint256 circulatingSupply = sNOMA.totalSupply() - sNOMA.balanceOf(address(staking));
+    //     uint256 stakingNOMABalance = NOMA.balanceOf(address(staking));
+    //     uint256 initialStakingBalance = sNOMA.balanceForGons(INITIAL_FRAGMENTS_SUPPLY);
+    //     uint256 availableNOMA = stakingNOMABalance > initialStakingBalance ? stakingNOMABalance - initialStakingBalance : 0;
+
+    //     // console.log("Circulating sNOMA supply:", circulatingSupply);
+    //     // console.log("Staking contract NOMA balance:", stakingNOMABalance);
+    //     // console.log("Initial staking balance (in current sNOMA terms):", initialStakingBalance);
+    //     // console.log("Available NOMA for unstaking:", availableNOMA);
+
+    //     assertGe(availableNOMA, circulatingSupply, "Staking contract should have enough NOMA to cover all circulating sNOMA");
+    // }
+
     function testBuyTokens() public {
         vm.recordLogs();
         vm.startBroadcast(privateKey);
@@ -138,19 +194,19 @@ contract Invariants is Test {
         IWETH(WETH).deposit{ value:  tradeAmount * numTrades}();
         IWETH(WETH).transfer(idoManager, tradeAmount * numTrades);
 
-        uint256 tokenBalanceBefore = noma.balanceOf(address(deployer));
+        uint256 tokenBalanceBefore = NOMA.balanceOf(address(deployer));
 
         for (uint i = 0; i < numTrades; i++) {
             spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
 
             managerContract.buyTokens(spotPrice, tradeAmount, address(deployer));
-            uint256 tokenBalanceAfter = noma.balanceOf(address(deployer));
+            uint256 tokenBalanceAfter = NOMA.balanceOf(address(deployer));
             
             uint256 receivedAmount = tokenBalanceAfter > tokenBalanceBefore 
                 ? tokenBalanceAfter - tokenBalanceBefore
                 : 0;
 
-            console.log("Traded %s Ethereum, received %s tokens", (i + 1) * tradeAmount, receivedAmount);
+            // console.log("Traded %s Ethereum, received %s tokens", (i + 1) * tradeAmount, receivedAmount);
 
         }
         vm.stopBroadcast();
@@ -175,7 +231,7 @@ contract Invariants is Test {
         IWETH(WETH).deposit{ value:  tradeAmountWETH * totalTradesBuy}();
         IWETH(WETH).transfer(idoManager, tradeAmountWETH * totalTradesBuy);
 
-        uint256 tokenBalanceBefore = noma.balanceOf(address(deployer));
+        uint256 tokenBalanceBefore = NOMA.balanceOf(address(deployer));
         console.log("Token balance before buying is %s", tokenBalanceBefore);
 
         for (uint i = 0; i < totalTradesBuy; i++) {
@@ -191,10 +247,10 @@ contract Invariants is Test {
         spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
         console.log("Spot price is: ", spotPrice);
 
-        uint256 tokenBalanceBeforeSelling = noma.balanceOf(address(deployer));
+        uint256 tokenBalanceBeforeSelling = NOMA.balanceOf(address(deployer));
         console.log("Token balance before selling is %s", tokenBalanceBeforeSelling);
 
-        noma.transfer(idoManager, tokenBalanceBeforeSelling);
+        NOMA.transfer(idoManager, tokenBalanceBeforeSelling);
 
         (sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
         spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
@@ -220,7 +276,7 @@ contract Invariants is Test {
         IWETH(WETH).deposit{ value: (tradeAmount * totalTrades)}();
         IWETH(WETH).transfer(idoManager, tradeAmount * totalTrades);
 
-        uint256 tokenBalanceBefore = noma.balanceOf(address(this));
+        uint256 tokenBalanceBefore = NOMA.balanceOf(address(this));
         uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault));
         console.log("Circulating supply is: ", circulatingSupplyBefore);
 
@@ -356,13 +412,12 @@ contract Invariants is Test {
         if (liquidityRatio < 0.98e18) {
             console.log("Attempt to shift positions");
             IVault(address(vault)).shift();
-        }  
-        // testLargePurchaseTriggerShift();
+        }
         
-        uint256 tokenBalanceBeforeSelling = noma.balanceOf(address(this));
+        uint256 tokenBalanceBeforeSelling = NOMA.balanceOf(address(this));
         console.log("Token balance before selling is %s", tokenBalanceBeforeSelling);
 
-        noma.transfer(idoManager, tokenBalanceBeforeSelling);
+        NOMA.transfer(idoManager, tokenBalanceBeforeSelling);
 
         (sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
         spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
@@ -401,7 +456,6 @@ contract Invariants is Test {
         BaseVault vault = managerContract.vault();
         address pool = address(vault.pool());
 
-        // To guarantee solvency, Noma ensures that capacity > circulating supply each liquidity is deployed.
 
         uint256 circulatingSupply = modelHelper.getCirculatingSupply(pool, address(vault));
         console.log("Circulating supply is: ", circulatingSupply);
@@ -424,7 +478,7 @@ contract Invariants is Test {
         console.log("Anchor capacity + floor balance is: ", anchorCapacity + floorBalance);
         console.log("Circulating supply is: ", circulatingSupply);
 
-        
+        // To guarantee solvency, Noma ensures that capacity > circulating supply each liquidity is deployed.
         require(anchorCapacity + floorCapacity > circulatingSupply, "Insolvency invariant failed");
     }
 
@@ -432,31 +486,4 @@ contract Invariants is Test {
     //     return IVault(vault).getPositions();
     // }
     
-}
-
-library Utils {
-    function testLessThan(uint256 a, uint256 b) public {
-        // Use require to assert 'a' is less than 'b' with a custom error message
-        require(a <= b, "Value 'a' should be less than 'b'.");
-    } 
-    
-    function _uint2str(uint256 _i) internal pure returns (string memory _uintAsString) {
-        if (_i == 0) return "0";
-        uint256 j = _i;
-        uint256 len;
-        while (j != 0) {
-            len++;
-            j /= 10;
-        }
-        bytes memory bstr = new bytes(len);
-        uint256 k = len;
-        while (_i != 0) {
-            k = k - 1;
-            uint8 temp = (48 + uint8(_i - (_i / 10) * 10));
-            bytes1 b1 = bytes1(temp);
-            bstr[k] = b1;
-            _i /= 10;
-        }
-        return string(bstr);
-    }    
 }

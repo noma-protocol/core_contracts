@@ -12,7 +12,7 @@ import {Utils} from "../src/libraries/Utils.sol";
 import {Conversions} from "../src/libraries/Conversions.sol";
 import {Underlying } from  "../src/libraries/Underlying.sol";
 import {DecimalMath} from "../src/libraries/DecimalMath.sol";
-import {LiquidityType, LiquidityPosition} from "../src/Types.sol";
+import {LiquidityType, LiquidityPosition} from "../src/types/Types.sol";
 
 interface IWETH {
     function balanceOf(address account) external view returns (uint256);
@@ -35,7 +35,8 @@ contract LendingVaultTest is Test {
     address WETH = 0xAaE73BfC17EC6CF6417cD7f15cf86F9AEbc33Edc;
     address payable idoManager = payable(0x4ff2d7eAf57E8a87e89436A4DCab3e05686fc501);
     address nomaToken = 0x71928Dd90031aB5Bb11d4765361c30958ecd4143;
-    address deployerContract = 0xc11FeB4A3B79a73CA4f4F3C4B6e757eDB8D19830;
+    address sNomaToken = 0x18Bb36A90984B43e8c5c07F461720394bA533134;
+    address deployerContract = 0x5EAC2ffAF4242b7099852EB96F585aBEdc37Cbe1;
     address vaultAddress;
 
     uint256 MAX_INT = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
@@ -185,7 +186,7 @@ contract LendingVaultTest is Test {
             IVault(address(vault)).shift();
             nextFloorPrice = getNextFloorPrice(pool, address(vault));
             console.log("Next floor price (after shift) is: ", nextFloorPrice);
-            // solvencyInvariant();
+            solvencyInvariant();
         } else {
             revert(
                 string(
@@ -212,5 +213,35 @@ contract LendingVaultTest is Test {
         uint256 scaledPercentage = percentage * 10**12; 
         fees = (borrowAmount * scaledPercentage * (duration / SECONDS_IN_DAY)) / (100 * 10**18);
     }    
+    
+    function solvencyInvariant() public view {
+        IDOManager managerContract = IDOManager(idoManager);
+        BaseVault vault = managerContract.vault();
+        address pool = address(vault.pool());
 
+
+        uint256 circulatingSupply = modelHelper.getCirculatingSupply(pool, address(vault));
+        console.log("Circulating supply is: ", circulatingSupply);
+
+        uint256 intrinsicMinimumValue = modelHelper.getIntrinsicMinimumValue(address(vault));
+        
+        LiquidityPosition[3] memory positions = vault.getPositions();
+        uint256 anchorCapacity = modelHelper.getPositionCapacity(pool, address(vault), positions[1], LiquidityType.Anchor);
+        (,,,uint256 floorBalance) = Underlying.getUnderlyingBalances(pool, address(vault), positions[0]);
+        
+        uint256 floorCapacity = DecimalMath.divideDecimal(
+            floorBalance, 
+            intrinsicMinimumValue
+        );
+
+        console.log("IMV is: ", intrinsicMinimumValue);
+        console.log("Anchor capacity is: ", anchorCapacity);
+        console.log("Floor balance is: ", floorBalance);
+        console.log("Floor capacity is: ", floorCapacity);
+        console.log("Anchor capacity + floor balance is: ", anchorCapacity + floorBalance);
+        console.log("Circulating supply is: ", circulatingSupply);
+
+        // To guarantee solvency, Noma ensures that capacity > circulating supply each liquidity is deployed.
+        require(anchorCapacity + floorCapacity > circulatingSupply, "Insolvency invariant failed");
+    }
 }
