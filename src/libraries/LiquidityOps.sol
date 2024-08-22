@@ -24,7 +24,7 @@ import {
     ShiftParameters,
     ProtocolAddresses,
     PreShiftParameters
-} from "../Types.sol";
+} from "../types/Types.sol";
 
 interface IVault {
     function updatePositions(LiquidityPosition[3] memory newPositions) external;

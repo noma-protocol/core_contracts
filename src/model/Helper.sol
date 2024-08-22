@@ -20,7 +20,7 @@ import {
     LiquidityType,
     TokenInfo,
     VaultInfo
-} from "../Types.sol";
+} from "../types/Types.sol";
 
 error AlreadyInitialized();
 error InvalidCaller();
@@ -223,6 +223,16 @@ contract ModelHelper {
             floorBalance, 
             intrinsicMinimumValue
         );
+
+        // revert(
+        //     string(
+        //         abi.encodePacked(
+        //             "enforceSolvencyInvariant: ", 
+        //             "Sum=", Utils._uint2str(uint256(anchorCapacity + floorCapacity)),
+        //             ", circulatingSupply=", Utils._uint2str(circulatingSupply)
+        //         )
+        //     )
+        // );
 
         // To guarantee solvency, Noma ensures that capacity > circulating supply each liquidity is deployed.
         require(anchorCapacity + floorCapacity > circulatingSupply, "Insolvency invariant failed");

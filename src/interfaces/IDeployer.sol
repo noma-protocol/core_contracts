@@ -6,7 +6,7 @@ import {
     AmountsToMint,
     LiquidityType,
     ProtocolAddresses
-} from "../Types.sol";
+} from "../types/Types.sol";
 
 interface IDeployer {
     function deployFloor(uint256 _floorPrice) external;

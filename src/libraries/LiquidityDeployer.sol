@@ -22,7 +22,7 @@ import {
     LiquidityType, 
     DeployLiquidityParameters, 
     AmountsToMint
-} from "../Types.sol";
+} from "../types/Types.sol";
 
 library LiquidityDeployer {
     
@@ -83,7 +83,7 @@ library LiquidityDeployer {
             upperTick,
             LiquidityType.Anchor,
             AmountsToMint({
-                amount0: 5_000_000e18,
+                amount0: 5_250_000e18,
                 amount1: 0
             })
         );
@@ -154,13 +154,6 @@ library LiquidityDeployer {
             (int24 lowerTick, int24 upperTick) = 
             Conversions.computeSingleTick(
                 newFloorPrice > 1 ? newFloorPrice : 
-                // Conversions
-                // .sqrtPriceX96ToPrice(
-                //     Conversions
-                //     .tickToSqrtPriceX96(
-                //         floorPosition.lowerTick
-                //     ), 
-                // 18),
                 currentFloorPrice,
                 60
             );

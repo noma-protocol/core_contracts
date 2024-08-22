@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
-import {LiquidityPosition} from "../Types.sol";
+import {LiquidityPosition} from "../types/Types.sol";
 
 interface IVault  {
     function getPositions() external view returns (LiquidityPosition[3] memory);

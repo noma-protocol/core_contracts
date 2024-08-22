@@ -17,7 +17,7 @@ import {
     LiquidityPosition, 
     LiquidityType,
     ProtocolAddresses
-} from "../Types.sol";
+} from "../types/Types.sol";
 
 interface IERC20 {
     function balanceOf(address account) external view returns (uint256);
@@ -240,7 +240,6 @@ contract StakingVault is BaseVault {
             IModelHelper(_v.modelHelper)
             .enforceSolvencyInvariant(address(this));   
         }
-      
     }
 
     function getFunctionSelectors() external pure  override returns (bytes4[] memory) {

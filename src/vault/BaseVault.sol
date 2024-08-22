@@ -16,7 +16,7 @@ import {
     TokenInfo,
     ProtocolAddresses,
     VaultInfo
-} from "../Types.sol";
+} from "../types/Types.sol";
 
 import "../libraries/DecimalMath.sol"; 
 

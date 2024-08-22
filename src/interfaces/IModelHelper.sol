@@ -6,7 +6,7 @@ import {
     LiquidityType,
     TokenInfo,
     VaultInfo
-} from "../Types.sol";
+} from "../types/Types.sol";
 
 interface IModelHelper{
     function getLiquidityRatio(address pool, address vault) external view returns (uint256 liquidityRatio);
@@ -17,4 +17,5 @@ interface IModelHelper{
     function updatePositions(LiquidityPosition[3] memory _positions) external;
     function getExcessReserveBalance(address pool, address vault, bool isToken0) external view returns (uint256);
     function getIntrinsicMinimumValue(address _vault) external view returns (uint256);
+    function enforceSolvencyInvariant(address _vault) external view;
 }

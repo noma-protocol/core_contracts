@@ -16,7 +16,7 @@ import {
     LiquidityPosition, 
     LiquidityType,
     ProtocolAddresses
-} from "../Types.sol";
+} from "../types/Types.sol";
 
 interface IERC20 {
     function balanceOf(address account) external view returns (uint256);

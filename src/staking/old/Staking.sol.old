@@ -1,0 +1,143 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.23;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+interface IRewardEscrow {
+    function createEscrowEntries(address user, uint256[] calldata amounts, uint256[] calldata releaseTimes) external;
+}
+
+contract Staking is Ownable {
+    using SafeERC20 for IERC20;
+
+    IERC20 public nomaToken;
+    IRewardEscrow public rewardEscrow;
+
+    uint256 public totalStaked;
+    uint256 public rewardRate;
+    uint256 public lastUpdateTime;
+    uint256 public rewardPerTokenStored;
+
+    mapping(address => uint256) public stakedAmounts;
+    mapping(address => uint256) public userRewardPerTokenPaid;
+    mapping(address => uint256) public rewardBalances;
+
+    event Staked(address indexed user, uint256 amount);
+    event Unstaked(address indexed user, uint256 amount);
+    event RewardAdded(uint256 reward);
+    event RewardPaid(address indexed user, uint256 reward);
+
+    bool public initialized;
+    bool public escrowActivated;
+
+    constructor(address _owner, address _nomaToken) Ownable(_owner) {
+        nomaToken = IERC20(_nomaToken);
+        initialized = false;
+        lastUpdateTime = block.timestamp; // Ensure lastUpdateTime is initialized
+    }
+
+    function setup(address _owner, address _nomaToke, address _rewardEscrow) external onlyOwner {
+        require(!initialized, "Already initialized");
+        transferOwnership(_owner);
+        nomaToken = IERC20(_nomaToken);
+        rewardEscrow = IRewardEscrow(_rewardEscrow);
+        initialized = true;
+    }
+
+    modifier updateReward(address account) {
+        rewardPerTokenStored = rewardPerToken();
+        lastUpdateTime = block.timestamp;
+        if (account != address(0)) {
+            rewardBalances[account] = earned(account);
+            userRewardPerTokenPaid[account] = rewardPerTokenStored;
+        }
+        _;
+    }
+
+    function rewardPerToken() public view returns (uint256) {
+        if (totalStaked == 0) {
+            return rewardPerTokenStored;
+        }
+        return rewardPerTokenStored + ((block.timestamp - lastUpdateTime) * rewardRate * 1e18) / totalStaked;
+    }
+
+    function earned(address account) public view returns (uint256) {
+        return (stakedAmounts[account] * (rewardPerToken() - userRewardPerTokenPaid[account])) / 1e18 + rewardBalances[account];
+    }
+
+    function stake(uint256 amount) external updateReward(msg.sender) {
+        require(amount > 0, "Cannot stake 0");
+        require(initialized, "Not initialized");
+
+        nomaToken.safeTransferFrom(msg.sender, address(this), amount);
+
+        totalStaked += amount;
+        stakedAmounts[msg.sender] += amount;
+
+        emit Staked(msg.sender, amount);
+    }
+
+    function unstake(uint256 amount) external updateReward(msg.sender) {
+        require(stakedAmounts[msg.sender] >= amount, "Insufficient staked amount");
+
+        nomaToken.safeTransfer(msg.sender, amount);
+
+        totalStaked -= amount;
+        stakedAmounts[msg.sender] -= amount;
+
+        emit Unstaked(msg.sender, amount);
+    }
+
+    function notifyRewardAmount(uint256 rewardAmount) external onlyOwner updateReward(address(0)) {
+        require(rewardAmount > 0, "Cannot notify 0 rewards");
+        require(initialized, "Not initialized");
+
+        nomaToken.safeTransferFrom(msg.sender, address(this), rewardAmount);
+
+        uint256 timeSinceLastUpdate = block.timestamp - lastUpdateTime;
+        if (timeSinceLastUpdate == 0) {
+            timeSinceLastUpdate = 1; 
+        }
+        rewardRate = rewardAmount / timeSinceLastUpdate;
+
+        rewardPerTokenStored = rewardPerToken();
+        lastUpdateTime = block.timestamp;
+        emit RewardAdded(rewardAmount);
+    }
+
+    function claimRewards() external updateReward(msg.sender) {
+        uint256 totalReleased = rewardBalances[msg.sender];
+        require(totalReleased > 0, "No rewards to claim");
+
+        if (escrowActivated) {
+            uint256[] memory amounts = new uint256[](3);
+            uint256[] memory releaseTimes = new uint256[](3);
+
+            amounts[0] = totalReleased.div(3);
+            amounts[1] = totalReleased.div(3);
+            amounts[2] = totalReleased.sub(amounts[0]).sub(amounts[1]);
+
+            releaseTimes[0] = block.timestamp + 30 days;
+            releaseTimes[1] = block.timestamp + 60 days;
+            releaseTimes[2] = block.timestamp + 90 days;
+
+            nomaToken.approve(address(rewardEscrow), totalReleased);
+            rewardEscrow.createEscrowEntries(msg.sender, amounts, releaseTimes);
+            
+            totalReleased = 0;
+        }
+
+        if (totalReleased > 0) {
+            rewardBalances[msg.sender] = 0;
+            nomaToken.safeTransfer(msg.sender, totalReleased);
+            emit RewardPaid(msg.sender, totalReleased);
+        }
+        
+    }
+
+    function setEscrowFlag(bool _flag) external onlyOwner {
+        escrowActivated = _flag;
+    }
+}

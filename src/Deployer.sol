@@ -21,7 +21,7 @@ import {
     LiquidityType, 
     DeployLiquidityParameters,
     ProtocolAddresses
-} from "./Types.sol";
+} from "./types/Types.sol";
 
 interface IVault {
     function initializeLiquidity(

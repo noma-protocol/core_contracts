@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {LiquidityAmounts} from "@uniswap/v3-periphery/libraries/LiquidityAmounts.sol";
-import {LiquidityPosition} from "../Types.sol";
+import {LiquidityPosition} from "../types/Types.sol";
 import {FullMath} from '@uniswap/v3-core/libraries/FullMath.sol';
 import {TickMath} from '@uniswap/v3-core/libraries/TickMath.sol';
 

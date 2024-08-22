@@ -13,12 +13,15 @@ contract MockNomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, U
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         _mint(deployer, totalSupply);
-        // super.transferOwnership(address(owner()));
     }
 
-    // function transferOwnership(address _owner) public override onlyOwner {
-    //     super.transferOwnership(address(owner()));
-    // }
+    function mint(address _recipient, uint256 _amount) public /*onlyOwner*/ {
+        _mint(_recipient, _amount);
+    }
+    
+    function mintTo(address to, uint256 amount) external /*onlyOwner*/  {
+        _mint(to, amount);
+    }
 
     function _authorizeUpgrade(address newImplementation) internal override /*onlyOwner*/ {}
 
@@ -34,4 +37,7 @@ contract MockNomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, U
         super.transferOwnership(_owner);
     }
 
+    function renounceOwnership() public override onlyOwner {
+        renounceOwnership();
+    }
 }

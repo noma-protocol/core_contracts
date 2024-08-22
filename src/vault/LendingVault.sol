@@ -17,7 +17,7 @@ import {
     LiquidityType,
     ProtocolAddresses,
     LoanPosition
-} from "../Types.sol";
+} from "../types/Types.sol";
 
 interface IERC20 {
     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);

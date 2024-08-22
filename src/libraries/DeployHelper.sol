@@ -16,7 +16,7 @@ import {DecimalMath} from "./DecimalMath.sol";
 import {
     LiquidityPosition, 
     LiquidityType 
-} from "../Types.sol";
+} from "../types/Types.sol";
 
 
 library DeployHelper {
@@ -39,7 +39,7 @@ library DeployHelper {
             sqrtRatioX96,
             TickMath.getSqrtRatioAtTick(lowerTick),
             TickMath.getSqrtRatioAtTick(upperTick),
-            375000 ether,
+            8_750_000e18,
             0 
         );
 

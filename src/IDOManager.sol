@@ -17,7 +17,7 @@ import {BaseVault} from "./vault/BaseVault.sol";
 import {MockNomaToken} from "./token/MockNomaToken.sol";
 import {Conversions} from "./libraries/Conversions.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {feeTier, tickSpacing, LiquidityPosition, LiquidityType, TokenInfo} from "./Types.sol";
+import {feeTier, tickSpacing, LiquidityPosition, LiquidityType, TokenInfo} from "./types/Types.sol";
 import {Uniswap} from "./libraries/Uniswap.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
@@ -78,7 +78,6 @@ contract IDOManager is Owned {
         address _deployer,
         address _uniswapFactory, 
         address _modelHelper,
-        address _token1,
         uint256 _totalSupply, 
         uint16 _percentageForSale
     ) Owned(_deployer) { 
@@ -89,16 +88,15 @@ contract IDOManager is Owned {
         );
 
         totalSupply = _totalSupply;
-        launchSupply = totalSupply * _percentageForSale / 100;   
+        launchSupply = (totalSupply * _percentageForSale) / 100;   
 
-        // Dev: force desired token order on Uniswap V3
+        // Force desired token order on Uniswap V3
         uint256 nonce = 0;
         MockNomaToken amphorToken;
 
         // Encode the initialize function call
         bytes memory data = abi.encodeWithSelector(
             amphorToken.initialize.selector,
-            // address(this),  // owner address
             address(this),  // Deployer address
             totalSupply     // Initial supply
         );
@@ -268,42 +266,42 @@ contract IDOManager is Owned {
         );        
     }
 
-    function collectIDOFunds(address receiver) public {
-        require(initialized, "not initialized");
+    // function collectIDOFunds(address receiver) public {
+    //     require(initialized, "not initialized");
 
-        uint256 balanceBeforeSwap = ERC20(tokenInfo.token1).balanceOf(address(this));
+    //     uint256 balanceBeforeSwap = ERC20(tokenInfo.token1).balanceOf(address(this));
 
-        bytes32 IDOPositionId = keccak256(
-            abi.encodePacked(
-                address(this), 
-                IDOPosition.lowerTick, 
-                IDOPosition.upperTick
-            )
-        );
+    //     bytes32 IDOPositionId = keccak256(
+    //         abi.encodePacked(
+    //             address(this), 
+    //             IDOPosition.lowerTick, 
+    //             IDOPosition.upperTick
+    //         )
+    //     );
 
-        (uint128 liquidity,,,,) = pool.positions(IDOPositionId);
+    //     (uint128 liquidity,,,,) = pool.positions(IDOPositionId);
 
-        if (liquidity > 0) {
-            Uniswap.burn(
-                address(pool),
-                address(this),
-                IDOPosition.lowerTick, 
-                IDOPosition.upperTick,
-                liquidity
-            );
-        } else {
-            revert("collectWETH: liquidity is 0");
-        }
+    //     if (liquidity > 0) {
+    //         Uniswap.burn(
+    //             address(pool),
+    //             address(this),
+    //             IDOPosition.lowerTick, 
+    //             IDOPosition.upperTick,
+    //             liquidity
+    //         );
+    //     } else {
+    //         revert("collectWETH: liquidity is 0");
+    //     }
 
-        uint256 balanceAfterSwap = ERC20(tokenInfo.token1).balanceOf(address(this));
-        require(balanceAfterSwap > balanceBeforeSwap, "no tokens exchanged");
+    //     uint256 balanceAfterSwap = ERC20(tokenInfo.token1).balanceOf(address(this));
+    //     require(balanceAfterSwap > balanceBeforeSwap, "no tokens exchanged");
         
-        // Send left over token0 to contract owner
-        ERC20(tokenInfo.token0).transfer(owner, ERC20(tokenInfo.token0).balanceOf(address(this)));
+    //     // Send left over token0 to contract owner
+    //     ERC20(tokenInfo.token0).transfer(owner, ERC20(tokenInfo.token0).balanceOf(address(this)));
 
-        // Send token1 to receiver (Deployer contract)
-        ERC20(tokenInfo.token1).transfer(receiver, ERC20(tokenInfo.token1).balanceOf(address(this)));
-    }
+    //     // Send token1 to receiver (Deployer contract)
+    //     ERC20(tokenInfo.token1).transfer(receiver, ERC20(tokenInfo.token1).balanceOf(address(this)));
+    // }
 
     // Test function
     function buyTokens(uint256 price, uint256 amount, address receiver) public {
@@ -384,8 +382,6 @@ contract IDOManager is Owned {
         }
     }
 
-
-
     receive() external payable {
 
         uint256 balanceBefore = ERC20(tokenInfo.token1).balanceOf(address(this));
@@ -393,9 +389,14 @@ contract IDOManager is Owned {
         IWETH(tokenInfo.token1).deposit{value: msg.value}();
 
         uint256 balanceAfter = ERC20(tokenInfo.token1).balanceOf(address(this));
-        uint256 excessAmount = balanceAfter - balanceBefore;
+        uint256 excessAmount;
+         
+        if (balanceAfter > balanceBefore) {
+            excessAmount = balanceAfter - balanceBefore;
+        }
 
-        ERC20(tokenInfo.token1).transfer(owner, excessAmount);
+        if (excessAmount > 0)
+            ERC20(tokenInfo.token1).transfer(owner, excessAmount);
     }
 
 }

@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
-import {LiquidityType} from "../Types.sol";
+import {LiquidityType} from "../types/Types.sol";
 // import {Utils} from "./Utils.sol";
 
 library Uniswap {
