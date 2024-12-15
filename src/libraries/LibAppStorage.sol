@@ -6,6 +6,18 @@ pragma solidity ^0.8.0;
 import { IUniswapV3Pool } from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { TokenInfo, LiquidityPosition, LoanPosition } from "../types/Types.sol";
+import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
+
+/**
+ * @notice Storage structure for resolver-related information.
+ */
+struct ResolverStorage {
+    IAddressResolver resolver;
+    mapping(bytes32 => address) addressCache;
+    mapping(bytes32 => address) repository;
+    mapping(bytes32 => uint256) uintSettings;
+}
+
 /**
  * @notice Storage structure for token-related information.
  */
