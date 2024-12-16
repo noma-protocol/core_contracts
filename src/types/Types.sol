@@ -78,6 +78,16 @@ struct VaultInfo {
     uint256 newFloor;
 }
 
+struct VaultDeployParameters {
+    bytes32 _name;
+    bytes32 _symbol;
+    uint8 _decimals;
+    uint256 _totalSupply;
+    uint16 _percentageForSale;
+    uint256 _IDOPrice;
+    address token1;
+}
+
 struct VaultDescription {
     bytes32 tokenName;
     bytes32 tokenSymbol;
