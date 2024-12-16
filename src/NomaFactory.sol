@@ -6,24 +6,24 @@ import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/I
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import { NomaFactoryStorage, ResolverStorage, VaultDescription } from "./libraries/LibAppStorage.sol";
-import { IAddressResolver } from "./interfaces/IAddressResolver.sol";
-import { MockNomaToken } from "./token/MockNomaToken.sol";
+import { IUniswapV3Factory } from "@uniswap/v3-core/interfaces/IUniswapV3Factory.sol";
+import { IUniswapV3Pool } from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
+import { LiquidityAmounts } from "@uniswap/v3-periphery/libraries/LiquidityAmounts.sol";
 
-import { Diamond } from "./Diamond.sol";
-import { DiamondInit } from "./init/DiamondInit.sol";
-import { OwnershipFacet } from "./facets/OwnershipFacet.sol";
-import { DiamondCutFacet } from "./facets/DiamondCutFacet.sol";
+import { NomaFactoryStorage, VaultDescription } from "./libraries/LibAppStorage.sol";
+import { Conversions } from "./libraries/Conversions.sol";
+import { Utils } from "../src/libraries/Utils.sol";
+import { IAddressResolver } from "./interfaces/IAddressResolver.sol";
 import { IDiamondCut } from "./interfaces/IDiamondCut.sol";
 import { IFacet } from "./interfaces/IFacet.sol";
 import { IDiamond } from "./interfaces/IDiamond.sol";
 import { BaseVault } from "./vault/BaseVault.sol";
 
-import { IUniswapV3Factory } from "@uniswap/v3-core/interfaces/IUniswapV3Factory.sol";
-import { IUniswapV3Pool } from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
-import { LiquidityAmounts } from "@uniswap/v3-periphery/libraries/LiquidityAmounts.sol";
-
-import {Conversions} from "./libraries/Conversions.sol";
+import { MockNomaToken } from "./token/MockNomaToken.sol";
+import { Diamond } from "./Diamond.sol";
+import { DiamondInit } from "./init/DiamondInit.sol";
+import { OwnershipFacet } from "./facets/OwnershipFacet.sol";
+import { DiamondCutFacet } from "./facets/DiamondCutFacet.sol";
 
 import {
     feeTier, 
@@ -32,6 +32,11 @@ import {
     LiquidityType, 
     VaultDeployParams
 } from "./types/Types.sol";
+
+interface IVaultUpgrade {
+    function doUpgradeStart(address diamond, address _vaultUpgradeFinalize) external;
+    function doUpgradeFinalize(address diamond) external;
+}
 
 contract NomaFactory {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -42,67 +47,67 @@ contract NomaFactory {
     DiamondInit dInit;
 
     NomaFactoryStorage internal _n;
-    ResolverStorage internal _r;
     
-    address private vaultUpgrade;
-    address private vaultUpgradeFinalize;
-
     constructor(
         address _uniswapV3Factory,
         address _resolver 
     ) {
         _n.authority = msg.sender;
         _n.uniswapV3Factory = _uniswapV3Factory;
-        _r.resolver = IAddressResolver(_resolver);
+        _n.resolver = IAddressResolver(_resolver);
     }
 
     function deployVault(
         VaultDeployParams memory _params
-    ) external {
+    ) external returns (address) {
         _validateToken1(_params.token1);
+
+        address modelHelper = _n.resolver
+        .requireAndGetAddress(
+            Utils.stringToBytes32("ModelHelper"), 
+            "no modelHelper"
+        );
+
+        address vaultUpgradeFinalize = _n.resolver
+        .requireAndGetAddress(
+            Utils.stringToBytes32("VaultUpgradeFinalize"), 
+            "no vaultUpgradeFinalize"
+        );
 
         uint256 _launchSupply = _params._totalSupply * _params._percentageForSale / 100;
 
-        // Force desired token order on Uniswap V3
-        uint256 nonce = 0;
-        MockNomaToken nomaToken;
-
-        // Encode the initialize function call
-        bytes memory data = abi.encodeWithSelector(
-            nomaToken.initialize.selector,
-            address(this),          // Deployer address
-            _params._totalSupply    // Initial supply
+        (MockNomaToken nomaToken, ERC1967Proxy proxy) = _deployNomaToken(
+            _params.token1, 
+            _params._totalSupply
         );
-
-        do {
-            nomaToken = new MockNomaToken{salt: bytes32(nonce)}();            
-            nonce++;
-        } while (address(nomaToken) >= _params.token1);
-
-        require(address(nomaToken) < _params.token1, "invalid token address");
-
-        uint256 totalSupplyFromContract = nomaToken.totalSupply();
-
-        require(totalSupplyFromContract == _params._totalSupply, "wrong parameters");
-
-        // Deploy the proxy contract
-        ERC1967Proxy proxy = new ERC1967Proxy(
-            address(nomaToken),
-            data
-        );      
-
-        require(address(proxy) != address(0), "Token deploy failed");
-
-        nomaToken.initialize(address(this), _params._totalSupply);
 
         // Set authority for future upgrades
         MockNomaToken(address(proxy)).setOwner(msg.sender);
 
         IUniswapV3Factory factory = IUniswapV3Factory(_n.uniswapV3Factory);
-        IUniswapV3Pool pool = _deployPool(address(proxy), _params.token1);
+        
+        IUniswapV3Pool pool = _deployPool(
+            address(proxy), 
+            _params.token1
+        );
 
-        address vaultAddress = _preDeployVault();
+        (address vaultAddress, address vaultUpgrade) = _preDeployVault();
         BaseVault vault = BaseVault(vaultAddress);
+
+        IVaultUpgrade(vaultUpgrade)
+        .doUpgradeStart(
+            vaultAddress, 
+            vaultUpgradeFinalize
+        );
+
+        _initializeVault(
+            vaultAddress, 
+            address(pool), 
+            _params.token1, 
+            modelHelper, 
+            vaultUpgrade, 
+            vaultUpgradeFinalize
+        );
 
        _n.vaultsRepository[address(proxy)] = 
         VaultDescription({
@@ -117,6 +122,68 @@ contract NomaFactory {
 
         _n.deployers.add(msg.sender);
         _n.totalVaults += 1;
+
+        return vaultAddress;
+    }
+    
+    function _deployNomaToken(
+        address _token1,
+        uint256 _totalSupply
+    ) internal returns (MockNomaToken, ERC1967Proxy) {
+        
+        // Force desired token order on Uniswap V3
+        uint256 nonce = 0;
+
+        MockNomaToken nomaToken;
+
+        // Encode the initialize function call
+        bytes memory data = abi.encodeWithSelector(
+            nomaToken.initialize.selector,
+            address(this),  // Deployer address
+            _totalSupply    // Initial supply
+        );
+
+        do {
+            nomaToken = new MockNomaToken{salt: bytes32(nonce)}();            
+            nonce++;
+        } while (address(nomaToken) >= _token1);
+
+        nomaToken.initialize(address(this), _totalSupply);
+
+        require(address(nomaToken) < _token1, "invalid token address");
+
+        uint256 totalSupplyFromContract = nomaToken.totalSupply();
+
+        require(totalSupplyFromContract == _totalSupply, "wrong parameters");
+
+        // Deploy the proxy contract
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(nomaToken),
+            data
+        );      
+
+        require(address(proxy) != address(0), "Token deploy failed");
+
+        return (nomaToken, proxy);
+    }
+
+    function _initializeVault(
+        address _vault,
+        address _token0,
+        address _token1,
+        address _modelHelper,
+        address _vaultUpgrade,
+        address _vaultUpgradeFinalize
+    ) internal {
+        BaseVault vault = BaseVault(_vault);
+        vault.initialize(
+            msg.sender, 
+            _token0, 
+            _modelHelper, 
+            _vaultUpgrade, 
+            _token1, 
+            _vaultUpgradeFinalize
+        );
     }
 
     function _deployPool(address token0, address token1) internal returns (IUniswapV3Pool) {
@@ -127,7 +194,11 @@ contract NomaFactory {
 
         if (address(pool) == address(0)) {
             pool = IUniswapV3Pool(
-                factory.createPool(token0, token1, feeTier)
+                factory.createPool(
+                    token0, 
+                    token1, 
+                    feeTier
+                )
             );
         }
 
@@ -136,7 +207,7 @@ contract NomaFactory {
 
     function _preDeployVault()
         internal
-        returns (address vault)
+        returns (address vault, address vaultUpgrade)
     {
         //deploy facets
         dCutFacet = new DiamondCutFacet();
@@ -171,13 +242,21 @@ contract NomaFactory {
             })
         );
 
+        vaultUpgrade = _n.resolver
+        .requireAndGetAddress(
+            Utils.stringToBytes32("VaultUpgrade"), 
+            "no VaultUpgrade"
+        );
+
         //upgrade diamond
         IDiamondCut(address(diamond)).diamondCut(cut, address(0x0), "");
         IDiamond(address(diamond)).transferOwnership(vaultUpgrade);
-
+            
         //Initialization
         DiamondInit(address(diamond)).init();
         vault = address(diamond);
+
+        return (vault, vaultUpgrade);
     }
 
     function _validateToken1(address token) internal view {
@@ -192,7 +271,7 @@ contract NomaFactory {
         assembly {
             result := mload(add(symbol, 32))
         }
-        _r.resolver.requireAndGetAddress(result, "not a reserve token");
+        _n.resolver.requireAndGetAddress(result, "not a reserve token");
     }
 
     modifier isAuthority() {
