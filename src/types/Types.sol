@@ -78,6 +78,16 @@ struct VaultInfo {
     uint256 newFloor;
 }
 
+struct VaultDescription {
+    bytes32 tokenName;
+    bytes32 tokenSymbol;
+    uint8 tokenDecimals;
+    address token0;
+    address token1;
+    address deployer;
+    address vault;
+}
+
 struct PreShiftParameters {
     ProtocolAddresses addresses;
     uint256 toSkim;
