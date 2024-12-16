@@ -5,8 +5,9 @@ pragma solidity ^0.8.0;
 
 import { IUniswapV3Pool } from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { TokenInfo, LiquidityPosition, LoanPosition } from "../types/Types.sol";
+import { TokenInfo, LiquidityPosition, LoanPosition, VaultDescription } from "../types/Types.sol";
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
+import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /**
  * @notice Storage structure for resolver-related information.
@@ -19,14 +20,13 @@ struct ResolverStorage {
 }
 
 /**
- * @notice Storage structure for token-related information.
+ * @notice Storage structure for factory-related information.
  */
-struct TokenStorage {
-    uint256 initialized;
-    uint256 totalSupply;
-    mapping(address => uint256) balances;
-    mapping(address => mapping(address => uint256)) allowances;
-    mapping(address => uint256) nonces;
+struct NomaFactoryStorage {
+    VaultDescription[] vaultsDescriptions;
+    uint256 totalVaults;
+    EnumerableSet.AddressSet deployers;
+    mapping(address => EnumerableSet.AddressSet) _vaults;
 }
 
 /**
@@ -67,6 +67,17 @@ struct VaultStorage {
     // System parameters
     bool initialized; 
     uint256 lastLiquidityRatio;
+}
+
+/**
+ * @notice Storage structure for token-related information.
+ */
+struct TokenStorage {
+    uint256 initialized;
+    uint256 totalSupply;
+    mapping(address => uint256) balances;
+    mapping(address => mapping(address => uint256)) allowances;
+    mapping(address => uint256) nonces;
 }
 
 /**
