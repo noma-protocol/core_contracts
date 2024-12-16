@@ -9,24 +9,18 @@ import { TokenInfo, LiquidityPosition, LoanPosition, VaultDescription } from "..
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-/**
- * @notice Storage structure for resolver-related information.
- */
-struct ResolverStorage {
-    IAddressResolver resolver;
-    mapping(bytes32 => address) addressCache;
-    mapping(bytes32 => address) repository;
-    mapping(bytes32 => uint256) uintSettings;
-}
 
 /**
  * @notice Storage structure for factory-related information.
  */
 struct NomaFactoryStorage {
-    VaultDescription[] vaultsDescriptions;
+    IAddressResolver resolver;
+    address authority;
+    address uniswapV3Factory;
     uint256 totalVaults;
     EnumerableSet.AddressSet deployers;
     mapping(address => EnumerableSet.AddressSet) _vaults;
+    mapping(address => VaultDescription) vaultsRepository;
 }
 
 /**
@@ -101,6 +95,16 @@ library LibAppStorage {
     function vaultStorage() internal pure returns (VaultStorage storage vs) {
         assembly {
             vs.slot := keccak256(add(0x20, "noma.money.vaultstorage"), 32)
+        }
+    }
+
+    /**
+     * @notice Get the factory storage.
+     * @return fs The factory storage.
+     */
+    function factoryStorage() internal pure returns (NomaFactoryStorage storage fs) {
+        assembly {
+            fs.slot := keccak256(add(0x20, "noma.money.factorystorage"), 32)
         }
     }
 

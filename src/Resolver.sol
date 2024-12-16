@@ -4,20 +4,25 @@ pragma solidity ^0.8.20;
 import "./abstract/OwnableUninitialized.sol";
 import "./libraries/LibAppStorage.sol";
 
-contract ResolverAddress is OwnableUninitialized {
-    ResolverStorage internal rs;
+contract Resolver is OwnableUninitialized {
+    
+    IAddressResolver resolver;
+
+    mapping(bytes32 => address) addressCache;
+    mapping(bytes32 => address) repository;
+    mapping(bytes32 => uint256) uintSettings;
 
     constructor()  {
         _manager = msg.sender;
     }
 
-    function importAddresses(bytes32[] calldata names, address[] calldata destinations) external /*onlyManager*/ {
+    function importAddresses(bytes32[] calldata names, address[] calldata destinations) external onlyManager {
         require(names.length == destinations.length, "Input lengths must match");
 
         for (uint256 i = 0; i < names.length; i++) {
             bytes32 name = names[i];
             address destination = destinations[i];
-            rs.repository[name] = destination;
+            repository[name] = destination;
             emit AddressImported(name, destination);
         }
     }
@@ -30,7 +35,7 @@ contract ResolverAddress is OwnableUninitialized {
         returns (bool)
     {
         for (uint256 i = 0; i < names.length; i++) {
-            if (rs.repository[names[i]] != destinations[i]) {
+            if (repository[names[i]] != destinations[i]) {
                 return false;
             }
         }
@@ -38,11 +43,11 @@ contract ResolverAddress is OwnableUninitialized {
     }
 
     function getAddress(bytes32 name) external view returns (address) {
-        return rs.repository[name];
+        return repository[name];
     }
 
     function requireAndGetAddress(bytes32 name, string calldata reason) external view returns (address) {
-        address _foundAddress = rs.repository[name];
+        address _foundAddress = repository[name];
         require(_foundAddress != address(0), reason);
         return _foundAddress;
     }
