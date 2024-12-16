@@ -78,7 +78,7 @@ struct VaultInfo {
     uint256 newFloor;
 }
 
-struct VaultDeployParameters {
+struct VaultDeployParams {
     bytes32 _name;
     bytes32 _symbol;
     uint8 _decimals;

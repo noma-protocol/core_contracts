@@ -30,8 +30,7 @@ import {
     tickSpacing, 
     LiquidityPosition, 
     LiquidityType, 
-    TokenInfo,
-    VaultDeployParameters
+    VaultDeployParams
 } from "./types/Types.sol";
 
 contract NomaFactory {
@@ -58,7 +57,7 @@ contract NomaFactory {
     }
 
     function deployVault(
-        VaultDeployParameters memory _params
+        VaultDeployParams memory _params
     ) external {
         _validateToken1(_params.token1);
 
