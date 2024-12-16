@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import { IUniswapV3Factory } from "@uniswap/v3-core/interfaces/IUniswapV3Factory.sol";
 import { IUniswapV3Pool } from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import { LiquidityAmounts } from "@uniswap/v3-periphery/libraries/LiquidityAmounts.sol";
+import { TickMath } from '@uniswap/v3-core/libraries/TickMath.sol';
 
 import { NomaFactoryStorage, VaultDescription } from "./libraries/LibAppStorage.sol";
 import { Conversions } from "./libraries/Conversions.sol";
@@ -24,6 +25,8 @@ import { Diamond } from "./Diamond.sol";
 import { DiamondInit } from "./init/DiamondInit.sol";
 import { OwnershipFacet } from "./facets/OwnershipFacet.sol";
 import { DiamondCutFacet } from "./facets/DiamondCutFacet.sol";
+
+import { ERC20 } from "solmate/tokens/ERC20.sol";
 
 import {
     feeTier, 
@@ -119,6 +122,15 @@ contract NomaFactory {
             deployer: msg.sender,
             vault: address(0)
         });
+
+        _bootstrapLiquidity(
+            _params._IDOPrice, 
+            _launchSupply,
+            _params._totalSupply, 
+            address(proxy), 
+            address(pool), 
+            address(0)
+        );
 
         _n.deployers.add(msg.sender);
         _n.totalVaults += 1;
@@ -257,6 +269,34 @@ contract NomaFactory {
         vault = address(diamond);
 
         return (vault, vaultUpgrade);
+    }
+
+    function _bootstrapLiquidity(
+        uint256 _idoPrice,
+        uint256 _launchSupply,
+        uint256 _totalSupply,
+        address _token0,
+        address _pool, 
+        address _deployerContract
+    ) internal {
+        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(_pool).slot0();
+
+        (int24 lowerTick, int24 upperTick) = Conversions
+        .computeSingleTick(_idoPrice, tickSpacing);
+
+        uint256 amount0Max = _launchSupply;
+        uint256 amount1Max = 0;
+
+        uint128 liquidity = LiquidityAmounts
+        .getLiquidityForAmounts(
+            sqrtRatioX96,
+            TickMath.getSqrtRatioAtTick(lowerTick),
+            TickMath.getSqrtRatioAtTick(upperTick),
+            amount0Max,
+            amount1Max
+        );
+
+        ERC20(_token0).transfer(_deployerContract, _totalSupply);
     }
 
     function _validateToken1(address token) internal view {
