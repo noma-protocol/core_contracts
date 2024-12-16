@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {BaseVault} from "../vault/BaseVault.sol";
-import {ExtVault} from "../vault/ExtVault.sol"; 
-import {StakingVault} from "../vault/StakingVault.sol"; 
-import {LendingVault} from "../vault/LendingVault.sol"; 
+import {BaseVault} from "../BaseVault.sol";
+import {ExtVault} from "../ExtVault.sol"; 
+import {StakingVault} from "../StakingVault.sol"; 
+import {LendingVault} from "../LendingVault.sol"; 
 
-import {IDiamondCut} from "../interfaces/IDiamondCut.sol";
-import {IFacet} from "../interfaces/IFacet.sol";
-import {IDiamond} from "../interfaces/IDiamond.sol";
-import "../libraries/Utils.sol";
+import {IDiamondCut} from "../../interfaces/IDiamondCut.sol";
+import {IFacet} from "../../interfaces/IFacet.sol";
+import {IDiamond} from "../../interfaces/IDiamond.sol";
+import "../../libraries/Utils.sol";
 
 interface IVaultUpgrader {
     function doUpgradeStart(address diamond, address _vaultUpgradeFinalize) external;
@@ -87,6 +87,7 @@ contract VaultUpgrade {
         _;
     }
 }
+
 contract VaultUpgradeStep1  {
     address public owner;
     address public upgradePreviousStep;
