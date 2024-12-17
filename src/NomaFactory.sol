@@ -8,32 +8,19 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import { IUniswapV3Factory } from "@uniswap/v3-core/interfaces/IUniswapV3Factory.sol";
 import { IUniswapV3Pool } from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
-import { LiquidityAmounts } from "@uniswap/v3-periphery/libraries/LiquidityAmounts.sol";
-import { TickMath } from '@uniswap/v3-core/libraries/TickMath.sol';
-
 import { NomaFactoryStorage, VaultDescription } from "./libraries/LibAppStorage.sol";
 import { Conversions } from "./libraries/Conversions.sol";
 import { Utils } from "../src/libraries/Utils.sol";
 import { IAddressResolver } from "./interfaces/IAddressResolver.sol";
-import { IDiamondCut } from "./interfaces/IDiamondCut.sol";
-import { IFacet } from "./interfaces/IFacet.sol";
-import { IDiamond } from "./interfaces/IDiamond.sol";
+
 import { BaseVault } from "./vault/BaseVault.sol";
-
 import { MockNomaToken } from "./token/MockNomaToken.sol";
-import { Diamond } from "./Diamond.sol";
-import { DiamondInit } from "./init/DiamondInit.sol";
-import { OwnershipFacet } from "./facets/OwnershipFacet.sol";
-import { DiamondCutFacet } from "./facets/DiamondCutFacet.sol";
-
-import { ERC20 } from "solmate/tokens/ERC20.sol";
 
 import {
     feeTier, 
     tickSpacing, 
-    LiquidityPosition, 
-    LiquidityType, 
-    VaultDeployParams
+    VaultDeployParams,
+    VaultInitParams
 } from "./types/Types.sol";
 
 interface IVaultUpgrade {
@@ -41,13 +28,12 @@ interface IVaultUpgrade {
     function doUpgradeFinalize(address diamond) external;
 }
 
+interface IEtchVault {
+    function preDeployVault() external returns (address, address);
+}
+
 contract NomaFactory {
     using EnumerableSet for EnumerableSet.AddressSet;
-
-    Diamond diamond;
-    DiamondCutFacet dCutFacet;
-    OwnershipFacet ownerF;
-    DiamondInit dInit;
 
     NomaFactoryStorage internal _n;
     
@@ -62,7 +48,7 @@ contract NomaFactory {
 
     function deployVault(
         VaultDeployParams memory _params
-    ) external returns (address) {
+    ) external returns (address, address, address) {
         _validateToken1(_params.token1);
 
         address modelHelper = _n.resolver
@@ -77,8 +63,6 @@ contract NomaFactory {
             "no vaultUpgradeFinalize"
         );
 
-        uint256 _launchSupply = _params._totalSupply * _params._percentageForSale / 100;
-
         (MockNomaToken nomaToken, ERC1967Proxy proxy) = _deployNomaToken(
             _params.token1, 
             _params._totalSupply
@@ -90,52 +74,61 @@ contract NomaFactory {
         IUniswapV3Factory factory = IUniswapV3Factory(_n.uniswapV3Factory);
         
         IUniswapV3Pool pool = _deployPool(
+            _params._IDOPrice,
             address(proxy), 
             _params.token1
         );
 
-        (address vaultAddress, address vaultUpgrade) = _preDeployVault();
-        BaseVault vault = BaseVault(vaultAddress);
+        (address vaultAddress, address vaultUpgrade) = IEtchVault(
+            _n.resolver.requireAndGetAddress(
+                Utils.stringToBytes32("EtchVault"), 
+                "no EtchVault"
+            )
+        ).preDeployVault();
 
-        IVaultUpgrade(vaultUpgrade)
-        .doUpgradeStart(
-            vaultAddress, 
-            vaultUpgradeFinalize
-        );
+        {
+            BaseVault vault = BaseVault(vaultAddress);
 
-        _initializeVault(
-            vaultAddress, 
-            address(pool), 
-            _params.token1, 
-            modelHelper, 
-            vaultUpgrade, 
-            vaultUpgradeFinalize
-        );
+            IVaultUpgrade(vaultUpgrade)
+            .doUpgradeStart(
+                vaultAddress, 
+                vaultUpgradeFinalize
+            );
 
-       _n.vaultsRepository[address(proxy)] = 
-        VaultDescription({
-            tokenName: _params._name,
-            tokenSymbol: _params._symbol,
-            tokenDecimals: _params._decimals,
-            token0: address(proxy),
-            token1: _params.token1,
-            deployer: msg.sender,
-            vault: address(0)
-        });
+            _initializeVault(
+                vaultAddress, 
+                address(pool), 
+                _params.token1, 
+                modelHelper, 
+                vaultUpgrade, 
+                vaultUpgradeFinalize
+            );
 
-        _bootstrapLiquidity(
-            _params._IDOPrice, 
-            _launchSupply,
-            _params._totalSupply, 
-            address(proxy), 
-            address(pool), 
-            address(0)
-        );
+            _n.vaultsRepository[address(proxy)] = 
+                VaultDescription({
+                    tokenName: _params._name,
+                    tokenSymbol: _params._symbol,
+                    tokenDecimals: _params._decimals,
+                    token0: address(proxy),
+                    token1: _params.token1,
+                    deployer: msg.sender,
+                    vault: vaultAddress
+                });
 
-        _n.deployers.add(msg.sender);
-        _n.totalVaults += 1;
+            IERC20Metadata(address(proxy)).transfer(
+                _n.resolver
+                .requireAndGetAddress(
+                    Utils.stringToBytes32("Deployer"), 
+                    "no deployer"
+                ),
+                _params._totalSupply
+            );
 
-        return vaultAddress;
+            _n.deployers.add(msg.sender);
+            _n.totalVaults += 1;
+        }
+
+        return (vaultAddress, address(pool), address(proxy));
     }
     
     function _deployNomaToken(
@@ -145,7 +138,6 @@ contract NomaFactory {
         
         // Force desired token order on Uniswap V3
         uint256 nonce = 0;
-
         MockNomaToken nomaToken;
 
         // Encode the initialize function call
@@ -163,9 +155,7 @@ contract NomaFactory {
         nomaToken.initialize(address(this), _totalSupply);
 
         require(address(nomaToken) < _token1, "invalid token address");
-
         uint256 totalSupplyFromContract = nomaToken.totalSupply();
-
         require(totalSupplyFromContract == _totalSupply, "wrong parameters");
 
         // Deploy the proxy contract
@@ -179,26 +169,7 @@ contract NomaFactory {
         return (nomaToken, proxy);
     }
 
-    function _initializeVault(
-        address _vault,
-        address _token0,
-        address _token1,
-        address _modelHelper,
-        address _vaultUpgrade,
-        address _vaultUpgradeFinalize
-    ) internal {
-        BaseVault vault = BaseVault(_vault);
-        vault.initialize(
-            msg.sender, 
-            _token0, 
-            _modelHelper, 
-            _vaultUpgrade, 
-            _token1, 
-            _vaultUpgradeFinalize
-        );
-    }
-
-    function _deployPool(address token0, address token1) internal returns (IUniswapV3Pool) {
+    function _deployPool(uint256 _initPrice, address token0, address token1) internal returns (IUniswapV3Pool) {
         IUniswapV3Factory factory = IUniswapV3Factory(_n.uniswapV3Factory);
         IUniswapV3Pool pool = IUniswapV3Pool(
             factory.getPool(token0, token1, feeTier)
@@ -212,91 +183,40 @@ contract NomaFactory {
                     feeTier
                 )
             );
+            pool.initialize(
+                Conversions
+                .priceToSqrtPriceX96(
+                    int256(_initPrice), 
+                    tickSpacing
+                )
+            );            
         }
 
         return pool;
     }
 
-    function _preDeployVault()
-        internal
-        returns (address vault, address vaultUpgrade)
-    {
-        //deploy facets
-        dCutFacet = new DiamondCutFacet();
-        diamond = new Diamond(address(this), address(dCutFacet));
-        ownerF = new OwnershipFacet();
-        dInit = new DiamondInit();
+    function _initializeVault(
+        address _vault,
+        address _token0,
+        address _token1,
+        address _modelHelper,
+        address _vaultUpgrade,
+        address _vaultUpgradeFinalize
+    ) internal {
+        BaseVault vault = BaseVault(_vault);
 
-        //build cut struct
-        IDiamondCut.FacetCut[] memory cut = new IDiamondCut.FacetCut[](3);
-
-        cut[0] = (
-            IDiamondCut.FacetCut({
-                facetAddress: address(ownerF),
-                action: IDiamondCut.FacetCutAction.Add,
-                functionSelectors: IFacet(address(ownerF)).getFunctionSelectors()
-            })
+        vault.initialize(
+            msg.sender,
+            _token0,
+            _token1,
+            _modelHelper,
+            _vaultUpgrade,
+            _vaultUpgradeFinalize
         );
-
-        cut[1] = (
-            IDiamondCut.FacetCut({
-                facetAddress: address(dInit),
-                action: IDiamondCut.FacetCutAction.Add,
-                functionSelectors: IFacet(address(dInit)).getFunctionSelectors()
-            })
-        );
-
-        cut[2] = (
-            IDiamondCut.FacetCut({
-                facetAddress: address(dCutFacet),
-                action: IDiamondCut.FacetCutAction.Add,
-                functionSelectors: IFacet(address(dCutFacet)).getFunctionSelectors()
-            })
-        );
-
-        vaultUpgrade = _n.resolver
-        .requireAndGetAddress(
-            Utils.stringToBytes32("VaultUpgrade"), 
-            "no VaultUpgrade"
-        );
-
-        //upgrade diamond
-        IDiamondCut(address(diamond)).diamondCut(cut, address(0x0), "");
-        IDiamond(address(diamond)).transferOwnership(vaultUpgrade);
-            
-        //Initialization
-        DiamondInit(address(diamond)).init();
-        vault = address(diamond);
-
-        return (vault, vaultUpgrade);
     }
 
-    function _bootstrapLiquidity(
-        uint256 _idoPrice,
-        uint256 _launchSupply,
-        uint256 _totalSupply,
-        address _token0,
-        address _pool, 
-        address _deployerContract
-    ) internal {
-        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(_pool).slot0();
-
-        (int24 lowerTick, int24 upperTick) = Conversions
-        .computeSingleTick(_idoPrice, tickSpacing);
-
-        uint256 amount0Max = _launchSupply;
-        uint256 amount1Max = 0;
-
-        uint128 liquidity = LiquidityAmounts
-        .getLiquidityForAmounts(
-            sqrtRatioX96,
-            TickMath.getSqrtRatioAtTick(lowerTick),
-            TickMath.getSqrtRatioAtTick(upperTick),
-            amount0Max,
-            amount1Max
-        );
-
-        ERC20(_token0).transfer(_deployerContract, _totalSupply);
+    function getVaultDescription(address deployer) external view returns (VaultDescription memory) {
+        return _n.vaultsRepository[deployer];
     }
 
     function _validateToken1(address token) internal view {
