@@ -180,20 +180,22 @@ library Utils {
         else return rounded;
     }
 
-    // function nearestUsableTick(int24 _tick) pure public returns (int24) {
-    //     if (_tick < 0) {
-    //         return -_nearestNumber(-_tick, 60);
-    //     } else {
-    //         return _nearestNumber(_tick, 60);
-    //     }
-    // }
-
-    // function _nearestNumber(int24 _tick, int24 _tickInterval) internal pure returns (int24) {
-    //     int24 high = ((_tick + _tickInterval - 1) / _tickInterval) * _tickInterval;
-    //     int24 low = high - _tickInterval;
-    //     if (abs(_tick - high) < abs(_tick - low)) return high;
-    //     else return low;
-    // }
+    function stringToBytes32(string memory source) public pure returns (bytes32 result) {
+        bytes memory tempEmptyStringTest = bytes(source);
+        if (tempEmptyStringTest.length == 0) {
+            return 0x0;
+        } else if (tempEmptyStringTest.length > 32) {
+            revert();
+        } else {
+            assembly {
+                result := mload(add(source, 32))
+            }
+            for (uint256 i = tempEmptyStringTest.length; i < 32; i++) {
+                result |= bytes32(uint256(0) << (8 * (31 - i)));
+            }
+            return result;
+        }
+    }
 
     function abs(int x) pure private returns (uint) {
         return uint(x >= 0 ? x : -x);
