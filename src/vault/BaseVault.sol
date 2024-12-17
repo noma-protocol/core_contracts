@@ -4,18 +4,16 @@ pragma solidity ^0.8.0;
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {OwnableUninitialized} from "../abstract/OwnableUninitialized.sol";
 
-import {IWETH} from "../interfaces/IWETH.sol";
-import {LiquidityOps} from "../libraries/LiquidityOps.sol";
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
 import {VaultStorage} from "../libraries/LibAppStorage.sol";
 
 import {
-    tickSpacing, 
     LiquidityPosition, 
     LiquidityType,
     TokenInfo,
-    ProtocolAddresses,
-    VaultInfo
+    VaultInfo,
+    VaultInitParams,
+    ProtocolAddresses
 } from "../types/Types.sol";
 
 import "../libraries/DecimalMath.sol"; 
@@ -25,10 +23,6 @@ interface IERC20 {
     function transfer(address recipient, uint256 amount) external returns (bool);
     function mint(address receiver, uint256 amount) external;
     function approve(address spender, uint256 amount) external;
-}
-
-interface IExtVault {
-    function mintAndDistributeRewards(ProtocolAddresses memory) external;
 }
 
 interface ILendingVault {
@@ -88,7 +82,7 @@ contract BaseVault is OwnableUninitialized {
         _v.escrowContract = _escrowContract;
         OwnableUninitialized(_deployer);
     }
-
+    
     function initializeLiquidity(
         LiquidityPosition[3] memory positions
     ) public {
@@ -120,8 +114,7 @@ contract BaseVault is OwnableUninitialized {
         _updatePositions(_positions);
     }
     
-    function _updatePositions(LiquidityPosition[3] memory _positions) internal {
-        
+    function _updatePositions(LiquidityPosition[3] memory _positions) internal {   
         _v.floorPosition = _positions[0];
         _v.anchorPosition = _positions[1];
         _v.discoveryPosition = _positions[2];
@@ -157,37 +150,6 @@ contract BaseVault is OwnableUninitialized {
         );
     }
 
-    function calcDynamicAmount(
-        address pool, 
-        address modelHelper,
-        bool isBurn
-    ) 
-    external 
-    view 
-    returns (uint256) {
-        require(msg.sender == address(this), "unathorized");
-
-        uint256 currentLiquidityRatio = IModelHelper(modelHelper)
-        .getLiquidityRatio(pool, address(this));
-
-        uint256 circulatingSupply = IModelHelper(modelHelper)
-        .getCirculatingSupply(
-            pool,
-            address(this)
-        );
-
-        uint256 result = DecimalMath
-        .multiplyDecimal(
-            circulatingSupply, 
-            isBurn ? currentLiquidityRatio - 1e18 : 
-            1e18 - currentLiquidityRatio
-        ); 
-
-        result = isBurn ? result / 100 : result;
-
-        return result;  
-    }
-
     function getUnderlyingBalances(
         LiquidityType liquidityType
     ) external view 
@@ -205,7 +167,7 @@ contract BaseVault is OwnableUninitialized {
         address _deployerContract, 
         address _stakingRewards
     ) public 
-    /*onlyOwner*/ {
+     {
         if (_v.initialized) revert AlreadyInitialized();
 
         _v.deployerContract = _deployerContract;
@@ -263,6 +225,15 @@ contract BaseVault is OwnableUninitialized {
         );
     }
 
+    function getProtocolAddresses() public view returns (ProtocolAddresses memory) {
+        return ProtocolAddresses({
+            pool: address(_v.pool),
+            vault: address(this),
+            deployer: _v.deployerContract,
+            modelHelper: _v.modelHelper
+        });
+    }
+
     function setStakingContract(address _stakingContract) external onlyManager {
         _v.stakingContract = _stakingContract;
     }
@@ -283,10 +254,10 @@ contract BaseVault is OwnableUninitialized {
         selectors[11] = bytes4(keccak256(bytes("setStakingContract(address)")));
         selectors[12] = bytes4(keccak256(bytes("getExcessReserveToken1()")));
         selectors[13] = bytes4(keccak256(bytes("borrow(address,uint256)")));
-        selectors[14] = bytes4(keccak256(bytes("calcDynamicAmount(address,address,bool)")));
-        selectors[15] = bytes4(keccak256(bytes("getCollateralAmount()")));
-        selectors[16] = bytes4(keccak256(bytes("payback(address)")));
-        selectors[17] = bytes4(keccak256(bytes("roll(address)")));
+        selectors[14] = bytes4(keccak256(bytes("getCollateralAmount()")));
+        selectors[15] = bytes4(keccak256(bytes("payback(address)")));
+        selectors[16] = bytes4(keccak256(bytes("roll(address)")));
+        selectors[17] = bytes4(keccak256(bytes("getProtocolAddresses()")));
         return selectors;
     }
 
