@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import {BaseVault} from "../BaseVault.sol";
-import {ExtVault} from "../ExtVault.sol"; 
 import {StakingVault} from "../StakingVault.sol"; 
 import {LendingVault} from "../LendingVault.sol"; 
 
@@ -15,7 +14,6 @@ interface IVaultUpgrader {
     function doUpgradeStart(address diamond, address _vaultUpgradeFinalize) external;
     function doUpgradeStep1(address diamond) external;
     function doUpgradeStep2(address diamond) external;
-    // function doUpgradeStep3(address diamond) external;
     function doUpgradeFinalize(address diamond) external;
 }
 
@@ -25,11 +23,11 @@ interface IDiamondInterface {
 }
 
 contract VaultUpgrade {
-    address public owner;
-    address public someContract;
-    address public factory;
-    address public upgradeStep1;
-    address public upgradeFinalize;
+    address private owner;
+    address private someContract;
+    address private factory;
+    address private upgradeStep1;
+    address private upgradeFinalize;
 
     constructor(address _owner, address _factory) {
         owner = _owner;
@@ -89,9 +87,10 @@ contract VaultUpgrade {
 }
 
 contract VaultUpgradeStep1  {
-    address public owner;
-    address public upgradePreviousStep;
-    address public upgradeNextStep;
+    address private owner;
+    address private upgradePreviousStep;
+    address private upgradeNextStep;
+
     constructor(address _owner) {
         owner = _owner;
     }
@@ -141,9 +140,10 @@ contract VaultUpgradeStep1  {
 }
 
 contract VaultUpgradeStep2  {
-    address public owner;
-    address public upgradePreviousStep;
-    address public upgradeNextStep;
+    address private owner;
+    address private upgradePreviousStep;
+    address private upgradeNextStep;
+    
     constructor(address _owner) {
         owner = _owner;
     }
@@ -193,53 +193,3 @@ contract VaultUpgradeStep2  {
 
 }
 
-contract VaultUpgradeFinalize  {
-    address public owner;
-    address public someContract;
-    address public upgradePreviousStep;
-    constructor(address _owner) {
-        owner = _owner;
-    }
-
-    function init(address _someContract, address _upgradePreviousStep) onlyOwner public {
-        require(_upgradePreviousStep != address(0), "Invalid address");
-        someContract = _someContract;
-        upgradePreviousStep = _upgradePreviousStep;
-    }
-
-    function doUpgradeFinalize(address diamond) public  {
- 
-        address[] memory newFacets = new address[](1);
-        IDiamondCut.FacetCutAction[] memory actions = new IDiamondCut.FacetCutAction[](1);
-        bytes4[][] memory functionSelectors = new bytes4[][](1);
-
-        newFacets[0] = address(new ExtVault());
-        actions[0] = IDiamondCut.FacetCutAction.Add;
-        functionSelectors[0] = IFacet(newFacets[0]).getFunctionSelectors();
-
-        IDiamondCut.FacetCut[] memory cuts = new IDiamondCut.FacetCut[](newFacets.length);
-        for (uint256 i = 0; i < newFacets.length; i++) {
-            cuts[i] = IDiamondCut.FacetCut({
-                facetAddress: newFacets[i],
-                action: actions[i],
-                functionSelectors: functionSelectors[i]
-            });
-        }
-
-        address lastOwner = IDiamond(diamond).owner();
-
-        IDiamondCut(diamond).diamondCut(cuts, address(0), "");
-        IDiamondInterface(diamond).transferOwnership(someContract);
-    }  
-
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner");
-        _;
-    }
-
-    modifier authorized() {
-        require(msg.sender == upgradePreviousStep, "Only UpgradePreviousStep");
-        _;
-    }
-
-}
