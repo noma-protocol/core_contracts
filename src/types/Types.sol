@@ -88,6 +88,15 @@ struct VaultDeployParams {
     address token1;
 }
 
+struct VaultInitParams {
+    address _deployer;
+    address _pool;
+    address _modelHelper;
+    address _stakingContract;
+    address _proxyAddress;
+    address _escrowContract;
+}
+
 struct VaultDescription {
     bytes32 tokenName;
     bytes32 tokenSymbol;
