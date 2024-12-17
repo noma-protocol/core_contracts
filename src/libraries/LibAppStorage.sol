@@ -63,31 +63,11 @@ struct VaultStorage {
     uint256 lastLiquidityRatio;
 }
 
-/**
- * @notice Storage structure for token-related information.
- */
-struct TokenStorage {
-    uint256 initialized;
-    uint256 totalSupply;
-    mapping(address => uint256) balances;
-    mapping(address => mapping(address => uint256)) allowances;
-    mapping(address => uint256) nonces;
-}
 
 /**
  * @notice Library for accessing token-related storage.
  */
 library LibAppStorage {
-    /**
-     * @notice Get the token storage.
-     * @return ts The token storage.
-     */
-    function tokenStorage() internal pure returns (TokenStorage storage ts) {
-        assembly {
-            ts.slot := keccak256(add(0x20, "noma.money.tokenstorage"), 32)
-        }
-    }
-
     /**
      * @notice Get the vault storage.
      * @return vs The vault storage.
