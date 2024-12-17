@@ -8,9 +8,9 @@ contract Resolver is OwnableUninitialized {
     
     IAddressResolver resolver;
 
-    mapping(bytes32 => address) addressCache;
-    mapping(bytes32 => address) repository;
-    mapping(bytes32 => uint256) uintSettings;
+    mapping(bytes32 => address) private addressCache;
+    mapping(bytes32 => address) private repository;
+    mapping(bytes32 => uint256) private uintSettings;
 
     constructor()  {
         _manager = msg.sender;
