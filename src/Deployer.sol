@@ -10,7 +10,6 @@ import {Utils} from "./libraries/Utils.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
 import {LiquidityOps} from "./libraries/LiquidityOps.sol";
 import {LiquidityDeployer} from "./libraries/LiquidityDeployer.sol";
-
 import {DeployHelper} from "./libraries/DeployHelper.sol";
 
 import {
@@ -31,13 +30,13 @@ interface IVault {
 
 contract Deployer is Owned {
 
-    LiquidityPosition public floorPosition;
-    LiquidityPosition public anchorPosition;
-    LiquidityPosition public discoveryPosition;
+    LiquidityPosition private floorPosition;
+    LiquidityPosition private anchorPosition;
+    LiquidityPosition private discoveryPosition;
 
     address vault;
-    address public token0;
-    address public token1;
+    address private token0;
+    address private token1;
     address private modelHelper;
 
     IUniswapV3Pool public pool;
@@ -46,11 +45,15 @@ contract Deployer is Owned {
     event AnchorDeployed(LiquidityPosition position);
     event DiscoveryDeployed(LiquidityPosition position);
 
-    constructor(
+    constructor() Owned(msg.sender) {
+    }
+
+    function initialize(
         address _vault, 
         address _pool,
         address _modelHelper
-    ) Owned(msg.sender) {
+    ) public onlyOwner {
+        require(vault == address(0), "already initialized");
         pool = IUniswapV3Pool(_pool);
         vault = _vault;
         token0 = pool.token0();
@@ -74,17 +77,11 @@ contract Deployer is Owned {
 
         if (token0Balance >= amount0Owed) {
             if (amount0Owed > 0) ERC20(token0).transfer(msg.sender, amount0Owed);
-        } else {
-            ERC20(token0).transferFrom(vault, address(this), amount0Owed);
-            ERC20(token0).transfer(msg.sender, amount0Owed);
-        }
+        } 
 
         if (token1Balance >= amount1Owed) {
             if (amount1Owed > 0) ERC20(token1).transfer(msg.sender, amount1Owed);
-        } else {
-            ERC20(token1).transferFrom(vault, address(this), amount1Owed);
-            ERC20(token1).transfer(msg.sender, amount1Owed);
-        }
+        } 
     }
 
     function deployFloor(uint256 _floorPrice) public initialized /*onlyOwner*/ {
@@ -150,7 +147,7 @@ contract Deployer is Owned {
     ) public returns (LiquidityPosition memory newPosition) {
         return LiquidityDeployer
         ._deployPosition(
-            address(pool),
+            pool,
             receiver,
             lowerTick,
             upperTick,
