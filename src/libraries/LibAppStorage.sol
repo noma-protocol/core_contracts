@@ -8,6 +8,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol"
 import { TokenInfo, LiquidityPosition, LoanPosition, VaultDescription } from "../types/Types.sol";
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import { Deployer } from "../Deployer.sol";
 
 
 /**
@@ -15,6 +16,9 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
  */
 struct NomaFactoryStorage {
     IAddressResolver resolver;
+    Deployer deployer;
+    address deploymentFactory;
+    address extFactory;
     address authority;
     address uniswapV3Factory;
     uint256 totalVaults;
@@ -27,6 +31,9 @@ struct NomaFactoryStorage {
  * @notice Storage structure for vault-related information.
  */
 struct VaultStorage {
+    // Vault information
+    address factory;
+
     // Liquidity positions
     LiquidityPosition  floorPosition;
     LiquidityPosition  anchorPosition;
