@@ -72,6 +72,8 @@ contract NomaFactory {
 
         (MockNomaToken nomaToken, ERC1967Proxy proxy) = 
         _deployNomaToken(
+            _params._name,
+            _params._symbol,
             _params.token1, 
             _params._totalSupply
         );
@@ -160,7 +162,6 @@ contract NomaFactory {
         _deployLiquidity(_params._IDOPrice);
 
         _n.deployer.finalize();
-
         _n.deployers.add(msg.sender);
         _n.totalVaults += 1;
         
@@ -168,20 +169,42 @@ contract NomaFactory {
     }
     
     function _deployNomaToken(
+        string memory _name,
+        string memory _symbol,
         address _token1,
         uint256 _totalSupply
     ) internal returns (MockNomaToken, ERC1967Proxy) {
-        
-        // Force desired token order on Uniswap V3
-        uint256 nonce = 0;
+        // Calculate the hash of the name and symbol
+        bytes32 tokenHash = keccak256(abi.encodePacked(_name, _symbol));
+
+        // Check if the token hash already exists
+        require(!_n.deployedTokenHashes[tokenHash], "Token with same name and symbol already exists");
+
+        // Mark this token hash as deployed
+        _n.deployedTokenHashes[tokenHash] = true;
+
+        // Generate a pseudo-random nonce
+        uint256 randValue = block.prevrandao != 0 ? block.prevrandao : block.difficulty;
+        uint256 nonce = uint256(
+            keccak256(
+                abi.encodePacked(
+                    block.timestamp,
+                    randValue,
+                    _n.totalVaults,
+                    msg.sender
+                )
+            )
+        );
+
+
         MockNomaToken nomaToken;
 
         do {
-            nomaToken = new MockNomaToken{salt: bytes32(nonce)}();            
-            nonce++;
+            nomaToken = new MockNomaToken{salt: bytes32(nonce)}();
+            nonce++; // Increment to avoid collisions in the loop
         } while (address(nomaToken) >= _token1);
 
-        nomaToken.initialize(address(this), _totalSupply);
+        nomaToken.initialize(address(this), _totalSupply, _name, _symbol);
 
         require(address(nomaToken) < _token1, "invalid token address");
 
@@ -192,15 +215,17 @@ contract NomaFactory {
         // Encode the initialize function call
         bytes memory data = abi.encodeWithSelector(
             nomaToken.initialize.selector,
-            address(this), // Deployer address
-            _totalSupply   // Initial supply
+            address(this),  // Deployer address
+            _totalSupply,   // Initial supply
+            _name,          // Token name
+            _symbol         // Token symbol
         );
 
         // Deploy the proxy contract
         ERC1967Proxy proxy = new ERC1967Proxy(
             address(nomaToken),
             data
-        );      
+        );
 
         require(address(proxy) != address(0), "Token deploy failed");
 
@@ -258,7 +283,7 @@ contract NomaFactory {
     }
 
     function _deployLiquidity(uint256 _IDOPrice) internal {
-        // TODO 
+        // TODO liquidity structure parameters
         _n.deployer.deployFloor(_IDOPrice);
         _n.deployer.deployAnchor(700, 500);
         _n.deployer.deployDiscovery(_IDOPrice * 3);
