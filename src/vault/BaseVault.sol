@@ -64,6 +64,8 @@ contract BaseVault is OwnableUninitialized {
     }
 
     function initialize(
+        address _factory,
+        address _owner,
         address _deployer,
         address _pool, 
         address _modelHelper,
@@ -72,6 +74,7 @@ contract BaseVault is OwnableUninitialized {
         address _escrowContract
     ) public {
         _v.pool = IUniswapV3Pool(_pool);
+        _v.factory = _factory;
         _v.modelHelper = _modelHelper;
         _v.tokenInfo.token0 = _v.pool.token0();
         _v.tokenInfo.token1 = _v.pool.token1();
@@ -80,14 +83,14 @@ contract BaseVault is OwnableUninitialized {
         _v.stakingContract = _stakingContract;
         _v.proxyAddress = _proxyAddress;
         _v.escrowContract = _escrowContract;
-        OwnableUninitialized(_deployer);
+        _v.deployerContract = _deployer;
+        OwnableUninitialized(_owner);
     }
     
     function initializeLiquidity(
         LiquidityPosition[3] memory positions
-    ) public {
+    ) public onlyDeployer {
         if (_v.initialized) revert AlreadyInitialized();
-        if (msg.sender != _v.deployerContract) revert InvalidCaller();
 
         require(positions[0].liquidity > 0 && 
                 positions[1].liquidity > 0 && 
@@ -163,17 +166,6 @@ contract BaseVault is OwnableUninitialized {
         ); 
     }
 
-    function setParameters(
-        address _deployerContract, 
-        address _stakingRewards
-    ) public 
-     {
-        if (_v.initialized) revert AlreadyInitialized();
-
-        _v.deployerContract = _deployerContract;
-        _v.stakingContract = _stakingRewards;
-    }
-
     function setFees(
         uint256 _feesAccumulatedToken0, 
         uint256 _feesAccumulatedToken1
@@ -238,11 +230,16 @@ contract BaseVault is OwnableUninitialized {
         _v.stakingContract = _stakingContract;
     }
 
+    modifier onlyDeployer() {
+        require(msg.sender == _v.deployerContract, "only deployer");
+        _;
+    }
+
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](18);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
         selectors[1] = bytes4(keccak256(bytes("pool()")));
-        selectors[2] = bytes4(keccak256(bytes("initialize(address,address,address,address,address,address)")));
+        selectors[2] = bytes4(keccak256(bytes("initialize(address,address,address,address,address,address,address,address)")));
         selectors[3] = bytes4(keccak256(bytes("setParameters(address,address)")));
         selectors[4] = bytes4(keccak256(bytes("initializeLiquidity((int24,int24,uint128,uint256)[3])")));
         selectors[5] = bytes4(keccak256(bytes("getPositions()")));
