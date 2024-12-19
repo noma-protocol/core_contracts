@@ -79,8 +79,8 @@ struct VaultInfo {
 }
 
 struct VaultDeployParams {
-    bytes32 _name;
-    bytes32 _symbol;
+    string _name;
+    string _symbol;
     uint8 _decimals;
     uint256 _totalSupply;
     uint16 _percentageForSale;
@@ -98,8 +98,8 @@ struct VaultInitParams {
 }
 
 struct VaultDescription {
-    bytes32 tokenName;
-    bytes32 tokenSymbol;
+    string tokenName;
+    string tokenSymbol;
     uint8 tokenDecimals;
     address token0;
     address token1;
