@@ -34,10 +34,14 @@ contract Deployer is Owned {
     LiquidityPosition private anchorPosition;
     LiquidityPosition private discoveryPosition;
 
-    address vault;
+    address private vault;
     address private token0;
     address private token1;
     address private modelHelper;
+    address private factory;
+
+    bool private locked; // Lock mechanism
+    bool private initialized; // Reinitialization state
 
     IUniswapV3Pool public pool;
 
@@ -45,19 +49,23 @@ contract Deployer is Owned {
     event AnchorDeployed(LiquidityPosition position);
     event DiscoveryDeployed(LiquidityPosition position);
 
-    constructor() Owned(msg.sender) {
-    }
+    constructor(address _owner) Owned(_owner) {}
 
+    /**
+     * @notice Reinitializable function to set up state for a new deployment
+     */
     function initialize(
-        address _vault, 
+        address _factory,
+        address _vault,
         address _pool,
         address _modelHelper
-    ) public onlyOwner {
-        require(vault == address(0), "already initialized");
+    ) public onlyOwner lock {
+        factory = _factory;
         pool = IUniswapV3Pool(_pool);
         vault = _vault;
         token0 = pool.token0();
         token1 = pool.token1();
+        modelHelper = _modelHelper;
     }
 
     /**
@@ -74,19 +82,26 @@ contract Deployer is Owned {
 
         uint256 token0Balance = ERC20(token0).balanceOf(address(this));
         uint256 token1Balance = ERC20(token1).balanceOf(address(this));
-
+        
         if (token0Balance >= amount0Owed) {
             if (amount0Owed > 0) ERC20(token0).transfer(msg.sender, amount0Owed);
-        } 
+        } else {
+            ERC20(token0).transferFrom(vault, address(this), amount0Owed);
+            ERC20(token0).transfer(msg.sender, amount0Owed);
+        }
 
         if (token1Balance >= amount1Owed) {
             if (amount1Owed > 0) ERC20(token1).transfer(msg.sender, amount1Owed);
-        } 
+        } else {
+            ERC20(token1).transferFrom(vault, address(this), amount1Owed);
+            ERC20(token1).transfer(msg.sender, amount1Owed);
+        }
     }
 
-    function deployFloor(uint256 _floorPrice) public initialized /*onlyOwner*/ {
+    function deployFloor(uint256 _floorPrice) public 
+    onlyFactory {
         
-        (LiquidityPosition memory newPosition,) = 
+        (LiquidityPosition memory newPosition, ) = 
         DeployHelper
         .deployFloor(
             pool, 
@@ -99,7 +114,8 @@ contract Deployer is Owned {
         emit FloorDeployed(newPosition);
     }
 
-    function deployAnchor(uint256 bips, uint256 bipsBelowSpot) public initialized /*onlyOwner*/ {
+    function deployAnchor(uint256 bips, uint256 bipsBelowSpot) public 
+    onlyFactory {
 
         (LiquidityPosition memory newPosition,) = LiquidityDeployer
         .deployAnchor(
@@ -120,8 +136,12 @@ contract Deployer is Owned {
         emit AnchorDeployed(newPosition);
     }
 
-    function deployDiscovery(uint256 upperDiscoveryPrice) public initialized /*onlyOwner*/ 
-    returns (LiquidityPosition memory newPosition, LiquidityType liquidityType) {
+    function deployDiscovery(uint256 upperDiscoveryPrice) public 
+    onlyFactory 
+    returns (
+        LiquidityPosition memory newPosition, 
+        LiquidityType liquidityType
+    ) {
 
         (newPosition,) = LiquidityDeployer
         .deployDiscovery(
@@ -144,7 +164,10 @@ contract Deployer is Owned {
         int24 upperTick,
         LiquidityType liquidityType,
         AmountsToMint memory amounts
-    ) public returns (LiquidityPosition memory newPosition) {
+    ) public 
+    returns (
+        LiquidityPosition memory newPosition
+    ) {
         return LiquidityDeployer
         ._deployPosition(
             pool,
@@ -196,27 +219,36 @@ contract Deployer is Owned {
         );
     }
 
-    function finalize() public initialized /*onlyOwner*/ {
+    /**
+     * @notice Finalize function to clear the state after deployment
+     */
+    function finalize() public onlyFactory lock {
         require(
             floorPosition.upperTick != 0 &&
             anchorPosition.upperTick != 0 &&
-            discoveryPosition.upperTick != 0, 
+            discoveryPosition.upperTick != 0,
             "not deployed"
         );
 
         LiquidityPosition[3] memory positions = [floorPosition, anchorPosition, discoveryPosition];
-        
+
         uint256 balanceToken0 = ERC20(token0).balanceOf(address(this));
         ERC20(token0).transfer(vault, balanceToken0);
         IVault(vault).initializeLiquidity(positions);
     }
 
-    modifier initialized() {
-        require(
-            address(vault) != address(0) && 
-            address(pool) != address(0), 
-            "not initialized"
-        );
+    /**
+     * @dev Lock modifier to prevent reentrancy
+     */
+    modifier lock() {
+        require(!locked, "Deployer: Locked");
+        locked = true;
+        _;
+        locked = false;
+    }
+
+    modifier onlyFactory() {
+        require(msg.sender == factory, "only factory");
         _;
     }
 }
