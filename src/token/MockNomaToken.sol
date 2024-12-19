@@ -8,9 +8,9 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 contract MockNomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
 
-    function initialize(address deployer, uint256 totalSupply) initializer public {
-        __ERC20_init("Test Amphor", "tAMPH");
-        __Ownable_init(msg.sender);
+    function initialize(address deployer, uint256 totalSupply, string memory _name, string memory _symbol) initializer public {
+        __ERC20_init(_name, _symbol);
+        __Ownable_init(deployer);
         __UUPSUpgradeable_init();
         _mint(deployer, totalSupply);
     }
