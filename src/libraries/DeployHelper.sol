@@ -32,7 +32,13 @@ library DeployHelper {
         ) {
             
         (uint160 sqrtRatioX96,,,,,,) = pool.slot0();        
-        int24 lowerTick = TickMath.getTickAtSqrtRatio(Conversions.priceToSqrtPriceX96(int256(_floorPrice), tickSpacing));
+        int24 lowerTick = TickMath.getTickAtSqrtRatio(
+            Conversions.priceToSqrtPriceX96(
+                int256(_floorPrice), 
+                tickSpacing
+            )
+        );
+        
         int24 upperTick = lowerTick + tickSpacing;
         
         uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
