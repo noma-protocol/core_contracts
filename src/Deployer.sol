@@ -114,7 +114,7 @@ contract Deployer is Owned {
         emit FloorDeployed(newPosition);
     }
 
-    function deployAnchor(uint256 bips, uint256 bipsBelowSpot) public 
+    function deployAnchor(uint256 _bipsBelowSpot, uint256 _bipsWidth) public 
     onlyFactory {
 
         (LiquidityPosition memory newPosition,) = LiquidityDeployer
@@ -123,8 +123,8 @@ contract Deployer is Owned {
             vault,
             floorPosition,
             DeployLiquidityParameters({
-                bips: bips,
-                bipsBelowSpot: bipsBelowSpot,
+                bips: _bipsWidth,
+                bipsBelowSpot: _bipsBelowSpot,
                 tickSpacing: tickSpacing,
                 lowerTick: 0,
                 upperTick: 0
@@ -136,7 +136,7 @@ contract Deployer is Owned {
         emit AnchorDeployed(newPosition);
     }
 
-    function deployDiscovery(uint256 upperDiscoveryPrice) public 
+    function deployDiscovery(uint256 _upperDiscoveryPrice) public 
     onlyFactory 
     returns (
         LiquidityPosition memory newPosition, 
@@ -148,7 +148,7 @@ contract Deployer is Owned {
             address(pool), 
             vault,
             anchorPosition, 
-            upperDiscoveryPrice, 
+            _upperDiscoveryPrice, 
             tickSpacing
         );
 
