@@ -10,9 +10,7 @@ import {VaultStorage} from "../libraries/LibAppStorage.sol";
 import {
     LiquidityPosition, 
     LiquidityType,
-    TokenInfo,
     VaultInfo,
-    VaultInitParams,
     ProtocolAddresses
 } from "../types/Types.sol";
 
@@ -192,7 +190,12 @@ contract BaseVault is OwnableUninitialized {
         (
             vaultInfo
         ) =
-        IModelHelper(_v.modelHelper).getVaultInfo(address(_v.pool), address(this), _v.tokenInfo);
+        IModelHelper(_v.modelHelper)
+        .getVaultInfo(
+            address(_v.pool), 
+            address(this), 
+            _v.tokenInfo
+        );
     }
 
     function getCollateralAmount() public view returns (uint256) {
