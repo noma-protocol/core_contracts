@@ -13,7 +13,7 @@ import {DecimalMath} from "./DecimalMath.sol";
 
 import {Underlying} from "./Underlying.sol";
 import {ModelHelper} from "../model/Helper.sol";
-import {LiquidityOps} from "./LiquidityOps.sol";
+// import {LiquidityOps} from "./LiquidityOps.sol";
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
 import "../interfaces/IVault.sol";
 
@@ -29,9 +29,9 @@ library LiquidityDeployer {
     function deployAnchor(
         address pool,
         address receiver,
+        uint256 amount0,
         LiquidityPosition memory floorPosition,
-        DeployLiquidityParameters memory deployParams,
-        bool redeploy
+        DeployLiquidityParameters memory deployParams
     )
         internal
         returns (
@@ -40,41 +40,33 @@ library LiquidityDeployer {
         )
     {
         // require(floorPosition.lowerTick != 0, "deployAnchor: invalid floor position");
-
-        (uint160 sqrtRatioX96,,,,,, ) = IUniswapV3Pool(pool).slot0();
+        // (uint160 sqrtRatioX96,,,,,, ) = IUniswapV3Pool(pool).slot0();
 
         uint256 lowerAnchorPrice = Conversions.sqrtPriceX96ToPrice(
             Conversions.tickToSqrtPriceX96(floorPosition.upperTick),
             18
         );
 
-        uint256 upperAnchorPrice = Utils.addBips(
-            lowerAnchorPrice,
-            int256(deployParams.bips)
-        );
-
-        int24 lowerAnchorTick = Conversions.priceToTick(
-            int256(lowerAnchorPrice),
-            deployParams.tickSpacing
-        );
-
-        require(floorPosition.upperTick <= lowerAnchorTick, "some msg 1");
+        // require(floorPosition.upperTick <= lowerAnchorTick, "some msg 1");
 
         (int24 lowerTick, int24 upperTick) = Conversions
         .computeRangeTicks(
             lowerAnchorPrice + lowerAnchorPrice * 1 / 100,
-            upperAnchorPrice,
+            Utils.addBips(
+                lowerAnchorPrice,
+                int256(deployParams.bips)
+            ),
             deployParams.tickSpacing
         );
 
         require(upperTick > lowerTick, "deployAnchor: invalid ticks");
 
-        uint256 balanceToken0 = ERC20(IUniswapV3Pool(pool).token0()).balanceOf(
-            address(this)
-        );
-        uint256 balanceToken1 = ERC20(IUniswapV3Pool(pool).token1()).balanceOf(
-            address(this)
-        );
+        // uint256 balanceToken0 = ERC20(IUniswapV3Pool(pool).token0()).balanceOf(
+        //     address(this)
+        // );
+        // uint256 balanceToken1 = ERC20(IUniswapV3Pool(pool).token1()).balanceOf(
+        //     address(this)
+        // );
 
         (newPosition) = _deployPosition(
             pool,
@@ -83,7 +75,7 @@ library LiquidityDeployer {
             upperTick,
             LiquidityType.Anchor,
             AmountsToMint({
-                amount0: 5_250_000e18,
+                amount0: amount0,
                 amount1: 0
             })
         );
