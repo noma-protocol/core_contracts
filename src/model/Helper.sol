@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {LiquidityAmounts} from "@uniswap/v3-periphery/libraries/LiquidityAmounts.sol";
 import {TickMath} from '@uniswap/v3-core/libraries/TickMath.sol';
-import {ERC20} from "solmate/tokens/ERC20.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {Uniswap} from "../libraries/Uniswap.sol";
 import {Conversions} from "../libraries/Conversions.sol";
@@ -14,6 +14,7 @@ import {DecimalMath} from "../libraries/DecimalMath.sol";
 import {Underlying} from "../libraries/Underlying.sol";
 import {Utils} from "../libraries/Utils.sol";
 import {VaultStorage} from "../libraries/LibAppStorage.sol";
+import { IVault } from "../interfaces/IVault.sol";
 
 import {
     LiquidityPosition,
@@ -24,13 +25,6 @@ import {
 
 error AlreadyInitialized();
 error InvalidCaller();
-
-interface IVault {
-    function getPositions() external view returns (LiquidityPosition[3] memory);
-    function getAccumulatedFees() external view returns (uint256, uint256);
-    function getCollateralAmount() external view returns (uint256);
-    function pool() external view returns (IUniswapV3Pool);
-}
 
 interface IStakingContract {
     function totalStaked() external view returns (uint256);
@@ -136,6 +130,17 @@ contract ModelHelper {
     returns (
         VaultInfo memory vaultInfo
     ) {
+        return _getVaultInfo(pool, vault, tokenInfo);
+    }   
+
+    function _getVaultInfo(
+        address pool,
+        address vault,
+        TokenInfo memory tokenInfo
+    ) internal view
+    returns (
+        VaultInfo memory vaultInfo
+    ) {
         LiquidityPosition[3] memory positions = IVault(vault).getPositions();
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
         
@@ -146,7 +151,9 @@ contract ModelHelper {
         vaultInfo.floorCapacity = getPositionCapacity(pool, vault, positions[0], LiquidityType.Floor);
         vaultInfo.token0 = tokenInfo.token0;
         vaultInfo.token1 = tokenInfo.token1;
-    }   
+
+        return vaultInfo;
+    }
 
     function getCirculatingSupply(
         address pool,
@@ -176,13 +183,16 @@ contract ModelHelper {
     function getTotalSupply(
         address pool,
         bool isToken0
-    ) public view returns (uint256) {
-      return ERC20(
+    ) public view returns (uint256 totalSupply) {
+
+        totalSupply =  ERC20(
         address(
             isToken0 ? 
             IUniswapV3Pool(pool).token0() :
             IUniswapV3Pool(pool).token1()
         )).totalSupply();
+
+      return totalSupply;
     }
 
     function getExcessReserveBalance(
@@ -209,31 +219,13 @@ contract ModelHelper {
     }
 
     function enforceSolvencyInvariant(address _vault) public view {
-        address pool = address(IVault(_vault).pool());
-
-        uint256 circulatingSupply = getCirculatingSupply(pool, _vault);
-        uint256 intrinsicMinimumValue = getIntrinsicMinimumValue(_vault);
+ 
+        VaultInfo memory vaultInfo = IVault(_vault).getVaultInfo();
+ 
+        uint256 circulatingSupply = vaultInfo.circulatingSupply;
+        uint256 anchorCapacity = vaultInfo.anchorCapacity;
+        uint256 floorCapacity = vaultInfo.floorCapacity;
         
-        LiquidityPosition[3] memory positions = IVault(_vault).getPositions();
-        uint256 anchorCapacity = getPositionCapacity(pool, _vault, positions[1], LiquidityType.Anchor);
-        (,,,uint256 floorBalance) = getUnderlyingBalances(pool, _vault, LiquidityType.Floor);
-        
-        uint256 floorCapacity = DecimalMath
-        .divideDecimal(
-            floorBalance, 
-            intrinsicMinimumValue
-        );
-
-        // revert(
-        //     string(
-        //         abi.encodePacked(
-        //             "enforceSolvencyInvariant: ", 
-        //             "Sum=", Utils._uint2str(uint256(anchorCapacity + floorCapacity)),
-        //             ", circulatingSupply=", Utils._uint2str(circulatingSupply)
-        //         )
-        //     )
-        // );
-
         // To guarantee solvency, Noma ensures that capacity > circulating supply each liquidity is deployed.
         require(anchorCapacity + floorCapacity > circulatingSupply, "Insolvency invariant failed");
     }
