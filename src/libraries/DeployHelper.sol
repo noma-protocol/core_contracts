@@ -25,6 +25,7 @@ library DeployHelper {
         IUniswapV3Pool pool,
         address receiver, 
         uint256 _floorPrice, 
+        uint256 _amount0,
         int24 tickSpacing
         ) internal returns (
             LiquidityPosition memory newPosition,
@@ -45,7 +46,7 @@ library DeployHelper {
             sqrtRatioX96,
             TickMath.getSqrtRatioAtTick(lowerTick),
             TickMath.getSqrtRatioAtTick(upperTick),
-            8_750_000e18,
+            _amount0,
             0 
         );
 
