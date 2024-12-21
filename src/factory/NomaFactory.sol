@@ -16,6 +16,7 @@ import { Utils } from "../libraries/Utils.sol";
 
 import { BaseVault } from "../vault/BaseVault.sol";
 import { MockNomaToken } from "../token/MockNomaToken.sol";
+
 import { Deployer } from "../Deployer.sol";
 
 import {
@@ -40,11 +41,10 @@ interface IExtFactory {
         address vaultAddress,
         address token0
     ) external returns (address, address);
-    function deployDeployer(address owner) external returns (address);
 }
 
 interface IDeployerFactory {
-    function deployDeployer(address owner) external returns (address);
+    function deployDeployer(address owner, address resolver) external returns (address);
 }
 
 contract NomaFactory {
@@ -70,7 +70,7 @@ contract NomaFactory {
     ) external returns (address, address, address) {
         _validateToken1(_params.token1);
 
-        (MockNomaToken nomaToken, ERC1967Proxy proxy) = 
+        (MockNomaToken nomaToken) = 
         _deployNomaToken(
             _params._name,
             _params._symbol,
@@ -95,7 +95,7 @@ contract NomaFactory {
             )
         ).preDeployVault();
 
-        (address stakingToken, address stakingContract) = 
+        (, address stakingContract) = 
         IExtFactory(_n.extFactory)
         .deployAll(
             address(this),
@@ -105,7 +105,10 @@ contract NomaFactory {
 
         _n.deployer = Deployer(
             IDeployerFactory(_n.deploymentFactory)
-            .deployDeployer(address(this))
+            .deployDeployer(
+                address(this), 
+                address(_n.resolver)
+            )
         );
 
         _n.deployer.initialize(
@@ -115,8 +118,6 @@ contract NomaFactory {
             modelHelper()
         );
         
-        BaseVault vault = BaseVault(vaultAddress);
-
         IVaultUpgrade(vaultUpgrade)
         .doUpgradeStart(
             vaultAddress, 
@@ -134,7 +135,7 @@ contract NomaFactory {
             address(pool), 
             modelHelper(), 
             stakingContract,
-            address(proxy),
+            address(nomaToken),
             address(0)
         );
 
@@ -159,12 +160,13 @@ contract NomaFactory {
         ) == _params._totalSupply, "supply transfer failed");
 
 
-        _deployLiquidity(_params._IDOPrice);
+        _deployLiquidity(_params._IDOPrice, _params._totalSupply);
 
-        _n.deployer.finalize();
         _n.deployers.add(msg.sender);
         _n.totalVaults += 1;
-        
+        _n.resolver.importDeployerACL(vaultAddress);        
+        _n.deployer.finalize();
+
         return (vaultAddress, address(pool), address(nomaToken));
     }
     
@@ -173,7 +175,9 @@ contract NomaFactory {
         string memory _symbol,
         address _token1,
         uint256 _totalSupply
-    ) internal returns (MockNomaToken, ERC1967Proxy) {
+    ) internal returns (MockNomaToken) {
+        MockNomaToken nomaToken;
+
         // Calculate the hash of the name and symbol
         bytes32 tokenHash = keccak256(abi.encodePacked(_name, _symbol));
 
@@ -183,21 +187,8 @@ contract NomaFactory {
         // Mark this token hash as deployed
         _n.deployedTokenHashes[tokenHash] = true;
 
-        // Generate a pseudo-random nonce
-        uint256 randValue = block.prevrandao != 0 ? block.prevrandao : block.difficulty;
-        uint256 nonce = uint256(
-            keccak256(
-                abi.encodePacked(
-                    block.timestamp,
-                    randValue,
-                    _n.totalVaults,
-                    msg.sender
-                )
-            )
-        );
-
-
-        MockNomaToken nomaToken;
+        // Generate a pseudo-random nonce from the hash
+        uint256 nonce =  uint256(tokenHash);
 
         do {
             nomaToken = new MockNomaToken{salt: bytes32(nonce)}();
@@ -229,7 +220,7 @@ contract NomaFactory {
 
         require(address(proxy) != address(0), "Token deploy failed");
 
-        return (nomaToken, proxy);
+        return nomaToken;
     }
 
     function _deployPool(uint256 _initPrice, address token0, address token1) internal returns (IUniswapV3Pool) {
@@ -282,15 +273,11 @@ contract NomaFactory {
         );
     }
 
-    function _deployLiquidity(uint256 _IDOPrice) internal {
+    function _deployLiquidity(uint256 _IDOPrice, uint256 _totalSupply) internal {
         // TODO liquidity structure parameters
-        _n.deployer.deployFloor(_IDOPrice);
-        _n.deployer.deployAnchor(700, 500);
+        _n.deployer.deployFloor(_IDOPrice, _totalSupply * 25 / 100);
+        _n.deployer.deployAnchor(500, 1200, _totalSupply * 15 / 100);
         _n.deployer.deployDiscovery(_IDOPrice * 3);
-    }
-
-    function getVaultDescription(address deployer) external view returns (VaultDescription memory) {
-        return _n.vaultsRepository[deployer];
     }
 
     function _validateToken1(address token) internal view {
@@ -306,6 +293,18 @@ contract NomaFactory {
             result := mload(add(symbol, 32))
         }
         _n.resolver.requireAndGetAddress(result, "not a reserve token");
+    }
+
+    function getVaultDescription(address deployer) external view returns (VaultDescription memory) {
+        return _n.vaultsRepository[deployer];
+    }
+
+    function getDeployers() external view returns (address[] memory) {
+        address[] memory deployers = new address[](_n.deployers.length());
+        for (uint256 i = 0; i < _n.deployers.length(); i++) {
+            deployers[i] = _n.deployers.at(i);
+        }
+        return deployers;
     }
 
     function modelHelper() public view returns (address) {
