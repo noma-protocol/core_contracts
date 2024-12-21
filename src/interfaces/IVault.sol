@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
-import {LiquidityPosition} from "../types/Types.sol";
+import {
+    VaultInfo,
+    LiquidityPosition
+} from "../types/Types.sol";
 
 interface IVault  {
     function getPositions() external view returns (LiquidityPosition[3] memory);
@@ -12,4 +15,8 @@ interface IVault  {
     function payback(address who) external;
     function roll(address who) external;
     function updatePositions(LiquidityPosition[3] memory newPositions) external;
+    function getVaultInfo() external view returns (VaultInfo memory);
+    function getExcessReserveToken1() external view returns (uint256);
+    function getCollateralAmount() external view returns (uint256);
+    function getAccumulatedFees() external view returns (uint256,uint256);  
 }

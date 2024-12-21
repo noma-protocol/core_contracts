@@ -18,12 +18,16 @@ interface IAddressResolver {
     /// @return address The contract address associated with the name identifier.
     function requireAndGetAddress(bytes32 name, string calldata reason) external view returns (address);
 
+    function requireDeployerACL(address _vault) external view;
+
     /// @notice Imports multiple addresses and associates them with their corresponding names.
     /// @dev This function allows batch updating of name-address pairs.
     /// Typically called by an admin or owner of the contract to update the resolver's records.
     /// @param names An array of bytes32 identifiers.
     /// @param destinations An array of contract addresses, each corresponding to the name at the same index in the names array.
     function importAddresses(bytes32[] calldata names, address[] calldata destinations) external;
+
+    function importDeployerACL(address _vault) external;
 
     /// @notice Checks if the provided name-address pairs are correctly imported in the resolver.
     /// @dev This function can be used for verification after executing importAddresses.
@@ -35,4 +39,5 @@ interface IAddressResolver {
         external
         view
         returns (bool);
+        
 }
