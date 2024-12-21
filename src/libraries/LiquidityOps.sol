@@ -37,7 +37,6 @@ error BelowThreshold();
 
 library LiquidityOps {
     
-
     function shift(
         ProtocolAddresses memory addresses,
         LiquidityPosition[3] memory positions
@@ -55,7 +54,7 @@ library LiquidityOps {
         
         (uint256 circulatingSupply, uint256 anchorToken1Balance, uint256 discoveryToken1Balance, uint256 discoveryToken0Balance) = getVaulData(addresses);
 
-        if (currentLiquidityRatio <= 98e16) {
+        if (currentLiquidityRatio <= 97e16) {
             
             // Shift --> ETH after skim at floor = 
             // ETH before skim at anchor - (liquidity ratio * ETH before skim at anchor)
@@ -98,6 +97,14 @@ library LiquidityOps {
                     positions
                 );
                 
+                IVault(address(this))
+                .updatePositions(
+                    newPositions
+                ); 
+
+                IModelHelper(addresses.modelHelper)
+                .enforceSolvencyInvariant(address(this));   
+
                 return (currentLiquidityRatio, newPositions);
             }
 
@@ -127,6 +134,7 @@ library LiquidityOps {
 
         (newPositions) =
         shiftPositions(
+            params.addresses,
             ShiftParameters({
                 pool: params.addresses.pool,
                 deployer: params.addresses.deployer,
@@ -141,14 +149,11 @@ library LiquidityOps {
             })
         );
 
-        IVault(address(this))
-        .updatePositions(
-            newPositions
-        ); 
-        
+
     }
 
     function shiftPositions(
+        ProtocolAddresses memory addresses,
         ShiftParameters memory params
     ) internal returns (
         LiquidityPosition[3] memory newPositions
@@ -243,7 +248,7 @@ library LiquidityOps {
                 newPositions[1].upperTick,
                 Utils.addBipsToTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                    25000
+                    25000 // todo remove hardcoded value
                 ),           
                 0,
                 LiquidityType.Discovery 
@@ -255,6 +260,7 @@ library LiquidityOps {
                 newPositions[2].liquidity > 0, 
                 "shiftPositions: no liquidity in positions"
             );
+
 
         } else {
             revert("shiftPositions: no liquidity in Floor");
