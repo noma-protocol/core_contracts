@@ -52,9 +52,14 @@ library LiquidityOps {
         currentLiquidityRatio = IModelHelper(addresses.modelHelper)
         .getLiquidityRatio(addresses.pool, addresses.vault);
         
-        (uint256 circulatingSupply, uint256 anchorToken1Balance, uint256 discoveryToken1Balance, uint256 discoveryToken0Balance) = getVaulData(addresses);
+        (
+            uint256 circulatingSupply, 
+            uint256 anchorToken1Balance, 
+            uint256 discoveryToken1Balance, 
+            uint256 discoveryToken0Balance
+        ) = getVaulData(addresses);
 
-        if (currentLiquidityRatio <= 97e16) {
+        if (currentLiquidityRatio <= 98e16) {
             
             // Shift --> ETH after skim at floor = 
             // ETH before skim at anchor - (liquidity ratio * ETH before skim at anchor)
@@ -159,7 +164,6 @@ library LiquidityOps {
         LiquidityPosition[3] memory newPositions
     ) {
         require(params.discoveryToken0Balance > 0, "invalid params");
-        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(params.pool).slot0();
        
         if (params.positions[0].liquidity > 0) {
 
@@ -228,15 +232,20 @@ library LiquidityOps {
                 params.positions[0]
             );
 
+            (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(params.pool).slot0();
 
             // Deploy new anchor position
             newPositions[1] = reDeploy(
                 params.pool,
                 params.deployer,
-                newPositions[0].upperTick,                
+                // newPositions[0].upperTick,
+                Utils.addBipsToTick(
+                    newPositions[0].upperTick, 
+                    10
+                ),                
                 Utils.addBipsToTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                    1
+                    50
                 ),
                 (params.anchorToken1Balance + params.discoveryToken1Balance) - params.toSkim, 
                 LiquidityType.Anchor
