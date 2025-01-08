@@ -59,7 +59,7 @@ library LiquidityDeployer {
             deployParams.tickSpacing
         );
 
-        require(upperTick > lowerTick, "deployAnchor: invalid ticks");
+        require(upperTick > lowerTick, "deployAnchor: invalid ticks LD");
 
         // uint256 balanceToken0 = ERC20(IUniswapV3Pool(pool).token0()).balanceOf(
         //     address(this)
@@ -212,9 +212,10 @@ library LiquidityDeployer {
             amounts.amount1
         );
 
-        if (liquidityType == LiquidityType.Discovery) {
-            require(amounts.amount0 >= 1 ether, "_deployPosition: amount0 is too low");
-        }
+        // TODO remove this
+        // if (liquidityType == LiquidityType.Discovery) {
+        //     require(amounts.amount0 >= 1 ether, "_deployPosition: amount0 is too low");
+        // }
 
         if (liquidity > 0) {
             Uniswap.mint(
@@ -252,7 +253,7 @@ library LiquidityDeployer {
         LiquidityPosition[3] memory positions
     ) internal returns (LiquidityPosition memory newPosition) {
         // Ensuring valid tick range
-        require(positions[0].upperTick > positions[0].lowerTick, "invalid ticks");
+        require(positions[0].upperTick > positions[0].lowerTick, "invalid ticks LD2");
 
         // Deploying the new liquidity position
         newPosition = _deployPosition(
