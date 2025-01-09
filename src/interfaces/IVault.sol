@@ -11,7 +11,7 @@ interface IVault  {
     function shift() external;
     function slide() external;
     function borrow(address who, uint256 borrowAmount) external;
-    function pool() external returns (IUniswapV3Pool);
+    function pool() external view returns (IUniswapV3Pool);
     function payback(address who) external;
     function roll(address who) external;
     function updatePositions(LiquidityPosition[3] memory newPositions) external;
