@@ -8,7 +8,8 @@ import {Owned} from "solmate/auth/Owned.sol";
 
 import {Utils} from "./libraries/Utils.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
-import {LiquidityOps} from "./libraries/LiquidityOps.sol";
+
+// import {LiquidityOps} from "./libraries/LiquidityOps.sol";
 import {LiquidityDeployer} from "./libraries/LiquidityDeployer.sol";
 import {DeployHelper} from "./libraries/DeployHelper.sol";
 
@@ -21,6 +22,8 @@ import {
     DeployLiquidityParameters,
     ProtocolAddresses
 } from "./types/Types.sol";
+
+import { IAddressResolver } from "./interfaces/IAddressResolver.sol";
 
 interface IVault {
     function initializeLiquidity(
@@ -39,6 +42,7 @@ contract Deployer is Owned {
     address private token1;
     address private modelHelper;
     address private factory;
+    address private resolver;
 
     bool private locked; // Lock mechanism
     bool private initialized; // Reinitialization state
@@ -49,7 +53,9 @@ contract Deployer is Owned {
     event AnchorDeployed(LiquidityPosition position);
     event DiscoveryDeployed(LiquidityPosition position);
 
-    constructor(address _owner) Owned(_owner) {}
+    constructor(address _owner, address _resolver) Owned(_owner) {
+        resolver = _resolver;
+    }
 
     /**
      * @notice Reinitializable function to set up state for a new deployment
@@ -98,7 +104,7 @@ contract Deployer is Owned {
         }
     }
 
-    function deployFloor(uint256 _floorPrice) public 
+    function deployFloor(uint256 _floorPrice, uint256 _amount0) public 
     onlyFactory {
         
         (LiquidityPosition memory newPosition, ) = 
@@ -106,7 +112,8 @@ contract Deployer is Owned {
         .deployFloor(
             pool, 
             vault, 
-            _floorPrice, 
+            _floorPrice,
+            _amount0,
             tickSpacing
         );
 
@@ -114,13 +121,14 @@ contract Deployer is Owned {
         emit FloorDeployed(newPosition);
     }
 
-    function deployAnchor(uint256 _bipsBelowSpot, uint256 _bipsWidth) public 
+    function deployAnchor(uint256 _bipsBelowSpot, uint256 _bipsWidth, uint256 amount0) public 
     onlyFactory {
 
         (LiquidityPosition memory newPosition,) = LiquidityDeployer
         .deployAnchor(
             address(pool),
             vault,
+            amount0,
             floorPosition,
             DeployLiquidityParameters({
                 bips: _bipsWidth,
@@ -128,8 +136,7 @@ contract Deployer is Owned {
                 tickSpacing: tickSpacing,
                 lowerTick: 0,
                 upperTick: 0
-            }),
-            false
+            })
         );
 
         anchorPosition = newPosition;
@@ -164,7 +171,7 @@ contract Deployer is Owned {
         int24 upperTick,
         LiquidityType liquidityType,
         AmountsToMint memory amounts
-    ) public 
+    ) public isVault
     returns (
         LiquidityPosition memory newPosition
     ) {
@@ -187,7 +194,7 @@ contract Deployer is Owned {
         uint256 newFloorBalance,
         uint256 currentFloorBalance,
         LiquidityPosition memory _floorPosition
-    ) public  returns (LiquidityPosition memory newPosition) {
+    ) public isVault returns (LiquidityPosition memory newPosition) {
 
         return LiquidityDeployer.shiftFloor(
             _pool, 
@@ -245,6 +252,12 @@ contract Deployer is Owned {
         locked = true;
         _;
         locked = false;
+    }
+
+    modifier isVault() {
+        IAddressResolver(resolver)
+        .requireDeployerACL(msg.sender);
+        _;
     }
 
     modifier onlyFactory() {
