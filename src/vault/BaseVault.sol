@@ -29,6 +29,11 @@ interface ILendingVault {
     function rollLoan(address who) external;
 }
 
+interface INomaFactory {
+    function mintTokens(address to, uint256 amount) external;
+}
+
+
 error AlreadyInitialized();
 error InvalidCaller();
 
@@ -36,6 +41,7 @@ contract BaseVault is OwnableUninitialized {
     VaultStorage internal _v;
 
     event FloorUpdated(uint256 floorPrice, uint256 floorCapacity);
+    error MyError();
 
     /**
      * @notice Uniswap V3 callback function, called back on pool.mint
@@ -164,6 +170,19 @@ contract BaseVault is OwnableUninitialized {
         ); 
     }
 
+    function mintTokens(
+        address to,
+        uint256 amount
+    ) public {
+        require(msg.sender == address(this), "invalid caller");
+        
+        INomaFactory(_v.factory)
+        .mintTokens(
+            to,
+            amount
+        );
+    }
+
     function setFees(
         uint256 _feesAccumulatedToken0, 
         uint256 _feesAccumulatedToken1
@@ -239,7 +258,7 @@ contract BaseVault is OwnableUninitialized {
     }
 
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](18);
+        bytes4[] memory selectors = new bytes4[](19);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
         selectors[1] = bytes4(keccak256(bytes("pool()")));
         selectors[2] = bytes4(keccak256(bytes("initialize(address,address,address,address,address,address,address,address)")));
@@ -258,6 +277,7 @@ contract BaseVault is OwnableUninitialized {
         selectors[15] = bytes4(keccak256(bytes("payback(address)")));
         selectors[16] = bytes4(keccak256(bytes("roll(address)")));
         selectors[17] = bytes4(keccak256(bytes("getProtocolAddresses()")));
+        selectors[18] = bytes4(keccak256(bytes("mintTokens(address,uint256)")));
         return selectors;
     }
 
