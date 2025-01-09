@@ -29,6 +29,7 @@ import {
 interface IVault {
     function updatePositions(LiquidityPosition[3] memory newPositions) external;
     function setFees(uint256 _feesAccumulatedToken0, uint256 _feesAccumulatedToken1) external;
+    function mintTokens(address to, uint256 amount) external;
 }
 
 error InvalidTick();
@@ -59,7 +60,7 @@ library LiquidityOps {
             uint256 discoveryToken0Balance
         ) = getVaulData(addresses);
 
-        if (currentLiquidityRatio <= 98e16) {
+        if (currentLiquidityRatio <= 90e16) {
             
             // Shift --> ETH after skim at floor = 
             // ETH before skim at anchor - (liquidity ratio * ETH before skim at anchor)
@@ -163,8 +164,15 @@ library LiquidityOps {
     ) internal returns (
         LiquidityPosition[3] memory newPositions
     ) {
-        require(params.discoveryToken0Balance > 0, "invalid params");
-       
+
+        if (params.discoveryToken0Balance <= 1_000e18) {
+            IVault(address(this))
+            .mintTokens(
+                address(this), 
+                1_000_000e18
+            );
+       }
+
         if (params.positions[0].liquidity > 0) {
 
             (
@@ -241,11 +249,11 @@ library LiquidityOps {
                 // newPositions[0].upperTick,
                 Utils.addBipsToTick(
                     newPositions[0].upperTick, 
-                    10
+                    50
                 ),                
                 Utils.addBipsToTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                    50
+                    100
                 ),
                 (params.anchorToken1Balance + params.discoveryToken1Balance) - params.toSkim, 
                 LiquidityType.Anchor
@@ -254,7 +262,10 @@ library LiquidityOps {
             newPositions[2] = reDeploy(
                 params.pool,
                 params.deployer, 
-                newPositions[1].upperTick,
+                Utils.addBipsToTick(
+                    newPositions[1].upperTick, 
+                    10
+                ),   
                 Utils.addBipsToTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
                     25000 // todo remove hardcoded value
@@ -327,14 +338,18 @@ library LiquidityOps {
                 positions[2].upperTick
             ); 
 
-            //Shift anchor position
+            //Slide anchor position
             newPositions[1] = reDeploy(
                 addresses.pool,
                 addresses.deployer,
-                positions[0].upperTick,                
+                // positions[0].upperTick,    
+                Utils.addBipsToTick(
+                    positions[0].upperTick, 
+                    50
+                ),                              
                 Utils.addBipsToTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                    30
+                    50
                 ),
                 anchorToken1Balance, 
                 LiquidityType.Anchor
@@ -343,7 +358,10 @@ library LiquidityOps {
             newPositions[2] = reDeploy(
                 addresses.pool,
                 addresses.deployer,
-                newPositions[1].upperTick,
+                Utils.addBipsToTick(
+                    newPositions[1].upperTick, 
+                    10
+                ),   
                 Utils.addBipsToTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
                     10000
@@ -377,7 +395,7 @@ library LiquidityOps {
         uint256 amount1ToDeploy,
         LiquidityType liquidityType
     ) internal returns (LiquidityPosition memory newPosition) {
-        require(upperTick > lowerTick, "invalid ticks");
+        require(upperTick > lowerTick, "invalid ticks LO");
         
         uint256 balanceToken0 = ERC20(IUniswapV3Pool(pool).token0()).balanceOf(address(this));
         // uint256 balanceToken1 = ERC20(IUniswapV3Pool(pool).token1()).balanceOf(address(this));
