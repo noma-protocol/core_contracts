@@ -31,11 +31,19 @@ interface IStakingRewards {
 }
 
 contract StakingVault is BaseVault {
+
+    //TODO move this to LibAppStorage
     uint256 public constant BASE_VALUE = 100e18;
 
-    function calculateMintAmount(int256 currentLiquidityRatio, uint256 excessTokens) public pure returns (uint256) {
+    function calculateMintAmount(int256 currentLiquidityRatio, uint256 excessTokens) public view returns (uint256) {
+        return _calculateMintAmont(currentLiquidityRatio, excessTokens);
+    }
+
+    function _calculateMintAmont(int256 currentLiquidityRatio, uint256 excessTokens) internal view returns (uint256) {
         require(currentLiquidityRatio >= -1e18 && currentLiquidityRatio <= 1e18 * 10, "currentLiquidityRatio out of range");
 
+        uint256 stakedBalance = IERC20(_v.pool.token0()).balanceOf(_v.stakingContract);
+        
         uint256 BASE_VALUE = 100e18;
         uint256 SCALING_FACTOR = 1e12; // New scaling factor
 
@@ -64,7 +72,7 @@ contract StakingVault is BaseVault {
         uint256 currentLiquidityRatio = IModelHelper(_v.modelHelper)
         .getLiquidityRatio(address(_v.pool), addresses.vault);
         
-        uint256 toMintScaledToken1 = calculateMintAmount(int256(currentLiquidityRatio), excessReservesToken1);
+        uint256 toMintScaledToken1 = _calculateMintAmont(int256(currentLiquidityRatio), excessReservesToken1);
 
         uint256 intrinsicMinimumValue = IModelHelper(_v.modelHelper)
         .getIntrinsicMinimumValue(addresses.vault) * 1e18;
@@ -74,9 +82,12 @@ contract StakingVault is BaseVault {
         if (toMintConverted == 0) {
             return;
         } 
-
+        
+        require(_v.stakingContract != address(0), "StakeVault: staking contract not set");
+        
         IERC20(_v.tokenInfo.token0).approve(_v.stakingContract, toMintConverted);
-        IERC20(_v.tokenInfo.token0).mint(_v.stakingContract, toMintConverted);
+        // IERC20(_v.tokenInfo.token0).mint(_v.stakingContract, toMintConverted);
+        mintTokens(_v.stakingContract, toMintConverted);
 
         // Update total minted (NOMA)
         _v.totalMinted += toMintConverted;
