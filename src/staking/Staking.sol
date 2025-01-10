@@ -41,11 +41,11 @@ contract Staking {
     constructor(    
         address _noma,
         address _sNoma,
-        address _authority
+        address _vault
     ) {
         NOMA = IERC20(_noma);
         sNOMA = IsNomaToken(_sNoma);
-        authority = _authority;
+        vault = _vault;
         
         // Initialize first epoch with distribute 0
         epoch = Epoch({
@@ -56,15 +56,6 @@ contract Staking {
 
         epochs[totalEpochs] = epoch;
         totalEpochs++;
-    }
-
-    function setup(address _vault, address _noma, address _sNoma) external onlyAuthority {
-        require(_noma != address(0), "Zero address: NOMA");
-        NOMA = IERC20(_noma);
-        require(_sNoma != address(0), "Zero address: sNOMA");
-        sNOMA = IsNomaToken(_sNoma);
-        require(_vault != address(0), "Zero address: vault");
-        vault = _vault;
     }
 
     function stake(
@@ -123,10 +114,6 @@ contract Staking {
     }
 
 
-    modifier onlyAuthority() {
-        // require(msg.sender == authority, "Caller is not the authority");
-        _;
-    }
 
     modifier onlyVault() {
         require(msg.sender == vault || msg.sender == address(this), "Caller is not the vault");
