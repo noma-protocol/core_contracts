@@ -32,6 +32,10 @@ interface IVault {
     function mintTokens(address to, uint256 amount) external;
 }
 
+interface IAdaptiveSupplyController {
+    function adjustSupply(address pool, address vault, int256 volatility) external returns (uint256, uint256);
+}
+
 error InvalidTick();
 error AboveThreshold();
 error BelowThreshold();
@@ -147,6 +151,7 @@ library LiquidityOps {
                 toSkim: params.toSkim,
                 newFloorPrice: newFloorPrice,
                 modelHelper: params.addresses.modelHelper,
+                adaptiveSupplyController: params.addresses.adaptiveSupplyController,
                 floorToken1Balance: params.floorToken1Balance,
                 anchorToken1Balance: params.anchorToken1Balance,
                 discoveryToken1Balance: params.discoveryToken1Balance,
@@ -166,10 +171,21 @@ library LiquidityOps {
     ) {
 
         if (params.discoveryToken0Balance <= 1_000e18) {
+
+            // TODO integrate volatility oracle
+            
+            (uint256 mintAmount, ) = IAdaptiveSupplyController(
+                addresses.adaptiveSupplyController
+            ).adjustSupply(
+                addresses.pool, 
+                address(this), 
+                1e18 // 100% volatility
+            );
+
             IVault(address(this))
             .mintTokens(
                 address(this), 
-                1_000_000e18
+                mintAmount
             );
        }
 
@@ -280,7 +296,6 @@ library LiquidityOps {
                 newPositions[2].liquidity > 0, 
                 "shiftPositions: no liquidity in positions"
             );
-
 
         } else {
             revert("shiftPositions: no liquidity in Floor");
