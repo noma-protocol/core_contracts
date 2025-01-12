@@ -46,6 +46,7 @@ struct ProtocolAddresses {
     address vault;
     address deployer;
     address modelHelper;
+    address adaptiveSupplyController;
 }
 
 struct ShiftParameters {
@@ -54,6 +55,7 @@ struct ShiftParameters {
     uint256 toSkim;
     uint256 newFloorPrice;
     address modelHelper;
+    address adaptiveSupplyController;
     uint256 floorToken1Balance;
     uint256 anchorToken1Balance;
     uint256 discoveryToken1Balance; 
