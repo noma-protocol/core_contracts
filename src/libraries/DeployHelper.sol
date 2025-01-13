@@ -15,7 +15,8 @@ import {DecimalMath} from "./DecimalMath.sol";
  
 import {
     LiquidityPosition, 
-    LiquidityType 
+    LiquidityType,
+    tickSpacing
 } from "../types/Types.sol";
 
 
@@ -40,7 +41,7 @@ library DeployHelper {
             )
         );
         
-        int24 upperTick = lowerTick + tickSpacing;
+        int24 upperTick = lowerTick + tickSpacing * 3;
         
         uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
             sqrtRatioX96,
