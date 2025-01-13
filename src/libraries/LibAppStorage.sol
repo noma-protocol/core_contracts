@@ -5,24 +5,42 @@ pragma solidity ^0.8.0;
 
 import { IUniswapV3Pool } from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { TokenInfo, LiquidityPosition, LoanPosition, VaultDescription } from "../types/Types.sol";
+import { 
+    TokenInfo, 
+    LiquidityPosition, 
+    LoanPosition, 
+    VaultDescription, 
+    LiquidityStructureParameters
+}  from "../types/Types.sol";
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import { Deployer } from "../Deployer.sol";
 
+interface IAdaptiveSupplyController {
+    function adjustSupply(address pool, address vault, int256 volatility) external returns (uint256, uint256);
+}
 
 /**
  * @notice Storage structure for factory-related information.
  */
 struct NomaFactoryStorage {
+    // Noma Factory state
     IAddressResolver resolver;
     Deployer deployer;
+
     address deploymentFactory;
     address extFactory;
     address authority;
     address uniswapV3Factory;
+
     uint256 totalVaults;
+    
+    bool permissionlessDeployEnabled;    
+
     EnumerableSet.AddressSet deployers;
+
+    LiquidityStructureParameters liquidityStructureParameters;
+    
     mapping(address => EnumerableSet.AddressSet) _vaults;
     mapping(address => VaultDescription) vaultsRepository;
     mapping(bytes32 => bool) deployedTokenHashes;
@@ -32,8 +50,10 @@ struct NomaFactoryStorage {
  * @notice Storage structure for vault-related information.
  */
 struct VaultStorage {
-    // Vault information
+    // Vault state
     address factory;
+
+    LiquidityStructureParameters liquidityStructureParameters;
 
     // Liquidity positions
     LiquidityPosition  floorPosition;
@@ -43,6 +63,8 @@ struct VaultStorage {
     // Loans
     mapping(address => LoanPosition) loanPositions;
     mapping(address => uint256) totalLoansPerUser;
+
+
     address[] loanAddresses;
     uint256 totalLoans;
     uint256 collateralAmount;
@@ -58,7 +80,7 @@ struct VaultStorage {
     address modelHelper;
     address stakingContract;
     address proxyAddress;
-    address escrowContract;
+    address adaptiveSupplyController;
 
     IUniswapV3Pool pool;
 
