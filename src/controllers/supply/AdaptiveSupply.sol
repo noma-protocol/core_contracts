@@ -93,44 +93,44 @@ contract AdaptiveSupply {
 
         if (markedCondition == MarketConditions.LowVolatility) {
             mintAmount = ScalingAlgorithms.harmonicUpdate(
-                deltaSupply,
+                totalSupply,
                 volatility,
                 1,
                 false
             );
             burnAmount = ScalingAlgorithms.harmonicUpdate(
-                deltaSupply,
+                totalSupply,
                 volatility,
                 1,
                 true
             );
         } else if (markedCondition == MarketConditions.MediumVolatility) {
             mintAmount = ScalingAlgorithms.harmonicUpdate(
-                deltaSupply,
+                totalSupply,
                 volatility,
                 10,
                 false
             );
             burnAmount = ScalingAlgorithms.harmonicUpdate(
-                deltaSupply,
+                totalSupply,
                 volatility,
                 10,
                 true
             );
         } else if (markedCondition == MarketConditions.HighVolatility) {
             mintAmount = ScalingAlgorithms.boundedQuadraticUpdate(
-                deltaSupply,
+                totalSupply,
                 volatility,
                 true
             );
             burnAmount = ScalingAlgorithms.boundedQuadraticUpdate(
-                deltaSupply,
+                totalSupply,
                 volatility,
                 false
             );
         } else if (markedCondition == MarketConditions.ExtremeVolatility) {
             mintAmount = ScalingAlgorithms.exponentialUpdate(
-                deltaSupply,
+                totalSupply,
                 volatility,
                 1
             );

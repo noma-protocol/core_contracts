@@ -9,7 +9,6 @@ import {Owned} from "solmate/auth/Owned.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
 
-// import {LiquidityOps} from "./libraries/LiquidityOps.sol";
 import {LiquidityDeployer} from "./libraries/LiquidityDeployer.sol";
 import {DeployHelper} from "./libraries/DeployHelper.sol";
 
@@ -215,7 +214,8 @@ contract Deployer is Owned {
         uint256 anchorCapacity,
         LiquidityPosition[3] memory positions
     ) external view returns (uint256 newFloorPrice) {
-        return LiquidityDeployer.computeNewFloorPrice(
+        return LiquidityDeployer
+        .computeNewFloorPrice(
             _pool,
             toSkim,
             floorNewToken1Balance,
@@ -259,9 +259,19 @@ contract Deployer is Owned {
         .requireDeployerACL(msg.sender);
         _;
     }
+    
+    function adaptiveSupply() public view returns (address) {
+        return IAddressResolver(resolver)
+        .requireAndGetAddress(
+            Utils.stringToBytes32("AdaptiveSupply"), 
+            "no AdaptiveSupply"
+        );
+    }
 
     modifier onlyFactory() {
         require(msg.sender == factory, "only factory");
         _;
     }
+
+
 }

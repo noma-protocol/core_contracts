@@ -13,8 +13,8 @@ pragma solidity ^0.8.0;
  * `onlyManager`, which can be applied to your functions to restrict their use to
  * the manager.
  */
-/// @dev DO NOT ADD STATE VARIABLES - APPEND THEM TO GelatoUniV3PoolStorage
-/// @dev DO NOT ADD BASE CONTRACTS WITH STATE VARS - APPEND THEM TO GelatoUniV3PoolStorage
+/// @dev DO NOT ADD STATE VARIABLES - APPEND THEM TO LibAppStorage
+/// @dev DO NOT ADD BASE CONTRACTS WITH STATE VARS - APPEND THEM TO LibAppStorage
 
 abstract contract OwnableUninitialized {
     address internal _manager;
