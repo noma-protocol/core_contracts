@@ -96,14 +96,13 @@ contract StakingVault is BaseVault {
         IStakingRewards(_v.stakingContract).notifyRewardAmount(toMintConverted);  
 
         // Send tokens to Floor
-        _sendToken1ToFloor(positions, addresses, toMintConverted, intrinsicMinimumValue);
+        _sendToken1ToFloor(positions, addresses, toMintConverted);
     }
 
     function _sendToken1ToFloor(
         LiquidityPosition[3] memory positions, 
         ProtocolAddresses memory addresses,
-        uint256 toMint,
-        uint256 intrinsicMinimumValue
+        uint256 toMint
     ) internal {
 
         (,,, uint256 floorToken1Balance) = IModelHelper(addresses.modelHelper)
