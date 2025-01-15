@@ -22,7 +22,7 @@ contract MockNomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, U
         __ERC20_init(_name, _symbol);
         __Ownable_init(_deployer);
         __UUPSUpgradeable_init();
-        _mint(_deployer, _totalSupply);
+        _mint(msg.sender, _totalSupply);
         resolver = IAddressResolver(_resolver);
     }
 
