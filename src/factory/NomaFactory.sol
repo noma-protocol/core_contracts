@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
@@ -52,13 +51,16 @@ interface IERC20 {
     function mint(address to, uint256 amount) external;
 }
 
+error OnlyVaultsError();
+error NotAuthorityError();
+error TokenDeployFailedError();
+error InvalidTokenAddressError();
+error SupplyTransferFailedError();
+error TokenAlreadyExistsError(string name, string symbol);
+
 contract NomaFactory {
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    error OnlyVaults();
-    error NotAuthority();
-    error TokenDeployFailed();
-    
     NomaFactoryStorage internal _n;
     
     constructor(
@@ -81,8 +83,7 @@ contract NomaFactory {
     ) external checkDeployAuthority returns (address, address, address) {
         _validateToken1(_params.token1);
 
-        (MockNomaToken nomaToken) = 
-        _deployNomaToken(
+        MockNomaToken nomaToken = _deployNomaToken(
             _params._name,
             _params._symbol,
             _params.token1, 
@@ -95,25 +96,21 @@ contract NomaFactory {
             _params.token1
         );
 
-        (address vaultAddress, address vaultUpgrade) = 
-        IEtchVault(
+        (address vaultAddress, address vaultUpgrade) = IEtchVault(
             _n.resolver.requireAndGetAddress(
                 Utils.stringToBytes32("EtchVault"), 
                 "no EtchVault"
             )
         ).preDeployVault();
 
-        (, address stakingContract) = 
-        IExtFactory(_n.extFactory)
-        .deployAll(
+        (, address stakingContract) = IExtFactory(_n.extFactory).deployAll(
             address(this),
             vaultAddress,
             address(nomaToken)
         );
 
         _n.deployer = Deployer(
-            IDeployerFactory(_n.deploymentFactory)
-            .deployDeployer(
+            IDeployerFactory(_n.deploymentFactory).deployDeployer(
                 address(this), 
                 address(_n.resolver)
             )
@@ -126,11 +123,9 @@ contract NomaFactory {
             modelHelper()
         );
         
-        IVaultUpgrade(vaultUpgrade)
-        .doUpgradeStart(
+        IVaultUpgrade(vaultUpgrade).doUpgradeStart(
             vaultAddress, 
-            _n.resolver
-            .requireAndGetAddress(
+            _n.resolver.requireAndGetAddress(
                 Utils.stringToBytes32("VaultUpgradeFinalize"), 
                 "no vaultUpgradeFinalize"
             )
@@ -148,8 +143,7 @@ contract NomaFactory {
             getLiquidityStructureParameters()
         );
 
-        _n.vaultsRepository[msg.sender] = 
-        VaultDescription({
+        VaultDescription memory vaultDesc = VaultDescription({
             tokenName: _params._name,
             tokenSymbol: _params._symbol,
             tokenDecimals: _params._decimals,
@@ -159,15 +153,11 @@ contract NomaFactory {
             vault: vaultAddress
         });
 
-        IERC20Metadata(address(nomaToken)).transfer(
-            address(_n.deployer),
-            _params._totalSupply
-        );
+        _n.vaultsRepository[msg.sender] = vaultDesc;
 
-        require(nomaToken.balanceOf(                
-            address(_n.deployer)
-        ) == _params._totalSupply, "supply transfer failed");
+        IERC20Metadata(address(nomaToken)).transfer(address(_n.deployer), _params._totalSupply);
 
+        if (nomaToken.balanceOf(address(_n.deployer)) != _params._totalSupply) revert SupplyTransferFailedError();
 
         _deployLiquidity(_params._IDOPrice, _params._totalSupply, getLiquidityStructureParameters());
 
@@ -178,59 +168,33 @@ contract NomaFactory {
 
         return (vaultAddress, address(pool), address(nomaToken));
     }
-    
+
     function _deployNomaToken(
         string memory _name,
         string memory _symbol,
         address _token1,
         uint256 _totalSupply
     ) internal returns (MockNomaToken) {
-        MockNomaToken nomaToken;
-
-        // Calculate the hash of the name and symbol
         bytes32 tokenHash = keccak256(abi.encodePacked(_name, _symbol));
 
-        // Check if the token hash already exists
-        require(!_n.deployedTokenHashes[tokenHash], "Token with same name and symbol already exists");
+        if (_n.deployedTokenHashes[tokenHash]) revert TokenAlreadyExistsError(_name, _symbol);
 
-        // Mark this token hash as deployed
         _n.deployedTokenHashes[tokenHash] = true;
+        uint256 nonce = uint256(tokenHash);
 
-        // Generate a pseudo-random nonce from the hash
-        uint256 nonce =  uint256(tokenHash);
-
+        MockNomaToken nomaToken;
         do {
             nomaToken = new MockNomaToken{salt: bytes32(nonce)}();
-            nonce++; // Increment to avoid collisions in the loop
+            nonce++;
         } while (address(nomaToken) >= _token1);
 
         nomaToken.initialize(_n.authority, _totalSupply, _name, _symbol, address(_n.resolver));
 
-        require(address(nomaToken) < _token1, "invalid token address");
+        if (address(nomaToken) >= _token1) revert InvalidTokenAddressError();
 
-        uint256 totalSupplyFromContract = nomaToken.totalSupply();
-
-        require(totalSupplyFromContract == _totalSupply, "wrong parameters");
-
-        // Encode the initialize function call
-        bytes memory data = abi.encodeWithSelector(
-            nomaToken.initialize.selector,
-            address(this),  // Deployer address
-            _totalSupply,   // Initial supply
-            _name,          // Token name
-            _symbol         // Token symbol
-        );
-
-        // Deploy the proxy contract
-        ERC1967Proxy proxy = new ERC1967Proxy(
-            address(nomaToken),
-            data
-        );
-
-        if (address(proxy) == address(0)) revert TokenDeployFailed();
-        
         return nomaToken;
     }
+
 
     function _deployPool(uint256 _initPrice, address token0, address token1) internal returns (IUniswapV3Pool) {
         IUniswapV3Factory factory = IUniswapV3Factory(_n.uniswapV3Factory);
@@ -370,18 +334,18 @@ contract NomaFactory {
 
     modifier checkDeployAuthority() {
         if (!_n.permissionlessDeployEnabled) {
-            require(msg.sender == _n.authority, "not allowed");
+            if (msg.sender != _n.authority) revert NotAuthorityError();
         }
         _;
     }
 
     modifier isAuthority() {
-        if (msg.sender != _n.authority) revert NotAuthority();
+        if (msg.sender != _n.authority) revert NotAuthorityError();
         _;
     }
 
     modifier onlyVaults() {
-        if (_n.vaultsRepository[msg.sender].vault != msg.sender) revert OnlyVaults();
+        if (_n.vaultsRepository[msg.sender].vault != msg.sender) revert OnlyVaultsError();
         _;
     }
 
