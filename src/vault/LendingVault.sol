@@ -31,6 +31,8 @@ interface IStakingRewards {
     function notifyRewardAmount(uint256 reward) external;
 }
 
+error NotInitialized();
+
 contract LendingVault is BaseVault {
     
     uint256 public constant SECONDS_IN_DAY = 86400;
@@ -162,17 +164,47 @@ contract LendingVault is BaseVault {
         }
     }
 
+    function updatePositions(LiquidityPosition[3] memory _positions) public onlyInternalCalls {
+        if (!_v.initialized) revert NotInitialized();
+        
+        require(
+            _positions[0].liquidity > 0 &&
+            _positions[1].liquidity > 0 && 
+            _positions[2].liquidity > 0, 
+            "updatePositions: no liquidity in positions"
+        );           
+        
+        _updatePositions(_positions);
+    }
+    
+    function _updatePositions(LiquidityPosition[3] memory _positions) internal {   
+        _v.floorPosition = _positions[0];
+        _v.anchorPosition = _positions[1];
+        _v.discoveryPosition = _positions[2];
+    }
+
+    function getPositions() public view
+    returns (LiquidityPosition[3] memory positions) {
+        positions = [
+            _v.floorPosition, 
+            _v.anchorPosition, 
+            _v.discoveryPosition
+        ];
+    }
+
     modifier onlyVault() {
         require(msg.sender == address(this), "LendingVault: only vault");
         _;
     }
 
     function getFunctionSelectors() external pure override returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](4);
+        bytes4[] memory selectors = new bytes4[](6);
         selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,uint256)")));    
         selectors[1] = bytes4(keccak256(bytes("paybackLoan(address)")));
         selectors[2] = bytes4(keccak256(bytes("rollLoan(address)")));
         selectors[3] = bytes4(keccak256(bytes("defaultLoans()")));
+        selectors[4] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256)[3])")));
+        selectors[5] = bytes4(keccak256(bytes("getPositions()")));
         return selectors;
     }
 }
