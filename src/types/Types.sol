@@ -49,6 +49,15 @@ struct ProtocolAddresses {
     address adaptiveSupplyController;
 }
 
+struct LiquidityStructureParameters {
+    uint8 floorPercentage;
+    uint8 anchorPercentage;
+    uint8 idoPriceMultiplier;
+    uint16[2] floorBips;
+    uint256 shiftRatio;
+    uint256 slideRatio;
+}
+
 struct ShiftParameters {
     address pool;
     address deployer;
