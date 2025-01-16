@@ -16,7 +16,8 @@ import "../libraries/LiquidityDeployer.sol";
 import {
     LiquidityPosition, 
     LiquidityType,
-    ProtocolAddresses
+    ProtocolAddresses,
+    LiquidityStructureParameters
 } from "../types/Types.sol";
 
 interface IERC20 {
@@ -86,7 +87,6 @@ contract StakingVault is BaseVault {
         require(_v.stakingContract != address(0), "StakeVault: staking contract not set");
         
         IERC20(_v.tokenInfo.token0).approve(_v.stakingContract, toMintConverted);
-        // IERC20(_v.tokenInfo.token0).mint(_v.stakingContract, toMintConverted);
         mintTokens(_v.stakingContract, toMintConverted);
 
         // Update total minted (NOMA)
@@ -222,8 +222,7 @@ contract StakingVault is BaseVault {
             // Deploy new anchor position
             positions[1] = LiquidityOps
             .reDeploy(
-                addresses.pool,
-                addresses.deployer,
+                addresses,
                 positions[0].upperTick,                
                 Utils.nearestUsableTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96)      
@@ -234,8 +233,7 @@ contract StakingVault is BaseVault {
 
             positions[2] = LiquidityOps
             .reDeploy(
-                addresses.pool,
-                addresses.deployer, 
+                addresses,
                 Utils.nearestUsableTick(
                     Utils.addBipsToTick(positions[1].upperTick, 150)
                 ),
@@ -253,9 +251,20 @@ contract StakingVault is BaseVault {
         }
     }
 
+    function liquidityStructureParameters() public view returns 
+    (LiquidityStructureParameters memory ) {
+        return _v.liquidityStructureParameters;
+    }
+
+    function setStakingContract(address _stakingContract) external onlyManager {
+        _v.stakingContract = _stakingContract;
+    }
+
     function getFunctionSelectors() external pure  override returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](1);
-        selectors[0] = bytes4(keccak256(bytes("mintAndDistributeRewards((address,address,address,address))")));      
+        bytes4[] memory selectors = new bytes4[](3);
+        selectors[0] = bytes4(keccak256(bytes("mintAndDistributeRewards((address,address,address,address,address))"))); 
+        selectors[1] = bytes4(keccak256(bytes("liquidityStructureParameters()")));  
+        selectors[2] = bytes4(keccak256(bytes("setStakingContract(address)")));
         return selectors;
     }
 }
