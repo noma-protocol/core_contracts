@@ -11,7 +11,8 @@ import {
     LiquidityPosition, 
     LiquidityType,
     VaultInfo,
-    ProtocolAddresses
+    ProtocolAddresses,
+    LiquidityStructureParameters
 } from "../types/Types.sol";
 
 import "../libraries/DecimalMath.sol"; 
@@ -33,7 +34,12 @@ interface INomaFactory {
     function mintTokens(address to, uint256 amount) external;
 }
 
+interface IAdaptiveSupplyController {
+    function adjustSupply(address pool, address vault, int256 volatility) external returns (uint256, uint256);
+}
 
+
+error NotInitialized();
 error AlreadyInitialized();
 error InvalidCaller();
 
@@ -75,7 +81,8 @@ contract BaseVault is OwnableUninitialized {
         address _modelHelper,
         address _stakingContract,
         address _proxyAddress,
-        address _escrowContract
+        address _adaptiveSupplyController,
+        LiquidityStructureParameters memory _params
     ) public {
         _v.pool = IUniswapV3Pool(_pool);
         _v.factory = _factory;
@@ -86,8 +93,9 @@ contract BaseVault is OwnableUninitialized {
         _v.lastLiquidityRatio = 0;
         _v.stakingContract = _stakingContract;
         _v.proxyAddress = _proxyAddress;
-        _v.escrowContract = _escrowContract;
+        _v.adaptiveSupplyController = _adaptiveSupplyController;
         _v.deployerContract = _deployer;
+        _v.liquidityStructureParameters = _params;
         OwnableUninitialized(_owner);
     }
     
@@ -107,9 +115,8 @@ contract BaseVault is OwnableUninitialized {
         );
     }
 
-    function updatePositions(LiquidityPosition[3] memory _positions) public {
-        require(msg.sender == address(this), "invalid caller");
-        require(_v.initialized, "not initialized");
+    function updatePositions(LiquidityPosition[3] memory _positions) public onlyInternalCalls {
+        if (!_v.initialized) revert NotInitialized();
         
         require(
             _positions[0].liquidity > 0 &&
@@ -173,8 +180,7 @@ contract BaseVault is OwnableUninitialized {
     function mintTokens(
         address to,
         uint256 amount
-    ) public {
-        require(msg.sender == address(this), "invalid caller");
+    ) public onlyInternalCalls {
         
         INomaFactory(_v.factory)
         .mintTokens(
@@ -186,8 +192,7 @@ contract BaseVault is OwnableUninitialized {
     function setFees(
         uint256 _feesAccumulatedToken0, 
         uint256 _feesAccumulatedToken1
-    ) external {
-        require(msg.sender == address(this), "invalid caller");
+    ) public onlyInternalCalls {
 
         _v.feesAccumulatorToken0 += _feesAccumulatedToken0;
         _v.feesAccumulatorToken1 += _feesAccumulatedToken1;
@@ -244,24 +249,27 @@ contract BaseVault is OwnableUninitialized {
             pool: address(_v.pool),
             vault: address(this),
             deployer: _v.deployerContract,
-            modelHelper: _v.modelHelper
+            modelHelper: _v.modelHelper,
+            adaptiveSupplyController: _v.adaptiveSupplyController
         });
     }
 
-    function setStakingContract(address _stakingContract) external onlyManager {
-        _v.stakingContract = _stakingContract;
-    }
 
     modifier onlyDeployer() {
         require(msg.sender == _v.deployerContract, "only deployer");
         _;
     }
 
+    modifier onlyInternalCalls() {
+        require(msg.sender == address(this), "only internal calls");
+        _;        
+    }
+
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](19);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
         selectors[1] = bytes4(keccak256(bytes("pool()")));
-        selectors[2] = bytes4(keccak256(bytes("initialize(address,address,address,address,address,address,address,address)")));
+        selectors[2] = bytes4(keccak256(bytes("initialize(address,address,address,address,address,address,address,address,(uint8,uint8,uint8,uint16[2],uint256,uint256))")));
         selectors[3] = bytes4(keccak256(bytes("setParameters(address,address)")));
         selectors[4] = bytes4(keccak256(bytes("initializeLiquidity((int24,int24,uint128,uint256)[3])")));
         selectors[5] = bytes4(keccak256(bytes("getPositions()")));
@@ -270,7 +278,6 @@ contract BaseVault is OwnableUninitialized {
         selectors[8] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256)[3])")));
         selectors[9] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));
         selectors[10] = bytes4(keccak256(bytes("getAccumulatedFees()")));
-        selectors[11] = bytes4(keccak256(bytes("setStakingContract(address)")));
         selectors[12] = bytes4(keccak256(bytes("getExcessReserveToken1()")));
         selectors[13] = bytes4(keccak256(bytes("borrow(address,uint256)")));
         selectors[14] = bytes4(keccak256(bytes("getCollateralAmount()")));
