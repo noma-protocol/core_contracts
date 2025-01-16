@@ -51,7 +51,7 @@ library LiquidityDeployer {
 
         (int24 lowerTick, int24 upperTick) = Conversions
         .computeRangeTicks(
-            lowerAnchorPrice + lowerAnchorPrice * 1 / 100,
+            lowerAnchorPrice,
             Utils.addBips(
                 lowerAnchorPrice,
                 int256(deployParams.bips)
@@ -138,6 +138,10 @@ library LiquidityDeployer {
         uint256 currentFloorBalance,
         LiquidityPosition memory floorPosition
     ) public returns (LiquidityPosition memory newPosition) {
+        
+        if (newFloorPrice < currentFloorPrice) {
+            newFloorPrice = currentFloorPrice;
+        }
 
         (uint160 sqrtRatioX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
 
@@ -145,8 +149,7 @@ library LiquidityDeployer {
             
             (int24 lowerTick, int24 upperTick) = 
             Conversions.computeSingleTick(
-                newFloorPrice > 1 ? newFloorPrice : 
-                currentFloorPrice,
+                newFloorPrice,
                 60
             );
 
@@ -212,10 +215,18 @@ library LiquidityDeployer {
             amounts.amount1
         );
 
-        // TODO remove this
-        // if (liquidityType == LiquidityType.Discovery) {
-        //     require(amounts.amount0 >= 1 ether, "_deployPosition: amount0 is too low");
-        // }
+        if (liquidityType == LiquidityType.Discovery) {
+            if (amounts.amount0 == 0) {
+                revert(
+                    string(
+                        abi.encodePacked(
+                            "_deployPosition: liquidity is 0 : ", 
+                            Utils._uint2str(uint256(amounts.amount0))
+                        )
+                    )
+                );
+            }
+        }
 
         if (liquidity > 0) {
             Uniswap.mint(
@@ -297,23 +308,10 @@ library LiquidityDeployer {
 
         uint256 newFloorPrice = DecimalMath.divideDecimal(
             floorNewToken1Balance + toSkim,
-            circulatingSupply - anchorCapacity
+            circulatingSupply
         );
 
-        if (newFloorPrice <= 1e18) {
-            return 0;
-        } else {
-            return newFloorPrice;
-            
-            revert(
-                string(
-                    abi.encodePacked(
-                        "pool: newFloorPrice is : ", 
-                        Utils._uint2str(uint256(newFloorPrice))
-                    )
-                )
-            );            
-        }
+        return newFloorPrice;  
     }
     
 }
