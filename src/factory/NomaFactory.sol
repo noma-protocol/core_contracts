@@ -23,7 +23,8 @@ import {
     feeTier, 
     tickSpacing, 
     VaultDeployParams,
-    VaultInitParams
+    VaultInitParams,
+    LiquidityStructureParameters
 } from "../types/Types.sol";
 
 interface IVaultUpgrade {
@@ -47,27 +48,37 @@ interface IDeployerFactory {
     function deployDeployer(address owner, address resolver) external returns (address);
 }
 
+interface IERC20 {
+    function mint(address to, uint256 amount) external;
+}
+
 contract NomaFactory {
     using EnumerableSet for EnumerableSet.AddressSet;
 
+    error OnlyVaults();
+    error NotAuthority();
+    error TokenDeployFailed();
+    
     NomaFactoryStorage internal _n;
     
     constructor(
         address _uniswapV3Factory,
         address _resolver,
         address _deploymentFactory,
-        address _extFactory
+        address _extFactory,
+        bool _permissionlessDeployEnabled
     ) {
         _n.authority = msg.sender;
         _n.uniswapV3Factory = _uniswapV3Factory;
         _n.resolver = IAddressResolver(_resolver);
         _n.deploymentFactory = _deploymentFactory;
         _n.extFactory = _extFactory;
+        _n.permissionlessDeployEnabled = false;
     }
 
     function deployVault(
         VaultDeployParams memory _params
-    ) external returns (address, address, address) {
+    ) external checkDeployAuthority returns (address, address, address) {
         _validateToken1(_params.token1);
 
         (MockNomaToken nomaToken) = 
@@ -77,9 +88,6 @@ contract NomaFactory {
             _params.token1, 
             _params._totalSupply
         );
-
-        // Set authority for future upgrades
-        // MockNomaToken(address(proxy)).setOwner(msg.sender);
         
         IUniswapV3Pool pool = _deployPool(
             _params._IDOPrice,
@@ -136,10 +144,11 @@ contract NomaFactory {
             modelHelper(), 
             stakingContract,
             address(nomaToken),
-            address(0)
+            adaptiveSupply(),
+            getLiquidityStructureParameters()
         );
 
-        _n.vaultsRepository[address(nomaToken)] = 
+        _n.vaultsRepository[msg.sender] = 
         VaultDescription({
             tokenName: _params._name,
             tokenSymbol: _params._symbol,
@@ -160,11 +169,11 @@ contract NomaFactory {
         ) == _params._totalSupply, "supply transfer failed");
 
 
-        _deployLiquidity(_params._IDOPrice, _params._totalSupply);
+        _deployLiquidity(_params._IDOPrice, _params._totalSupply, getLiquidityStructureParameters());
 
         _n.deployers.add(msg.sender);
         _n.totalVaults += 1;
-        _n.resolver.importDeployerACL(vaultAddress);        
+        _n.resolver.configureDeployerACL(vaultAddress);        
         _n.deployer.finalize();
 
         return (vaultAddress, address(pool), address(nomaToken));
@@ -195,7 +204,7 @@ contract NomaFactory {
             nonce++; // Increment to avoid collisions in the loop
         } while (address(nomaToken) >= _token1);
 
-        nomaToken.initialize(address(this), _totalSupply, _name, _symbol);
+        nomaToken.initialize(_n.authority, _totalSupply, _name, _symbol, address(_n.resolver));
 
         require(address(nomaToken) < _token1, "invalid token address");
 
@@ -218,8 +227,8 @@ contract NomaFactory {
             data
         );
 
-        require(address(proxy) != address(0), "Token deploy failed");
-
+        if (address(proxy) == address(0)) revert TokenDeployFailed();
+        
         return nomaToken;
     }
 
@@ -257,7 +266,8 @@ contract NomaFactory {
         address _modelHelper,
         address _stakingContract,
         address _token0,
-        address _escrowContract
+        address _adaptiveSupply,
+        LiquidityStructureParameters memory _params
     ) internal {
         BaseVault vault = BaseVault(_vault);
 
@@ -269,15 +279,37 @@ contract NomaFactory {
             _modelHelper,
             _stakingContract,
             _token0,
-            _escrowContract
+            _adaptiveSupply,
+            _params
         );
     }
 
-    function _deployLiquidity(uint256 _IDOPrice, uint256 _totalSupply) internal {
-        // TODO liquidity structure parameters
-        _n.deployer.deployFloor(_IDOPrice, _totalSupply * 25 / 100);
-        _n.deployer.deployAnchor(500, 1200, _totalSupply * 15 / 100);
-        _n.deployer.deployDiscovery(_IDOPrice * 3);
+    function _deployLiquidity(
+        uint256 _IDOPrice, 
+        uint256 _totalSupply, 
+        LiquidityStructureParameters memory _liquidityParams
+        ) internal {
+        _n.deployer.deployFloor(_IDOPrice, _totalSupply * _liquidityParams.floorPercentage / 100);  
+        _n.deployer.deployAnchor(
+            _liquidityParams.floorBips[0], 
+            _liquidityParams.floorBips[1], 
+            _totalSupply * _liquidityParams.anchorPercentage / 100
+        );
+        _n.deployer.deployDiscovery(_IDOPrice * _liquidityParams.idoPriceMultiplier);
+    }
+
+    function mintTokens(address to, uint256 amount) public onlyVaults {
+        IERC20(_n.vaultsRepository[msg.sender].token0).mint(to, amount);
+    }
+
+    function setLiquidityStructureParameters(
+        LiquidityStructureParameters memory _params
+    ) public isAuthority {
+        _n.liquidityStructureParameters = _params;
+    }
+
+    function setPermissionlessDeploy(bool _flag) public isAuthority {
+        _n.permissionlessDeployEnabled = _flag;
     }
 
     function _validateToken1(address token) internal view {
@@ -293,6 +325,11 @@ contract NomaFactory {
             result := mload(add(symbol, 32))
         }
         _n.resolver.requireAndGetAddress(result, "not a reserve token");
+    }
+
+    function getLiquidityStructureParameters() public view returns 
+    (LiquidityStructureParameters memory) {
+        return _n.liquidityStructureParameters;
     }
 
     function getVaultDescription(address deployer) external view returns (VaultDescription memory) {
@@ -323,9 +360,29 @@ contract NomaFactory {
                 );
     }
 
+    function adaptiveSupply() public view returns (address) {
+        return _n.resolver
+                .requireAndGetAddress(
+                    Utils.stringToBytes32("AdaptiveSupply"), 
+                    "no AdaptiveSupply"
+                );
+    }
 
-    modifier isAuthority() {
-        require(msg.sender == _n.authority, "NFA");
+    modifier checkDeployAuthority() {
+        if (!_n.permissionlessDeployEnabled) {
+            require(msg.sender == _n.authority, "not allowed");
+        }
         _;
     }
+
+    modifier isAuthority() {
+        if (msg.sender != _n.authority) revert NotAuthority();
+        _;
+    }
+
+    modifier onlyVaults() {
+        if (_n.vaultsRepository[msg.sender].vault != msg.sender) revert OnlyVaults();
+        _;
+    }
+
 }
