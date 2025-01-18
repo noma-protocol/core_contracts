@@ -2,16 +2,18 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../src/token/MockNomaToken.sol";
+import "./token/TestMockNomaToken.sol";
 import "./token/TestMockNomaTokenV2.sol";
 import "openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract MockNomaTokenTest is Test {
-    MockNomaToken public mockNomaToken;
+    TestMockNomaToken public mockNomaToken;
     TestMockNomaTokenV2 public mockNomaTokenV2;
     ERC1967Proxy public proxy;
 
+    uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address deployer = vm.envAddress("DEPLOYER");
+
     address user = address(2);
     address uniswapV3Pool = 0x18255e6a727Ed2f9c7261E8A59Fb6F884CB6C368;
     address nonUniswapV3Pool = address(4);
@@ -20,14 +22,18 @@ contract MockNomaTokenTest is Test {
         vm.startPrank(deployer);
 
         // Deploy the implementation contract
-        mockNomaToken = new MockNomaToken();
-
+        mockNomaToken = new TestMockNomaToken();
         // Encode the initialize function call
         bytes memory data = abi.encodeWithSelector(
             mockNomaToken.initialize.selector,
             deployer,
-            1000000 ether
+            1000000 ether,
+            "Mock NOMA",
+            "MNOMA",
+            address(0)
         );
+
+        // mockNomaToken.initialize(deployer, 1000000 ether, "Mock NOMA", "MNOMA", address(0));
 
         // Deploy the proxy contract
         proxy = new ERC1967Proxy(
@@ -36,8 +42,10 @@ contract MockNomaTokenTest is Test {
         );
 
         // Cast the proxy to MockNomaToken to interact with it
-        mockNomaToken = MockNomaToken(address(proxy));
+        mockNomaToken = TestMockNomaToken(address(proxy));
+        mockNomaToken.setOwner(deployer);
 
+        mockNomaToken.mintTest(deployer, 100 ether);
         // Mint some tokens to user
         mockNomaToken.transfer(user, 100 ether);
 
@@ -46,7 +54,7 @@ contract MockNomaTokenTest is Test {
 
     function testInitialSupply() public {
         uint256 deployerBalance = mockNomaToken.balanceOf(deployer);
-        assertEq(deployerBalance, 999900 ether);
+        assertEq(deployerBalance, 1000000 ether);
     }
 
     function testTransfer() public {
@@ -60,7 +68,7 @@ contract MockNomaTokenTest is Test {
 
         // Upgrade the proxy to use the new implementation
         vm.prank(deployer);
-        MockNomaToken(address(proxy)).upgradeToAndCall(address(mockNomaTokenV2), new bytes(0));
+        TestMockNomaToken(address(proxy)).upgradeToAndCall(address(mockNomaTokenV2), new bytes(0));
 
         // Cast the proxy to MockNomaTokenV2 to interact with the new implementation
         TestMockNomaTokenV2 upgraded = TestMockNomaTokenV2(address(proxy));
@@ -73,7 +81,7 @@ contract MockNomaTokenTest is Test {
         // Deploy new implementation and upgrade the proxy
         mockNomaTokenV2 = new TestMockNomaTokenV2();
         vm.prank(deployer);
-        MockNomaToken(address(proxy)).upgradeToAndCall(address(mockNomaTokenV2), new bytes(0));
+        TestMockNomaToken(address(proxy)).upgradeToAndCall(address(mockNomaTokenV2), new bytes(0));
         TestMockNomaTokenV2 upgraded = TestMockNomaTokenV2(address(proxy));
 
         // Allow uniswapV3Pool to perform transfers

@@ -3,39 +3,44 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import "../src/staking/Gons.sol";
-import "../src/token/MockNomaToken.sol";
+import "./token/TestMockNomaToken.sol";
 import "../src/staking/Staking.sol";
 
 contract TestRebase is Test {
     GonsToken rebaseToken;
-    MockNomaToken mockNomaToken;
+    TestMockNomaToken mockNomaToken;
     Staking staking;
 
     address userA = address(0x1);
     address userB = address(0x2);
     address userC = address(0x3);
     address userD = address(0x4);
+    address vault = address(0x1b26D84372D1F8699a3a71801B4CA757B95C9929);
 
     uint256 INITIAL_SUPPLY = 1_000e18;
 
+    uint256 privateKey = vm.envUint("PRIVATE_KEY");
+    address deployer = vm.envAddress("DEPLOYER");
+
     function setUp() public {
-        mockNomaToken = new MockNomaToken();
-        mockNomaToken.initialize(address(this), 100_000e18);
+        mockNomaToken = new TestMockNomaToken();
+        mockNomaToken.initialize(address(this), 100_000e18, "TEST", "TEST", address(0));
 
         rebaseToken = new GonsToken(address(this));
+
+        vm.prank(deployer);
         staking = new Staking(address(mockNomaToken), address(rebaseToken), address(this));        
-        mockNomaToken.mint(address(staking), INITIAL_SUPPLY);
-        staking.setup(address(this), address(mockNomaToken), address(rebaseToken));
-        // rebaseToken.setIndex(1);
+        mockNomaToken.mintTest(address(staking), INITIAL_SUPPLY);
+        // staking.setup(address(this), address(mockNomaToken), address(rebaseToken));
         rebaseToken.initialize(address(staking));
     }
-
 
     function testTotalSupply() public returns (uint256) {
         uint256 totalSupplyBefore = rebaseToken.totalSupply();
 
         uint256 profit = 150e18;
 
+        vm.prank(deployer);
         staking.notifyRewardAmount(0);
         mockNomaToken.approve(address(staking), profit);
         staking.notifyRewardAmount(profit);
@@ -43,20 +48,20 @@ contract TestRebase is Test {
         uint256 expectedTotalSupply = totalSupplyBefore + profit;
         uint256 actualTotalSupply = rebaseToken.totalSupply();
 
-        console.log("Actual total supply: %s", actualTotalSupply);
+        // console.log("Actual total supply: %s", actualTotalSupply);
 
         uint256 balanceOfStakingContract = rebaseToken.balanceOf(address(staking));
-        console.log("Balance of staking contract: %s", balanceOfStakingContract);
+        // console.log("Balance of staking contract: %s", balanceOfStakingContract);
 
         assertEq(actualTotalSupply, expectedTotalSupply);
         return actualTotalSupply;        
     }
 
     function testStakeUserA() public {
-        mockNomaToken.mint(userA, 1000e18);
+        mockNomaToken.mintTest(userA, 1000e18);
 
         uint256 rebaseTokenBalance = rebaseToken.balanceOf(userA);
-        console.log("rebaseTokenBalance: %s", rebaseTokenBalance);
+        // console.log("rebaseTokenBalance: %s", rebaseTokenBalance);
 
         vm.prank(userA);
         mockNomaToken.approve(address(staking), 100e18);
@@ -64,13 +69,13 @@ contract TestRebase is Test {
         vm.stopPrank();
 
         uint256 balanceAfterStaking = rebaseToken.balanceOf(userA);
-        console.log("balanceAfterStaking: %s", balanceAfterStaking);
+        // console.log("balanceAfterStaking: %s", balanceAfterStaking);
 
         assertGt(rebaseToken.balanceOf(userA), rebaseTokenBalance);
     }
 
     function testStakeUserB() public {
-        mockNomaToken.mint(userB, 1000e18);
+        mockNomaToken.mintTest(userB, 1000e18);
         uint256 nomaBalanceBefore = mockNomaToken.balanceOf(userB);
 
         vm.prank(userB);
@@ -84,10 +89,10 @@ contract TestRebase is Test {
     }
 
     function testStakeAndProfit() public {
-        mockNomaToken.mint(userA, 1000e18);
+        mockNomaToken.mintTest(userA, 1000e18);
 
         uint256 rebaseTokenBalance = rebaseToken.balanceOf(userA);
-        console.log("rebaseTokenBalance: %s", rebaseTokenBalance);
+        // console.log("rebaseTokenBalance: %s", rebaseTokenBalance);
 
         vm.prank(userA);
         mockNomaToken.approve(address(staking), 100e18);
@@ -95,11 +100,11 @@ contract TestRebase is Test {
         vm.stopPrank();
 
         uint256 balanceAfterStaking = rebaseToken.balanceOf(userA);
-        console.log("balanceAfterStaking: %s", balanceAfterStaking);
+        // console.log("balanceAfterStaking: %s", balanceAfterStaking);
 
         assertGt(rebaseToken.balanceOf(userA), rebaseTokenBalance);
 
-        mockNomaToken.mint(userB, 1000e18);
+        mockNomaToken.mintTest(userB, 1000e18);
         uint256 nomaBalanceBefore = mockNomaToken.balanceOf(userB);
 
         vm.prank(userB);
@@ -110,14 +115,14 @@ contract TestRebase is Test {
         uint256 nomaBalanceAfter = mockNomaToken.balanceOf(userB);
         assertLt(nomaBalanceAfter, nomaBalanceBefore); 
         
-        mockNomaToken.mint(userC, 1000e18);
+        mockNomaToken.mintTest(userC, 1000e18);
 
         vm.prank(userC);
         mockNomaToken.approve(address(staking), 100e18);
         staking.stake(userC, 100e18);
         vm.stopPrank();
 
-        mockNomaToken.mint(userD, 1000e18);
+        mockNomaToken.mintTest(userD, 1000e18);
 
         vm.prank(userD);
         mockNomaToken.approve(address(staking), 100e18);
@@ -126,6 +131,7 @@ contract TestRebase is Test {
 
         uint256 profit = 3000e18;
 
+        vm.prank(deployer);
         staking.notifyRewardAmount(0);
         mockNomaToken.approve(address(staking), profit);
         staking.notifyRewardAmount(profit); 
@@ -139,12 +145,12 @@ contract TestRebase is Test {
         uint256 nomaBalanceStaking = mockNomaToken.balanceOf(address(staking));
 
         require(nomaBalanceStaking >= (balanceAfterProfitUserA + balanceAfterProfitUserB + balanceAfterProfitUserC + balanceAfterProfitUserD), "Staking contract should have enough Noma tokens");
-        console.log("balanceAfterProfitUserA: %s", balanceAfterProfitUserA);    
-        console.log("balanceAfterProfitUserB: %s", balanceAfterProfitUserB);   
-        console.log("balanceAfterProfitUserC: %s", balanceAfterProfitUserC);      
-        console.log("balanceAfterProfitUserD: %s", balanceAfterProfitUserD);    
-        console.log("balanceAfterProfitStaking: %s", balanceAfterProfitStaking);
-        console.log("nomaBalanceStaking: %s", nomaBalanceStaking);
+        // console.log("balanceAfterProfitUserA: %s", balanceAfterProfitUserA);    
+        // console.log("balanceAfterProfitUserB: %s", balanceAfterProfitUserB);   
+        // console.log("balanceAfterProfitUserC: %s", balanceAfterProfitUserC);      
+        // console.log("balanceAfterProfitUserD: %s", balanceAfterProfitUserD);    
+        // console.log("balanceAfterProfitStaking: %s", balanceAfterProfitStaking);
+        // console.log("nomaBalanceStaking: %s", nomaBalanceStaking);
     }
 
     function testArbitraryStakesWithProfit() public {
@@ -162,7 +168,7 @@ contract TestRebase is Test {
         // Create users, mint tokens, and stake
         for (uint8 i = 0; i < numUsers; i++) {
             users[i] = address(uint160(i + 1));
-            mockNomaToken.mint(users[i], initialBalance);
+            mockNomaToken.mintTest(users[i], initialBalance);
 
             initialRebaseBalances[i] = rebaseToken.balanceOf(users[i]);
 
@@ -178,24 +184,31 @@ contract TestRebase is Test {
 
         // Distribute profit
         uint256 profit = 1000e18; // Scale profit with number of users
+
+        vm.prank(deployer);
         staking.notifyRewardAmount(0);
+        vm.stopPrank();
+
         mockNomaToken.approve(address(staking), profit);
+        
+        vm.prank(deployer);
         staking.notifyRewardAmount(profit);
+        vm.stopPrank();
 
         // Check balances after profit distribution
         uint256 totalRebaseBalance = 0;
         for (uint8 i = 0; i < numUsers; i++) {
             uint256 balanceAfterProfit = rebaseToken.balanceOf(users[i]);
-            console.log("Balance after profit for user %s: %s", i, balanceAfterProfit);
-            // assertGt(balanceAfterProfit, afterStakeRebaseBalances[i], "Balance should increase after profit distribution");
+            // console.log("Balance after profit for user %s: %s", i, balanceAfterProfit);
+            assertGt(balanceAfterProfit, afterStakeRebaseBalances[i], "Balance should increase after profit distribution");
             totalRebaseBalance += balanceAfterProfit;
         }
 
         uint256 balanceAfterProfitStaking = rebaseToken.balanceOf(address(staking));
         uint256 nomaBalanceStaking = mockNomaToken.balanceOf(address(staking));
 
-        console.log("Balance after profit for staking contract: %s", balanceAfterProfitStaking);
-        console.log("Noma balance of staking contract: %s", nomaBalanceStaking);
+        // console.log("Balance after profit for staking contract: %s", balanceAfterProfitStaking);
+        // console.log("Noma balance of staking contract: %s", nomaBalanceStaking);
 
         assertGe(nomaBalanceStaking, totalRebaseBalance - (balanceAfterProfitStaking - balanceAfterProfitStaking), "Staking contract should have enough Noma tokens");
     }
@@ -204,18 +217,21 @@ contract TestRebase is Test {
         uint16 numUsers = 254;
 
         uint256 initialBalance = 1000e18;
+
         address[] memory users = new address[](numUsers);
         uint256[] memory initialRebaseBalances = new uint256[](numUsers);
         uint256[] memory afterStakeRebaseBalances = new uint256[](numUsers);
         uint256[] memory stakeAmounts = new uint256[](numUsers);
+        
         uint256 totalStaked = 0;
 
         uint256 balanceBeforeProfitStakingContract = rebaseToken.balanceOf(address(staking));
 
         // Create users, mint tokens, and stake random amounts
         for (uint8 i = 0; i < numUsers; i++) {
+            
             users[i] = address(uint160(i + 1));
-            mockNomaToken.mint(users[i], initialBalance);
+            mockNomaToken.mintTest(users[i], initialBalance);
 
             initialRebaseBalances[i] = rebaseToken.balanceOf(users[i]);
 
@@ -233,25 +249,32 @@ contract TestRebase is Test {
             assertGt(afterStakeRebaseBalances[i], initialRebaseBalances[i], "Rebase balance should increase after staking");
             assertEq(mockNomaToken.balanceOf(users[i]), initialBalance - stakeAmount, "Noma balance should decrease by stake amount");
 
-            console.log("User %s staked amount: %s", i, stakeAmount);
+            // console.log("User %s staked amount: %s", i, stakeAmount);
         }
         
         // Distribute profit
         uint256 profit = 300_000e18; // Set profit to 50% of total staked amount
-        mockNomaToken.mint(address(this), profit);
+        mockNomaToken.mintTest(address(staking), profit);
 
+        vm.prank(deployer);
         staking.notifyRewardAmount(0);
-        mockNomaToken.approve(address(staking), profit);
-        staking.notifyRewardAmount(profit);
+        vm.stopPrank();
 
-        console.log("Total staked: %s", totalStaked);
-        console.log("Profit distributed: %s", profit);
+        vm.prank(address(staking));
+        mockNomaToken.approve(address(staking), profit);
+
+        vm.prank(deployer);
+        staking.notifyRewardAmount(profit);
+        vm.stopPrank();
+        
+        // console.log("Total staked: %s", totalStaked);
+        // console.log("Profit distributed: %s", profit);
 
         // Check balances after profit distribution
         uint256 totalRebaseBalance = 0;
         for (uint8 i = 0; i < numUsers; i++) {
             uint256 balanceAfterProfit = rebaseToken.balanceOf(users[i]);
-            console.log("Balance after profit for user %s: %s", i, balanceAfterProfit);
+            // console.log("Balance after profit for user %s: %s", i, balanceAfterProfit);
             assertGt(balanceAfterProfit, afterStakeRebaseBalances[i], "Balance should increase after profit distribution");
             totalRebaseBalance += balanceAfterProfit;
         }
@@ -259,12 +282,11 @@ contract TestRebase is Test {
         uint256 balanceAfterProfitStaking = rebaseToken.balanceOf(address(staking));
         uint256 nomaBalanceStaking = mockNomaToken.balanceOf(address(staking));
 
-        console.log("Balance after profit for staking contract: %s", balanceAfterProfitStaking);
-        console.log("Noma balance of staking contract: %s", nomaBalanceStaking);
+        // console.log("Balance after profit for staking contract: %s", balanceAfterProfitStaking);
+        // console.log("Noma balance of staking contract: %s", nomaBalanceStaking);
 
         assertGe(nomaBalanceStaking, totalRebaseBalance , "Staking contract should have enough Noma tokens");
         assertEq(rebaseToken.totalSupply(),  balanceAfterProfitStaking, "Total supply should match sum of all balances");
-
     }
 
     function testArbitraryStakesWithRandomAmountsAndProfit2() public {
@@ -278,13 +300,13 @@ contract TestRebase is Test {
         uint256 totalStaked = 0;
 
         uint256 balanceBeforeProfitStakingContract = rebaseToken.balanceOf(address(staking));
-        console.log("Initial staking contract balance:");
-        console.log(balanceBeforeProfitStakingContract);
+        // console.log("Initial staking contract balance:");
+        // console.log(balanceBeforeProfitStakingContract);
 
         // Create users, mint tokens, and stake random amounts
         for (uint8 i = 0; i < numUsers; i++) {
             users[i] = address(uint160(i + 1));
-            mockNomaToken.mint(users[i], initialBalance);
+            mockNomaToken.mintTest(users[i], initialBalance);
 
             initialRebaseBalances[i] = rebaseToken.balanceOf(users[i]);
 
@@ -300,62 +322,65 @@ contract TestRebase is Test {
             afterStakeRebaseBalances[i] = rebaseToken.balanceOf(users[i]);
         }
 
-        console.log("Total staked:");
-        console.log(totalStaked);
+        // console.log("Total staked:");
+        // console.log(totalStaked);
         
         // Distribute profit
         uint256 profit = 300_000e18;
-        mockNomaToken.mint(address(this), profit);
+        mockNomaToken.mintTest(address(staking), profit);
 
-        console.log("Before first notifyRewardAmount(0):");
-        console.log("Total supply:");
-        console.log(rebaseToken.totalSupply());
-        console.log("Circulating supply:");
-        console.log(rebaseToken.circulatingSupply());
-
+        // console.log("Before first notifyRewardAmount(0):");
+        // console.log("Total supply:");
+        // console.log(rebaseToken.totalSupply());
+        // console.log("Circulating supply:");
+        // console.log(rebaseToken.circulatingSupply());
+        vm.prank(deployer);
         staking.notifyRewardAmount(0);
 
-        console.log("After first notifyRewardAmount(0):");
-        console.log("Total supply:");
-        console.log(rebaseToken.totalSupply());
-        console.log("Circulating supply:");
-        console.log(rebaseToken.circulatingSupply());
+        // console.log("After first notifyRewardAmount(0):");
+        // console.log("Total supply:");
+        // console.log(rebaseToken.totalSupply());
+        // console.log("Circulating supply:");
+        // console.log(rebaseToken.circulatingSupply());
 
         // Log balances after first notifyRewardAmount(0)
         for (uint8 i = 0; i < numUsers; i++) {
             uint256 balanceAfterFirstNotify = rebaseToken.balanceOf(users[i]);
-            console.log("User balance after first notify:");
-            console.log(i);
-            console.log(balanceAfterFirstNotify);
+            // console.log("User balance after first notify:");
+            // console.log(i);
+            // console.log(balanceAfterFirstNotify);
         }
 
-        console.log("Before second notifyRewardAmount(profit):");
-        console.log("Total supply:");
-        console.log(rebaseToken.totalSupply());
-        console.log("Circulating supply:");
-        console.log(rebaseToken.circulatingSupply());
+        // console.log("Before second notifyRewardAmount(profit):");
+        // console.log("Total supply:");
+        // console.log(rebaseToken.totalSupply());
+        // console.log("Circulating supply:");
+        // console.log(rebaseToken.circulatingSupply());
 
+        vm.prank(address(staking));
         mockNomaToken.approve(address(staking), profit);
+
+        vm.prank(deployer);
         staking.notifyRewardAmount(profit);
 
-        console.log("After second notifyRewardAmount(profit):");
-        console.log("Total supply:");
-        console.log(rebaseToken.totalSupply());
-        console.log("Circulating supply:");
-        console.log(rebaseToken.circulatingSupply());
+        // console.log("After second notifyRewardAmount(profit):");
+        // console.log("Total supply:");
+        // console.log(rebaseToken.totalSupply());
+        // console.log("Circulating supply:");
+        // console.log(rebaseToken.circulatingSupply());
 
         // Check balances after profit distribution
         uint256 totalRebaseBalance = 0;
         for (uint8 i = 0; i < numUsers; i++) {
             uint256 balanceAfterProfit = rebaseToken.balanceOf(users[i]);
-            console.log("User balance:");
-            console.log(i);
-            console.log("Before stake:");
-            console.log(initialRebaseBalances[i]);
-            console.log("After stake:");
-            console.log(afterStakeRebaseBalances[i]);
-            console.log("After profit:");
-            console.log(balanceAfterProfit);
+            // console.log("User balance:");
+            // console.log(i);
+            // console.log("Before stake:");
+            // console.log(initialRebaseBalances[i]);
+            // console.log("After stake:");
+            // console.log(afterStakeRebaseBalances[i]);
+            // console.log("After profit:");
+            // console.log(balanceAfterProfit);
             assertGt(balanceAfterProfit, afterStakeRebaseBalances[i], "Balance should increase after profit distribution");
             totalRebaseBalance += balanceAfterProfit;
         }
@@ -363,10 +388,10 @@ contract TestRebase is Test {
         uint256 balanceAfterProfitStaking = rebaseToken.balanceOf(address(staking));
         uint256 nomaBalanceStaking = mockNomaToken.balanceOf(address(staking));
 
-        console.log("Balance after profit for staking contract:");
-        console.log(balanceAfterProfitStaking);
-        console.log("Noma balance of staking contract:");
-        console.log(nomaBalanceStaking);
+        // console.log("Balance after profit for staking contract:");
+        // console.log(balanceAfterProfitStaking);
+        // console.log("Noma balance of staking contract:");
+        // console.log(nomaBalanceStaking);
 
         assertGe(nomaBalanceStaking, totalRebaseBalance, "Staking contract should have enough Noma tokens");
     }
@@ -376,19 +401,19 @@ contract TestRebase is Test {
         uint256 initialCirculatingSupply = rebaseToken.circulatingSupply();
         uint256 rebaseAmount = 1000e18;
 
-        console.log("Initial Total Supply:", initialTotalSupply);
-        console.log("Initial Circulating Supply:", initialCirculatingSupply);
-        console.log("Rebase Amount:", rebaseAmount);
+        // console.log("Initial Total Supply:", initialTotalSupply);
+        // console.log("Initial Circulating Supply:", initialCirculatingSupply);
+        // console.log("Rebase Amount:", rebaseAmount);
         
         rebaseToken.rebase(rebaseAmount);
         
         uint256 newTotalSupply = rebaseToken.totalSupply();
         uint256 newCirculatingSupply = rebaseToken.circulatingSupply();
         
-        console.log("New Total Supply:", newTotalSupply);
-        console.log("New Circulating Supply:", newCirculatingSupply);
-        console.log("Total Supply Difference:", newTotalSupply - initialTotalSupply);
-        console.log("Circulating Supply Difference:", newCirculatingSupply - initialCirculatingSupply);
+        // console.log("New Total Supply:", newTotalSupply);
+        // console.log("New Circulating Supply:", newCirculatingSupply);
+        // console.log("Total Supply Difference:", newTotalSupply - initialTotalSupply);
+        // console.log("Circulating Supply Difference:", newCirculatingSupply - initialCirculatingSupply);
         
         // Check if total supply increased
         assertGt(newTotalSupply, initialTotalSupply, "Total supply should increase after rebase");
@@ -410,18 +435,18 @@ contract TestRebase is Test {
         uint256 initialTotalSupply = rebaseToken.totalSupply();
         uint256 initialCirculatingSupply = rebaseToken.circulatingSupply();
         
-        console.log("Initial Total Supply:", initialTotalSupply);
-        console.log("Initial Circulating Supply:", initialCirculatingSupply);
-        console.log("Rebase Amount:", rebaseAmount);
+        // console.log("Initial Total Supply:", initialTotalSupply);
+        // console.log("Initial Circulating Supply:", initialCirculatingSupply);
+        // console.log("Rebase Amount:", rebaseAmount);
         
         try rebaseToken.rebase(rebaseAmount) {
             uint256 newTotalSupply = rebaseToken.totalSupply();
             uint256 newCirculatingSupply = rebaseToken.circulatingSupply();
             
-            console.log("New Total Supply:", newTotalSupply);
-            console.log("New Circulating Supply:", newCirculatingSupply);
-            console.log("Total Supply Difference:", newTotalSupply - initialTotalSupply);
-            console.log("Circulating Supply Difference:", newCirculatingSupply - initialCirculatingSupply);
+            // console.log("New Total Supply:", newTotalSupply);
+            // console.log("New Circulating Supply:", newCirculatingSupply);
+            // console.log("Total Supply Difference:", newTotalSupply - initialTotalSupply);
+            // console.log("Circulating Supply Difference:", newCirculatingSupply - initialCirculatingSupply);
             
             assertGt(newTotalSupply, initialTotalSupply, "Total supply should increase after rebase");
             assertGe(newCirculatingSupply, initialCirculatingSupply, "Circulating supply should not decrease");
@@ -433,7 +458,6 @@ contract TestRebase is Test {
             assertTrue(false, "Rebase should not revert");
         }
     }
-
 }
 
 

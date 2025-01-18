@@ -4,29 +4,33 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 
-import "../src/token/MockNomaToken.sol";
+import "./token/TestMockNomaToken.sol";
 import "./token/TestMockNomaTokenV2.sol";
 import "openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract DeployToken is Test {
-    MockNomaToken public mockNomaToken;
+    TestMockNomaToken public mockNomaToken;
     TestMockNomaTokenV2 public mockNomaTokenV2;
     ERC1967Proxy public proxy;
 
-    address deployer = address(1);
+    uint256 privateKey = vm.envUint("PRIVATE_KEY");
+    address deployer = vm.envAddress("DEPLOYER");
     address user = address(2);
 
     function setUp() public {
         vm.startPrank(deployer);
 
         // Deploy the implementation contract
-        mockNomaToken = new MockNomaToken();
+        mockNomaToken = new TestMockNomaToken();
 
         // Encode the initialize function call
         bytes memory data = abi.encodeWithSelector(
             mockNomaToken.initialize.selector,
             deployer,
-            1000000 ether
+            1000000 ether,
+            "Mock NOMA",
+            "MNOMA",
+            address(0)
         );
 
         // Deploy the proxy contract
@@ -36,9 +40,10 @@ contract DeployToken is Test {
         );
 
         // Cast the proxy to MockNomaToken to interact with it
-        mockNomaToken = MockNomaToken(address(proxy));
+        mockNomaToken = TestMockNomaToken(address(proxy));
 
-        // Mint some tokens to user
+        // Mint tokens
+        mockNomaToken.mintTest(deployer, 100 ether);
         mockNomaToken.transfer(user, 100 ether);
 
         vm.stopPrank();
@@ -46,7 +51,7 @@ contract DeployToken is Test {
 
     function testInitialSupply() public {
         uint256 deployerBalance = mockNomaToken.balanceOf(deployer);
-        assertEq(deployerBalance, 999900 ether);
+        assertEq(deployerBalance, 1000000 ether);
     }
 
     function testTransfer() public {
@@ -60,7 +65,7 @@ contract DeployToken is Test {
 
         // Upgrade the proxy to use the new implementation
         vm.prank(deployer);
-        MockNomaToken(address(proxy)).upgradeToAndCall(address(mockNomaTokenV2), new bytes(0));
+        TestMockNomaToken(address(proxy)).upgradeToAndCall(address(mockNomaTokenV2), new bytes(0));
 
         // Cast the proxy to TestMockNomaTokenV2 to interact with the new implementation
         TestMockNomaTokenV2 upgraded = TestMockNomaTokenV2(address(proxy));

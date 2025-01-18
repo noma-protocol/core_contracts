@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import "../src/staking/Gons.sol";
-import "../src/token/MockNomaToken.sol";
+import "./token/TestMockNomaToken.sol";
 import "../src/staking/Staking.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -12,7 +12,7 @@ contract TestRebaseTokenTransfers is Test {
     using SafeERC20 for IERC20;
 
     GonsToken rebaseToken;
-    MockNomaToken mockNomaToken;
+    TestMockNomaToken mockNomaToken;
     Staking staking;
 
     address alice = address(0x1);
@@ -22,13 +22,13 @@ contract TestRebaseTokenTransfers is Test {
     uint256 INITIAL_SUPPLY = 1_000_000e18;
 
     function setUp() public {
-        mockNomaToken = new MockNomaToken();
-        mockNomaToken.initialize(address(this), 100_000_000e18);
+        mockNomaToken = new TestMockNomaToken();
+        mockNomaToken.initialize(address(this), 100_000_000e18, "TEST", "TEST", address(0));
 
         rebaseToken = new GonsToken(address(this));
         staking = new Staking(address(mockNomaToken), address(rebaseToken), address(this));        
-        mockNomaToken.mint(address(staking), INITIAL_SUPPLY);
-        staking.setup(address(this), address(mockNomaToken), address(rebaseToken));
+        mockNomaToken.mintTest(address(staking), INITIAL_SUPPLY);
+        // staking.setup(address(this), address(mockNomaToken), address(rebaseToken));
         rebaseToken.initialize(address(staking));
 
         // Distribute some tokens to Alice and Bob
