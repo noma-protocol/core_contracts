@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 import { IUniswapV3Factory } from "@uniswap/v3-core/interfaces/IUniswapV3Factory.sol";
 import { IUniswapV3Pool } from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
@@ -56,7 +55,8 @@ error NotAuthorityError();
 error TokenDeployFailedError();
 error InvalidTokenAddressError();
 error SupplyTransferFailedError();
-error TokenAlreadyExistsError(string name, string symbol);
+error TokenAlreadyExistsError();
+error OnlyOneVaultError();
 
 contract NomaFactory {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -82,6 +82,11 @@ contract NomaFactory {
         VaultDeployParams memory _params
     ) external checkDeployAuthority returns (address, address, address) {
         _validateToken1(_params.token1);
+
+        // Ensure deployer has not already deployed a vault
+        if (_n.vaultsRepository[msg.sender].vault != address(0)) {
+            revert OnlyOneVaultError();
+        }
 
         MockNomaToken nomaToken = _deployNomaToken(
             _params._name,
@@ -177,7 +182,7 @@ contract NomaFactory {
     ) internal returns (MockNomaToken) {
         bytes32 tokenHash = keccak256(abi.encodePacked(_name, _symbol));
 
-        if (_n.deployedTokenHashes[tokenHash]) revert TokenAlreadyExistsError(_name, _symbol);
+        if (_n.deployedTokenHashes[tokenHash]) revert TokenAlreadyExistsError();
 
         _n.deployedTokenHashes[tokenHash] = true;
         uint256 nonce = uint256(tokenHash);
