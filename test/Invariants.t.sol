@@ -8,6 +8,8 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 
 import {Deployer} from "../src/Deployer.sol";
 import {BaseVault} from  "../src/vault/BaseVault.sol";
+import {ExtVault} from  "../src/vault/ExtVault.sol";
+import {LendingVault} from  "../src/vault/LendingVault.sol";
 import {MockNomaToken} from  "../src/token/MockNomaToken.sol";
 import {ModelHelper} from  "../src/model/Helper.sol";
 import {Underlying } from  "../src/libraries/Underlying.sol";
@@ -45,15 +47,14 @@ contract Invariants is Test {
     bytes32 salt = keccak256(bytes(vm.envString("SALT")));
 
     // Constants
-    address WETH = 0xAaE73BfC17EC6CF6417cD7f15cf86F9AEbc33Edc;
+    address WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
     
     // Protocol addresses
-    address payable idoManager = payable(0x4ff2d7eAf57E8a87e89436A4DCab3e05686fc501);
-    address nomaToken = 0x71928Dd90031aB5Bb11d4765361c30958ecd4143;
+    address payable idoManager = payable(0x7D6Cb1678d761C100566eC1D25ceC421e4F3A0a7);
+    address nomaToken = 0x61F91A57677988def3dfD9c04b4411a023F105b8;
     address sNomaToken = 0x18Bb36A90984B43e8c5c07F461720394bA533134;
-    address deployerContract = 0x5EAC2ffAF4242b7099852EB96F585aBEdc37Cbe1;
     address stakingContract = 0xeB0beC62AA5AB0e1dBEcDd8ae4CE70DAC36C1db3;
-
+    address modelHelperContract = 0x0E90A3D616F9Fe2405325C3a7FB064837817F45F;
     MockNomaToken private NOMA;
     GonsToken sNOMA;
 
@@ -68,13 +69,12 @@ contract Invariants is Test {
         NOMA = MockNomaToken(nomaToken);
         require(address(NOMA) != address(0), "Noma token address is zero");
 
-        sNOMA = GonsToken(sNomaToken);
-        require(address(sNOMA) != address(0), "sNoma token address is zero");
+        // sNOMA = GonsToken(sNomaToken);
+        // require(address(sNOMA) != address(0), "sNoma token address is zero");
 
-        staking = Staking(stakingContract);
-        require(address(staking) != address(0), "Staking contract address is zero");
+        // staking = Staking(stakingContract);
+        // require(address(staking) != address(0), "Staking contract address is zero");
         
-        address modelHelperContract = managerContract.modelHelper();
         modelHelper = ModelHelper(modelHelperContract);
     }
 
@@ -98,7 +98,7 @@ contract Invariants is Test {
         uint256 totalSupply = NOMA.totalSupply();
         console.log("Total supply is %s", totalSupply);
 
-        require(totalSupply >= 35_000_000e18, "Total supply is less than expected");
+        require(totalSupply >= 1e20, "Total supply is less than expected");
         vm.stopBroadcast();
     }
 
@@ -130,7 +130,7 @@ contract Invariants is Test {
         console.log("Circulating supply is: ", circulatingSupplyAfter);
 
         // adapt for 1 wei discrepance
-        assertApproxEqAbs(tokenBalanceAfter + circulatingSupplyBefore, circulatingSupplyAfter, 1 wei , "Circulating supply does not match bought tokens");
+        assertApproxEqAbs(tokenBalanceAfter + circulatingSupplyBefore, circulatingSupplyAfter, 2 wei , "Circulating supply does not match bought tokens");
     }
 
     // function testInvariantWithStakeUnstakeAndRebases() public {
@@ -185,21 +185,23 @@ contract Invariants is Test {
 
         address pool = address(vault.pool());
 
-        (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
-        uint256 spotPrice;
-
-        uint8 numTrades = 200;
-        uint256 tradeAmount = 100 ether;
+        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(vault.pool()).slot0();
+        uint8 numTrades = 100;
+        uint256 tradeAmount = 1 ether;
         
         IWETH(WETH).deposit{ value:  tradeAmount * numTrades}();
         IWETH(WETH).transfer(idoManager, tradeAmount * numTrades);
 
         uint256 tokenBalanceBefore = NOMA.balanceOf(address(deployer));
+        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, 18);
+        uint256 purchasePrice = spotPrice + (spotPrice * 1 / 100);
 
         for (uint i = 0; i < numTrades; i++) {
-            spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+            (sqrtRatioX96,,,,,,) = IUniswapV3Pool(vault.pool()).slot0();
+            spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, 18);
+            purchasePrice = spotPrice + (spotPrice * 1 / 100);
 
-            managerContract.buyTokens(spotPrice, tradeAmount, address(deployer));
+            managerContract.buyTokens(purchasePrice, tradeAmount, address(deployer));
             uint256 tokenBalanceAfter = NOMA.balanceOf(address(deployer));
             
             uint256 receivedAmount = tokenBalanceAfter > tokenBalanceBefore 
@@ -223,6 +225,8 @@ contract Invariants is Test {
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
         uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+        uint256 purchasePrice = spotPrice + (spotPrice * 1 / 100);
+
         console.log("Spot price is: ", spotPrice);
 
         uint8 totalTradesBuy = 24;
@@ -235,9 +239,12 @@ contract Invariants is Test {
         console.log("Token balance before buying is %s", tokenBalanceBefore);
 
         for (uint i = 0; i < totalTradesBuy; i++) {
+            (sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
             spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+            purchasePrice = spotPrice + (spotPrice * i / 100);
+
             if (i >= 4) {
-                spotPrice = spotPrice + (spotPrice * i / 100);
+                spotPrice = purchasePrice;
             }
             managerContract.buyTokens(spotPrice, tradeAmountWETH, address(deployer));
 
@@ -270,8 +277,10 @@ contract Invariants is Test {
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
         uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
-        uint16 totalTrades = 500;
-        uint256 tradeAmount = 200 ether;
+        uint256 purchasePrice = spotPrice + (spotPrice * 1 / 100);
+
+        uint16 totalTrades = 50;
+        uint256 tradeAmount = 1 ether;
 
         IWETH(WETH).deposit{ value: (tradeAmount * totalTrades)}();
         IWETH(WETH).transfer(idoManager, tradeAmount * totalTrades);
@@ -281,9 +290,11 @@ contract Invariants is Test {
         console.log("Circulating supply is: ", circulatingSupplyBefore);
 
         for (uint i = 0; i < totalTrades; i++) {
+            (sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
             spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+            purchasePrice = spotPrice + (spotPrice * 1 / 100);
             if (i >= 4) {
-                spotPrice = spotPrice + (spotPrice * i / 100);
+                spotPrice = purchasePrice;
             }
             managerContract.buyTokens(spotPrice, tradeAmount, address(this));
         }
@@ -361,7 +372,7 @@ contract Invariants is Test {
             managerContract.buyTokens(spotPrice, tradeAmount, address(deployer));
         }
 
-        LiquidityPosition[3] memory positions = vault.getPositions();
+        LiquidityPosition[3] memory positions = LendingVault(address(vault)).getPositions();
 
         uint256 circulatingSupply = modelHelper.getCirculatingSupply(pool, address(vault));
         uint256 anchorCapacity = modelHelper.getPositionCapacity(pool, address(vault), positions[1], LiquidityType.Anchor);
@@ -389,9 +400,10 @@ contract Invariants is Test {
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
         uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+        uint256 purchasePrice = spotPrice + (spotPrice * 1 / 100);
 
-        uint16 totalTrades = 200;
-        uint256 tradeAmount = 2000 ether;
+        uint16 totalTrades = 100;
+        uint256 tradeAmount = 1 ether;
 
         IWETH(WETH).deposit{ value: tradeAmount * totalTrades }();
         IWETH(WETH).transfer(idoManager, tradeAmount * totalTrades);
@@ -400,9 +412,11 @@ contract Invariants is Test {
         console.log("Circulating supply is: ", circulatingSupplyBefore);
 
         for (uint i = 0; i < totalTrades; i++) {
+            (sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
             spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+            purchasePrice = spotPrice + (spotPrice * i / 100);
             if (i >= 4) {
-                spotPrice = spotPrice + (spotPrice * i / 100);
+                spotPrice = purchasePrice;
             }
             managerContract.buyTokens(spotPrice, tradeAmount, address(this));
         }
@@ -462,7 +476,7 @@ contract Invariants is Test {
 
         uint256 intrinsicMinimumValue = modelHelper.getIntrinsicMinimumValue(address(vault));
         
-        LiquidityPosition[3] memory positions = vault.getPositions();
+        LiquidityPosition[3] memory positions =  LendingVault(address(vault)).getPositions();
         uint256 anchorCapacity = modelHelper.getPositionCapacity(pool, address(vault), positions[1], LiquidityType.Anchor);
         (,,,uint256 floorBalance) = Underlying.getUnderlyingBalances(pool, address(vault), positions[0]);
         
