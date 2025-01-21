@@ -87,14 +87,10 @@ library Underlying {
     {
         // require(position.liquidity > 0, "0 liquidity position");
 
-        (uint160 sqrtRatioX96, int24 tick,,,,,) = IUniswapV3Pool(pool).slot0();
+        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
 
         (
-            uint128 liquidity,
-            uint256 feeGrowthInside0Last,
-            uint256 feeGrowthInside1Last,
-            uint128 tokensOwed0,
-            uint128 tokensOwed1
+            uint128 liquidity,,,,
         ) = IUniswapV3Pool(pool).positions(
             keccak256(
             abi.encodePacked(

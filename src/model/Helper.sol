@@ -13,7 +13,6 @@ import {DecimalMath} from "../libraries/DecimalMath.sol";
 
 import {Underlying} from "../libraries/Underlying.sol";
 import {Utils} from "../libraries/Utils.sol";
-import {VaultStorage} from "../libraries/LibAppStorage.sol";
 import { IVault } from "../interfaces/IVault.sol";
 
 import {
@@ -33,8 +32,6 @@ interface IStakingContract {
 }
 
 contract ModelHelper {
-    VaultStorage internal _v;
-
     bool private initialized;
     address private stakingContract;
     address private initializer;
@@ -123,7 +120,6 @@ contract ModelHelper {
             position = positions[2];
         }
 
-        // require(position.liquidity > 0, "no liquidity");
         if (position.liquidity == 0) {
             revert NoLiquidity();
         }
