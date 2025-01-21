@@ -32,6 +32,14 @@ interface IStakingRewards {
 }
 
 error NotInitialized();
+error InsufficientLoanAmount();
+error InsufficientFloorBalance();
+error NoActiveLoan();
+error LoanExpired();
+error InsufficientCollateral();
+error CantRollLoan();
+error NoLiquidity();
+error OnlyVault();
 
 contract LendingVault is BaseVault {
     
@@ -49,16 +57,15 @@ contract LendingVault is BaseVault {
     }    
 
     function borrowFromFloor(address who, uint256 borrowAmount, uint256 duration) public onlyVault {
-        require(borrowAmount > 0, "Amounts must be greater than 0");
-        // require(_v.loanPositions[who].borrowAmount == 0, "Existing loan found");
+        if (borrowAmount == 0) revert InsufficientLoanAmount(); 
         
         (uint256 collateralAmount,) = _getCollateralAmount(borrowAmount);
-        require(collateralAmount > 0, "Collateral must be greater than 0");
+        if (collateralAmount == 0) revert InsufficientCollateral();
 
         (,,, uint256 floorToken1Balance) = IModelHelper(_v.modelHelper)
         .getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
 
-        require(floorToken1Balance >= borrowAmount, "Insufficient floor balance");
+        if (floorToken1Balance < borrowAmount) revert InsufficientFloorBalance();
 
         IERC20(_v.pool.token0()).transferFrom(who, address(this), collateralAmount);  
         uint256 loanFees = calculateLoanFees(borrowAmount, duration);
@@ -93,7 +100,8 @@ contract LendingVault is BaseVault {
 
     function paybackLoan(address who) public onlyVault {
         LoanPosition storage loan = _v.loanPositions[who];
-        require(loan.borrowAmount > 0, "No active loan");
+
+        if (loan.borrowAmount == 0) revert NoActiveLoan();
 
         IERC20(_v.pool.token1()).transferFrom(who, address(this), loan.borrowAmount);
         IERC20(_v.pool.token0()).transfer(who, loan.collateralAmount);
@@ -104,15 +112,17 @@ contract LendingVault is BaseVault {
 
     function rollLoan(address who) public onlyVault {
         LoanPosition storage loan = _v.loanPositions[who];
-        require(loan.borrowAmount > 0, "No active loan");
-        require(block.timestamp < loan.expiry, "Loan expired");
+
+        if (loan.borrowAmount == 0) revert NoActiveLoan();
+        if (block.timestamp > loan.expiry) revert LoanExpired();
 
         uint256 newCollateralValue = DecimalMath.multiplyDecimal(
             loan.collateralAmount, 
             IModelHelper(_v.modelHelper).getIntrinsicMinimumValue(address(this))
         );
 
-        require(newCollateralValue > loan.borrowAmount, "Can't roll loan");
+        if (newCollateralValue <= loan.borrowAmount) revert CantRollLoan();
+
         uint256 newBorrowAmount = newCollateralValue - loan.borrowAmount;
         uint256 newFees = calculateLoanFees(newBorrowAmount, loan.expiry - block.timestamp);
 
@@ -165,14 +175,8 @@ contract LendingVault is BaseVault {
     }
 
     function updatePositions(LiquidityPosition[3] memory _positions) public onlyInternalCalls {
-        if (!_v.initialized) revert NotInitialized();
-        
-        require(
-            _positions[0].liquidity > 0 &&
-            _positions[1].liquidity > 0 && 
-            _positions[2].liquidity > 0, 
-            "updatePositions: no liquidity in positions"
-        );           
+        if (!_v.initialized) revert NotInitialized();             
+        if (_positions[0].liquidity == 0 || _positions[1].liquidity == 0 || _positions[2].liquidity == 0) revert NoLiquidity();
         
         _updatePositions(_positions);
     }
@@ -193,7 +197,7 @@ contract LendingVault is BaseVault {
     }
 
     modifier onlyVault() {
-        require(msg.sender == address(this), "LendingVault: only vault");
+        if (msg.sender != address(this)) revert OnlyVault();
         _;
     }
 

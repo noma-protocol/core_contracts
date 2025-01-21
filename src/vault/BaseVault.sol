@@ -35,6 +35,10 @@ interface IAdaptiveSupplyController {
 
 error AlreadyInitialized();
 error InvalidCaller();
+error InvalidPosition();
+error OnlyDeployer();
+error OnlyInternalCalls();
+error CallbackCaller();
 
 contract BaseVault is OwnableUninitialized {
     VaultStorage internal _v;
@@ -52,8 +56,8 @@ contract BaseVault is OwnableUninitialized {
     )
         external
     {
-        require(msg.sender == address(_v.pool), "cc");
-
+        if (msg.sender != address(_v.pool)) revert CallbackCaller();
+        
         uint256 token0Balance = IERC20(_v.tokenInfo.token0).balanceOf(address(this));
         uint256 token1Balance = IERC20(_v.tokenInfo.token1).balanceOf(address(this));
 
@@ -97,9 +101,11 @@ contract BaseVault is OwnableUninitialized {
     ) public onlyDeployer {
         if (_v.initialized) revert AlreadyInitialized();
 
-        require(positions[0].liquidity > 0 && 
-                positions[1].liquidity > 0 && 
-                positions[2].liquidity > 0, "invalid position");
+        if (
+            positions[0].liquidity == 0 || 
+            positions[1].liquidity == 0 || 
+            positions[2].liquidity == 0
+        ) revert InvalidPosition();
                 
         _v.initialized = true;
 
@@ -182,12 +188,12 @@ contract BaseVault is OwnableUninitialized {
 
 
     modifier onlyDeployer() {
-        require(msg.sender == _v.deployerContract, "only deployer");
+        if (msg.sender != _v.deployerContract) revert OnlyDeployer();
         _;
     }
 
     modifier onlyInternalCalls() {
-        require(msg.sender == address(this), "only internal calls");
+        if (msg.sender != _v.factory && msg.sender != _v.stakingContract) revert OnlyInternalCalls();
         _;        
     }
 

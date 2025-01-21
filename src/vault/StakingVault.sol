@@ -31,6 +31,11 @@ interface IStakingRewards {
     function notifyRewardAmount(uint256 reward) external;
 }
 
+error NotInitialized();
+error LiquidityRatioOutOfRange();
+error StakingContractNotSet();
+error Unauthorized();
+
 contract StakingVault is BaseVault {
 
     //TODO move this to LibAppStorage
@@ -41,7 +46,9 @@ contract StakingVault is BaseVault {
     }
 
     function _calculateMintAmont(int256 currentLiquidityRatio, uint256 excessTokens) internal view returns (uint256) {
-        require(currentLiquidityRatio >= -1e18 && currentLiquidityRatio <= 1e18 * 10, "currentLiquidityRatio out of range");
+        if (currentLiquidityRatio < -1e18 || currentLiquidityRatio > 1e18 * 10) {
+            revert LiquidityRatioOutOfRange();
+        }
 
         uint256 stakedBalance = IERC20(_v.pool.token0()).balanceOf(_v.stakingContract);
         
@@ -55,7 +62,9 @@ contract StakingVault is BaseVault {
     }
 
     function mintAndDistributeRewards(ProtocolAddresses memory addresses) public {
-        require(msg.sender == address(this), "StakeVault: unauthorized");
+        if (msg.sender != address(this)) {
+            revert Unauthorized();
+        }
 
         LiquidityPosition[3] memory positions = [
             _v.floorPosition, 
@@ -84,9 +93,13 @@ contract StakingVault is BaseVault {
             return;
         } 
         
-        require(_v.stakingContract != address(0), "StakeVault: staking contract not set");
+        if (_v.stakingContract == address(0)) {
+            revert StakingContractNotSet();
+        }
         
         IERC20(_v.tokenInfo.token0).approve(_v.stakingContract, toMintConverted);
+        
+        // TODO enable minting
         // mintTokens(_v.stakingContract, toMintConverted);
 
         // Update total minted (NOMA)
@@ -236,6 +249,7 @@ contract StakingVault is BaseVault {
                 Utils.nearestUsableTick(
                     Utils.addBipsToTick(
                         positions[1].upperTick, 
+                        // TODO remove hardcoded
                         150, 
                         ERC20(address(IUniswapV3Pool(addresses.pool).token0())).decimals()
                     )
