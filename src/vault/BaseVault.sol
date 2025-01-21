@@ -3,10 +3,10 @@ pragma solidity ^0.8.0;
 
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {OwnableUninitialized} from "../abstract/OwnableUninitialized.sol";
-
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
 import {VaultStorage} from "../libraries/LibAppStorage.sol";
-
+import {LibDiamond} from "../libraries/LibDiamond.sol";
+import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
 import {
     LiquidityPosition, 
     LiquidityType,
@@ -16,6 +16,7 @@ import {
 } from "../types/Types.sol";
 
 import "../libraries/DecimalMath.sol"; 
+import "../libraries/Utils.sol";
 
 interface IERC20 {
     function balanceOf(address account) external view returns (uint256);
@@ -23,7 +24,6 @@ interface IERC20 {
     function mint(address receiver, uint256 amount) external;
     function approve(address spender, uint256 amount) external;
 }
-
 
 interface INomaFactory {
     function mintTokens(address to, uint256 amount) external;
@@ -34,11 +34,12 @@ interface IAdaptiveSupplyController {
 }
 
 error AlreadyInitialized();
-error InvalidCaller();
 error InvalidPosition();
+error OnlyFactory();
 error OnlyDeployer();
 error OnlyInternalCalls();
 error CallbackCaller();
+error ResolverNotSet();
 
 contract BaseVault is OwnableUninitialized {
     VaultStorage internal _v;
@@ -80,7 +81,14 @@ contract BaseVault is OwnableUninitialized {
         address _proxyAddress,
         address _adaptiveSupplyController,
         LiquidityStructureParameters memory _params
-    ) public {
+    ) public onlyFactory {
+        LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
+
+        if (ds.resolver == address(0)) {
+            revert ResolverNotSet();
+        }
+        
+        _v.resolver = IAddressResolver(ds.resolver);
         _v.pool = IUniswapV3Pool(_pool);
         _v.factory = _factory;
         _v.modelHelper = _modelHelper;
@@ -93,6 +101,7 @@ contract BaseVault is OwnableUninitialized {
         _v.adaptiveSupplyController = _adaptiveSupplyController;
         _v.deployerContract = _deployer;
         _v.liquidityStructureParameters = _params;
+        
         OwnableUninitialized(_owner);
     }
     
@@ -186,6 +195,25 @@ contract BaseVault is OwnableUninitialized {
         });
     }
 
+    modifier onlyFactory() {
+        IAddressResolver resolver = _getResolver();
+        address factory = resolver
+                .requireAndGetAddress(
+                    Utils.stringToBytes32("NomaFactory"), 
+                    "no factory"
+                );
+        if (msg.sender != factory) revert OnlyFactory();
+        _;
+    }
+
+    function _getResolver() internal view returns (IAddressResolver resolver) {
+        resolver = _v.resolver;
+        if (address(resolver) == address(0)) {
+            // Fallback to Diamond storage
+            LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
+            resolver = IAddressResolver(ds.resolver);
+        }
+    }
 
     modifier onlyDeployer() {
         if (msg.sender != _v.deployerContract) revert OnlyDeployer();
@@ -201,7 +229,7 @@ contract BaseVault is OwnableUninitialized {
         bytes4[] memory selectors = new bytes4[](11);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
         selectors[1] = bytes4(keccak256(bytes("pool()")));
-        selectors[2] = bytes4(keccak256(bytes("initialize(address,address,address,address,address,address,address,address,(uint8,uint8,uint8,uint16[2],uint256,uint256))")));
+        selectors[2] = bytes4(keccak256(bytes("initialize(address,address,address,address,address,address,address,address,(uint8,uint8,uint8,uint16[2],uint256,uint256,int24))")));
         selectors[3] = bytes4(keccak256(bytes("initializeLiquidity((int24,int24,uint128,uint256)[3])")));
         selectors[4] = bytes4(keccak256(bytes("uniswapV3MintCallback(uint256,uint256,bytes)")));
         selectors[5] = bytes4(keccak256(bytes("getUnderlyingBalances(uint8)")));
