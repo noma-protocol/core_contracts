@@ -37,10 +37,9 @@ struct NomaFactoryStorage {
     
     bool permissionlessDeployEnabled;    
 
-    EnumerableSet.AddressSet deployers;
-
     LiquidityStructureParameters liquidityStructureParameters;
-    
+
+    EnumerableSet.AddressSet deployers;    
     mapping(address => EnumerableSet.AddressSet) _vaults;
     mapping(address => VaultDescription) vaultsRepository;
     mapping(bytes32 => bool) deployedTokenHashes;
