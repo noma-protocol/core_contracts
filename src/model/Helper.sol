@@ -25,6 +25,8 @@ import {
 
 error AlreadyInitialized();
 error InvalidCaller();
+error NoLiquidity();
+error InsolvencyInvariant();
 
 interface IStakingContract {
     function totalStaked() external view returns (uint256);
@@ -42,7 +44,9 @@ contract ModelHelper {
     }
 
     function initialize(address _stakingContract) public onlyInitializer {
-        require(!initialized, "Already initialized");
+        if (initialized) {
+            revert AlreadyInitialized();
+        }
 
         stakingContract = _stakingContract;
         initialized = true;
@@ -55,8 +59,8 @@ contract ModelHelper {
         LiquidityPosition[3] memory positions = IVault(vault).getPositions();
 
         (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
-
         uint8 decimals = ERC20(address(IUniswapV3Pool(pool).token0())).decimals();
+
         uint256 anchorUpperPrice = Conversions.sqrtPriceX96ToPrice(
                 Conversions.tickToSqrtPriceX96(positions[1].upperTick),
             decimals);
@@ -119,7 +123,10 @@ contract ModelHelper {
             position = positions[2];
         }
 
-        require(position.liquidity > 0, "no liquidity");
+        // require(position.liquidity > 0, "no liquidity");
+        if (position.liquidity == 0) {
+            revert NoLiquidity();
+        }
         return Underlying.getUnderlyingBalances(address(pool), vault, position);
     }
 
@@ -228,11 +235,15 @@ contract ModelHelper {
         uint256 floorCapacity = vaultInfo.floorCapacity;
         
         // To guarantee solvency, Noma ensures that capacity > circulating supply each liquidity is deployed.
-        require(anchorCapacity + floorCapacity > circulatingSupply, "Insolvency invariant failed");
+        if (anchorCapacity + floorCapacity <= circulatingSupply) {
+            revert InsolvencyInvariant();
+        }
     }
 
     modifier onlyInitializer() {
-        require(msg.sender == initializer, "Invalid caller");
+        if (msg.sender != initializer) {
+            revert InvalidCaller();
+        }
         _;
     }
 }

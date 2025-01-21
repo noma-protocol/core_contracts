@@ -161,10 +161,6 @@ contract NomaFactory {
 
         _deployLiquidity(_params._IDOPrice, _params._totalSupply, getLiquidityStructureParameters());
 
-        require(address(this) == _n.resolver
-            .requireAndGetAddress("NomaFactory", "NomaFactoryNotFound")
-        );
-
         _n.resolver.configureDeployerACL(vaultAddress);        
         _n.deployer.finalize();
 

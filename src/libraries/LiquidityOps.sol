@@ -42,6 +42,11 @@ interface IAdaptiveSupplyController {
 error InvalidTick();
 error AboveThreshold();
 error BelowThreshold();
+error PositionsLength();
+error NoLiquidity();
+error MintAmount();
+error BalanceToken0();
+error OnlyNotEmptyPositions();
 
 library LiquidityOps {
     
@@ -54,7 +59,9 @@ library LiquidityOps {
         uint256 currentLiquidityRatio,
         LiquidityPosition[3] memory newPositions
     ) {
-        require(positions.length == 3, "invalid positions");
+        if (positions.length != 3) {
+            revert PositionsLength();
+        }
 
         // Ratio of the anchor's price to market price
         currentLiquidityRatio = IModelHelper(addresses.modelHelper)
@@ -173,6 +180,7 @@ library LiquidityOps {
     ) internal returns (
         LiquidityPosition[3] memory newPositions
     ) {
+        uint8 decimals = ERC20(address(IUniswapV3Pool(params.pool).token0())).decimals();
 
         if (params.positions[0].liquidity > 0) {
 
@@ -234,7 +242,7 @@ library LiquidityOps {
                     .tickToSqrtPriceX96(
                         params.positions[0].upperTick
                     ), 
-                18), 
+                decimals), 
                 params.newFloorPrice,
                 params.floorToken1Balance + params.toSkim,
                 params.floorToken1Balance,
@@ -255,7 +263,8 @@ library LiquidityOps {
                 newPositions[0].upperTick,               
                 Utils.addBipsToTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                    10
+                    10,
+                    decimals
                 ),
                 (params.anchorToken1Balance + params.discoveryToken1Balance) - params.toSkim, 
                 LiquidityType.Anchor
@@ -272,18 +281,16 @@ library LiquidityOps {
                 newPositions[1].upperTick + tickSpacing,
                 Utils.addBipsToTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                    25000 // todo remove hardcoded value
+                    25000, // todo remove hardcoded value
+                    decimals
                 ),           
                 0,
                 LiquidityType.Discovery 
             );   
             
-            require(
-                newPositions[0].liquidity > 0 &&
-                newPositions[1].liquidity > 0 &&  
-                newPositions[2].liquidity > 0, 
-                "shiftPositions: no liquidity in positions"
-            );
+            if (newPositions[0].liquidity == 0 || newPositions[1].liquidity == 0 || newPositions[2].liquidity == 0) {
+                revert NoLiquidity();
+            }
 
         } else {
             revert("shiftPositions: no liquidity in Floor");
@@ -299,7 +306,11 @@ library LiquidityOps {
     returns (
         LiquidityPosition[3] memory newPositions
     ) {
-        require(positions.length == 3, "invalid positions");
+        if (positions.length != 3) {
+            revert PositionsLength();
+        }
+
+        uint8 decimals = ERC20(address(IUniswapV3Pool(addresses.pool).token0())).decimals();
         (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(addresses.pool).slot0();
 
         // Ratio of the anchor's price to market price
@@ -348,7 +359,8 @@ library LiquidityOps {
                 positions[0].upperTick,                                
                 Utils.addBipsToTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                    300
+                    300,
+                    decimals
                 ),
                 anchorToken1Balance, 
                 LiquidityType.Anchor
@@ -365,7 +377,8 @@ library LiquidityOps {
                 newPositions[1].upperTick + tickSpacing, 
                 Utils.addBipsToTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                    25000
+                    25000,
+                    decimals
                 ),              
                 0,
                 LiquidityType.Discovery
@@ -395,7 +408,9 @@ library LiquidityOps {
         uint256 amount1ToDeploy,
         LiquidityType liquidityType
     ) internal returns (LiquidityPosition memory newPosition) {
-        require(upperTick > lowerTick, "invalid ticks LO");
+        if (upperTick <= lowerTick) {
+            revert InvalidTick();
+        }
         
         uint256 balanceToken0 = ERC20(IUniswapV3Pool(addresses.pool).token0()).balanceOf(address(this));
         uint256 token0Allowance = ERC20(IUniswapV3Pool(addresses.pool).token0()).allowance(address(this), addresses.deployer);
@@ -425,7 +440,9 @@ library LiquidityOps {
                     1e18 // 100% volatility
                 );
 
-                require(mintAmount > 0, "reDeploy (Discovery): mintAmount is 0");
+                if (mintAmount > 0) {
+                    revert MintAmount();
+                }
 
                 IVault(address(this))
                 .mintTokens(
@@ -436,7 +453,9 @@ library LiquidityOps {
 
             // check balance after minting
             balanceToken0 = ERC20(IUniswapV3Pool(addresses.pool).token0()).balanceOf(address(this));
-            require(balanceToken0 > 0, "reDeploy (Discovery): balanceToken0 is 0");
+            if (balanceToken0 == 0) {
+                revert BalanceToken0();
+            }
         }
         
         newPosition = IDeployer(addresses.deployer)
@@ -544,7 +563,9 @@ library LiquidityOps {
             );
 
             (uint128 liquidity,,,,) = IUniswapV3Pool(pool).positions(positionId);
-            require(liquidity > 0, "onlyNotEmptyPositions");
+            if (liquidity == 0) {
+                revert OnlyNotEmptyPositions();
+            }
         }
         _;
     }

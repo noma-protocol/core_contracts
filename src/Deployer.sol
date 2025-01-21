@@ -55,6 +55,7 @@ contract Deployer is Owned {
     error OnlyFactoryAllowed();
     error NotDeployed();
     error Locked();
+    error CallBackCaller();
 
     constructor(address _owner, address _resolver) Owned(_owner) {
         resolver = _resolver;
@@ -87,7 +88,7 @@ contract Deployer is Owned {
     )
         external
     {
-        require(msg.sender == address(pool), "cc");
+        if (msg.sender != address(pool)) revert CallBackCaller();
 
         uint256 token0Balance = ERC20(token0).balanceOf(address(this));
         uint256 token1Balance = ERC20(token1).balanceOf(address(this));

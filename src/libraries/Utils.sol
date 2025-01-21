@@ -4,11 +4,14 @@ import "./Conversions.sol";
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {
+    tickSpacing
+} from "../types/Types.sol";
+
 library Utils {
     
     int24 public constant MIN_TICK = -887272;
     int24 public constant MAX_TICK = 887272;
-    int24 public constant TICK_SPACING = 60;
 
     function calculateLoanFees(uint256 amount) public view returns (uint256) {
         uint256 fee = (amount * 3) / 100;
@@ -30,19 +33,19 @@ library Utils {
     }
 
     // Function to add bips to a tick value
-    function addBipsToTick(int24 currentTick, int24 bips) public pure returns (int24) {
+    function addBipsToTick(int24 currentTick, int24 bips, uint8 _decimals) public pure returns (int24) {
 
         uint256 tickToPrice = Conversions
         .sqrtPriceX96ToPrice(
             Conversions.tickToSqrtPriceX96(currentTick), 
-            18
+            _decimals
         );
 
         uint256 newPrice = addBips(tickToPrice, bips);
         int24 newTickValue = Conversions
         .priceToTick(
             int256(newPrice), 
-            TICK_SPACING
+            tickSpacing
         );
 
         // Ensure the new tick value is within the range of int24 and within Uniswap's tick range
@@ -161,8 +164,6 @@ library Utils {
     // TICK CALCULATION FUNCTIONS
 
     function nearestUsableTick(int24 tick) public pure returns (int24) {
-        int24 tickSpacing = 60;
-
         require(tickSpacing > 0, "TICK_SPACING");
         require(tick >= MIN_TICK && tick <= MAX_TICK, "TICK_BOUND");
         
