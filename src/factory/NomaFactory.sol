@@ -6,7 +6,7 @@ import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/I
 
 import { IUniswapV3Factory } from "@uniswap/v3-core/interfaces/IUniswapV3Factory.sol";
 import { IUniswapV3Pool } from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
-import { NomaFactoryStorage, VaultDescription } from "../libraries/LibAppStorage.sol";
+import { VaultDescription } from "../types/Types.sol";
 
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
 import { Conversions } from "../libraries/Conversions.sol";
@@ -14,7 +14,6 @@ import { Utils } from "../libraries/Utils.sol";
 
 import { BaseVault } from "../vault/BaseVault.sol";
 import { MockNomaToken } from "../token/MockNomaToken.sol";
-
 import { Deployer } from "../Deployer.sol";
 
 import {
@@ -31,7 +30,7 @@ interface IVaultUpgrade {
 }
 
 interface IEtchVault {
-    function preDeployVault() external returns (address, address);
+    function preDeployVault(address _resolver) external returns (address, address);
 }
 
 interface IExtFactory {
@@ -54,7 +53,7 @@ error OnlyVaultsError();
 error NotAuthorityError();
 error TokenDeployFailedError();
 error InvalidTokenAddressError();
-error SupplyTransferFailedError();
+error SupplyTransferError();
 error TokenAlreadyExistsError();
 error OnlyOneVaultError();
 error InvalidSymbol();
@@ -62,8 +61,27 @@ error InvalidSymbol();
 contract NomaFactory {
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    NomaFactoryStorage internal _n;
+    // Noma Factory state
+    IAddressResolver resolver;
+    Deployer deployer;
+
+    address deploymentFactory;
+    address extFactory;
+    address authority;
+    address uniswapV3Factory;
+
+    uint256 totalVaults;
     
+    bool permissionlessDeployEnabled;    
+
+    LiquidityStructureParameters liquidityStructureParameters;
+
+    EnumerableSet.AddressSet deployers; 
+
+    mapping(address => EnumerableSet.AddressSet) _vaults;
+    mapping(address => VaultDescription) vaultsRepository;
+    mapping(bytes32 => bool) deployedTokenHashes;
+
     constructor(
         address _uniswapV3Factory,
         address _resolver,
@@ -71,12 +89,12 @@ contract NomaFactory {
         address _extFactory,
         bool _permissionlessDeployEnabled
     ) {
-        _n.authority = msg.sender;
-        _n.uniswapV3Factory = _uniswapV3Factory;
-        _n.resolver = IAddressResolver(_resolver);
-        _n.deploymentFactory = _deploymentFactory;
-        _n.extFactory = _extFactory;
-        _n.permissionlessDeployEnabled = false;
+        authority = msg.sender;
+        uniswapV3Factory = _uniswapV3Factory;
+        resolver = IAddressResolver(_resolver);
+        deploymentFactory = _deploymentFactory;
+        extFactory = _extFactory;
+        permissionlessDeployEnabled = false;
     }
 
     function deployVault(
@@ -98,26 +116,28 @@ contract NomaFactory {
         );
 
         (address vaultAddress, address vaultUpgrade) = IEtchVault(
-            _n.resolver.requireAndGetAddress(
+            resolver.requireAndGetAddress(
                 Utils.stringToBytes32("EtchVault"), 
                 "no EtchVault"
             )
-        ).preDeployVault();
+        ).preDeployVault(address(resolver));
 
-        (, address stakingContract) = IExtFactory(_n.extFactory).deployAll(
+        (, address stakingContract) = IExtFactory(extFactory)
+        .deployAll(
             address(this),
             vaultAddress,
             address(nomaToken)
         );
 
-        _n.deployer = Deployer(
-            IDeployerFactory(_n.deploymentFactory).deployDeployer(
+        deployer = Deployer(
+            IDeployerFactory(deploymentFactory)
+            .deployDeployer(
                 address(this), 
-                address(_n.resolver)
+                address(resolver)
             )
         );
 
-        _n.deployer.initialize(
+        deployer.initialize(
             address(this), 
             vaultAddress, 
             address(pool), 
@@ -126,7 +146,7 @@ contract NomaFactory {
         
         IVaultUpgrade(vaultUpgrade).doUpgradeStart(
             vaultAddress, 
-            _n.resolver
+            resolver
             .requireAndGetAddress(
                 Utils.stringToBytes32("VaultUpgradeFinalize"), 
                 "no vaultUpgradeFinalize"
@@ -136,7 +156,7 @@ contract NomaFactory {
         _initializeVault(
             vaultAddress,
             msg.sender,
-            address(_n.deployer), 
+            address(deployer), 
             address(pool), 
             modelHelper(), 
             stakingContract,
@@ -155,19 +175,19 @@ contract NomaFactory {
             vault: vaultAddress
         });
 
-        IERC20Metadata(address(nomaToken)).transfer(address(_n.deployer), _params._totalSupply);
+        IERC20Metadata(address(nomaToken)).transfer(address(deployer), _params._totalSupply);
 
-        if (nomaToken.balanceOf(address(_n.deployer)) != _params._totalSupply) revert SupplyTransferFailedError();
+        if (nomaToken.balanceOf(address(deployer)) != _params._totalSupply) revert SupplyTransferError();
 
         _deployLiquidity(_params._IDOPrice, _params._totalSupply, getLiquidityStructureParameters());
 
-        _n.resolver.configureDeployerACL(vaultAddress);        
-        _n.deployer.finalize();
+        resolver.configureDeployerACL(vaultAddress);        
+        deployer.finalize();
 
-        _n.vaultsRepository[vaultAddress] = vaultDesc;
-        _n._vaults[msg.sender].add(vaultAddress);
-        _n.deployers.add(msg.sender);
-        _n.totalVaults += 1;
+        vaultsRepository[vaultAddress] = vaultDesc;
+        _vaults[msg.sender].add(vaultAddress);
+        deployers.add(msg.sender);
+        totalVaults += 1;
 
         return (vaultAddress, address(pool), address(nomaToken));
     }
@@ -180,9 +200,9 @@ contract NomaFactory {
     ) internal returns (MockNomaToken) {
         bytes32 tokenHash = keccak256(abi.encodePacked(_name, _symbol));
 
-        if (_n.deployedTokenHashes[tokenHash]) revert TokenAlreadyExistsError();
+        if (deployedTokenHashes[tokenHash]) revert TokenAlreadyExistsError();
 
-        _n.deployedTokenHashes[tokenHash] = true;
+        deployedTokenHashes[tokenHash] = true;
         uint256 nonce = uint256(tokenHash);
 
         MockNomaToken nomaToken;
@@ -191,7 +211,7 @@ contract NomaFactory {
             nonce++;
         } while (address(nomaToken) >= _token1);
 
-        nomaToken.initialize(_n.authority, _totalSupply, _name, _symbol, address(_n.resolver));
+        nomaToken.initialize(authority, _totalSupply, _name, _symbol, address(resolver));
 
         if (address(nomaToken) >= _token1) revert InvalidTokenAddressError();
 
@@ -200,7 +220,7 @@ contract NomaFactory {
 
 
     function _deployPool(uint256 _initPrice, address token0, address token1) internal returns (IUniswapV3Pool) {
-        IUniswapV3Factory factory = IUniswapV3Factory(_n.uniswapV3Factory);
+        IUniswapV3Factory factory = IUniswapV3Factory(uniswapV3Factory);
         IUniswapV3Pool pool = IUniswapV3Pool(
             factory.getPool(token0, token1, feeTier)
         );
@@ -256,27 +276,27 @@ contract NomaFactory {
         uint256 _totalSupply,
         LiquidityStructureParameters memory _liquidityParams
         ) internal {
-        _n.deployer.deployFloor(_IDOPrice, _totalSupply * _liquidityParams.floorPercentage / 100);  
-        _n.deployer.deployAnchor(
+        deployer.deployFloor(_IDOPrice, _totalSupply * _liquidityParams.floorPercentage / 100);  
+        deployer.deployAnchor(
             _liquidityParams.floorBips[0], 
             _liquidityParams.floorBips[1], 
             _totalSupply * _liquidityParams.anchorPercentage / 100
         );
-        _n.deployer.deployDiscovery(_IDOPrice * _liquidityParams.idoPriceMultiplier);
+        deployer.deployDiscovery(_IDOPrice * _liquidityParams.idoPriceMultiplier);
     }
 
     function mintTokens(address to, uint256 amount) public onlyVaults {
-        IERC20(_n.vaultsRepository[msg.sender].token0).mint(to, amount);
+        IERC20(vaultsRepository[msg.sender].token0).mint(to, amount);
     }
 
     function setLiquidityStructureParameters(
         LiquidityStructureParameters memory _params
     ) public isAuthority {
-        _n.liquidityStructureParameters = _params;
+        liquidityStructureParameters = _params;
     }
 
     function setPermissionlessDeploy(bool _flag) public isAuthority {
-        _n.permissionlessDeployEnabled = _flag;
+        permissionlessDeployEnabled = _flag;
     }
 
     function _validateToken1(address token) internal view {
@@ -291,16 +311,16 @@ contract NomaFactory {
         assembly {
             result := mload(add(symbol, 32))
         }
-        _n.resolver.requireAndGetAddress(result, "not a reserve token");
+        resolver.requireAndGetAddress(result, "not a reserve token");
     }
 
     function getLiquidityStructureParameters() public view returns 
     (LiquidityStructureParameters memory) {
-        return _n.liquidityStructureParameters;
+        return liquidityStructureParameters;
     }
 
     function getVaultDescription(address deployer) external view returns (VaultDescription memory) {
-        return _n.vaultsRepository[deployer];
+        return vaultsRepository[deployer];
     }
 
     function getDeployers() public view returns (address[] memory) {
@@ -331,39 +351,31 @@ contract NomaFactory {
     }
 
     function numDeployers() public view returns (uint256) {
-        return _n.deployers.length();
+        return deployers.length();
     }
 
     function numVaults(address deployer) public view returns (uint256) {
-        return _n._vaults[deployer].length();
+        return _vaults[deployer].length();
     }
 
     function _getDeployer(uint256 index) internal view returns (address) {
-        return _n.deployers.at(index);
+        return deployers.at(index);
     }
 
     function _getVault(address deployer, uint256 index) internal view returns (address) {
-        return _n._vaults[deployer].at(index);
+        return _vaults[deployer].at(index);
     }
 
     function modelHelper() public view returns (address) {
-        return _n.resolver
+        return resolver
                 .requireAndGetAddress(
                     Utils.stringToBytes32("ModelHelper"), 
                     "no modelHelper"
                 );
     }
 
-    function deployer() public view returns (address) {
-        return _n.resolver
-                .requireAndGetAddress(
-                    Utils.stringToBytes32("Deployer"), 
-                    "no Deployer"
-                );
-    }
-
     function adaptiveSupply() public view returns (address) {
-        return _n.resolver
+        return resolver
                 .requireAndGetAddress(
                     Utils.stringToBytes32("AdaptiveSupply"), 
                     "no AdaptiveSupply"
@@ -371,19 +383,19 @@ contract NomaFactory {
     }
 
     modifier checkDeployAuthority() {
-        if (!_n.permissionlessDeployEnabled) {
-            if (msg.sender != _n.authority) revert NotAuthorityError();
+        if (!permissionlessDeployEnabled) {
+            if (msg.sender != authority) revert NotAuthorityError();
         }
         _;
     }
 
     modifier isAuthority() {
-        if (msg.sender != _n.authority) revert NotAuthorityError();
+        if (msg.sender != authority) revert NotAuthorityError();
         _;
     }
 
     modifier onlyVaults() {
-        if (_n.vaultsRepository[msg.sender].vault != msg.sender) revert OnlyVaultsError();
+        if (vaultsRepository[msg.sender].vault != msg.sender) revert OnlyVaultsError();
         _;
     }
 
