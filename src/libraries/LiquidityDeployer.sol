@@ -11,21 +11,23 @@ import {Utils} from "./Utils.sol";
 import {Conversions} from "./Conversions.sol";
 import {DecimalMath} from "./DecimalMath.sol";
 
-import {Underlying} from "./Underlying.sol";
-import {ModelHelper} from "../model/Helper.sol";
-// import {LiquidityOps} from "./LiquidityOps.sol";
-import {IModelHelper} from "../interfaces/IModelHelper.sol";
 import "../interfaces/IVault.sol";
 
 import {
     LiquidityPosition, 
     LiquidityType, 
     DeployLiquidityParameters, 
-    AmountsToMint
+    AmountsToMint,
+    tickSpacing
 } from "../types/Types.sol";
 
 library LiquidityDeployer {
     
+    // Custom errors
+    error InvalidTicks();
+    error EmptyFloor();
+    error NoLiquidity();
+
     function deployAnchor(
         address pool,
         address receiver,
@@ -39,34 +41,27 @@ library LiquidityDeployer {
             LiquidityType liquidityType
         )
     {
-        // require(floorPosition.lowerTick != 0, "deployAnchor: invalid floor position");
-        // (uint160 sqrtRatioX96,,,,,, ) = IUniswapV3Pool(pool).slot0();
-
-        uint256 lowerAnchorPrice = Conversions.sqrtPriceX96ToPrice(
-            Conversions.tickToSqrtPriceX96(floorPosition.upperTick),
-            18
-        );
-
-        // require(floorPosition.upperTick <= lowerAnchorTick, "some msg 1");
+        uint8 decimals = ERC20(address(IUniswapV3Pool(pool).token0())).decimals();
 
         (int24 lowerTick, int24 upperTick) = Conversions
         .computeRangeTicks(
-            lowerAnchorPrice,
+            Conversions.sqrtPriceX96ToPrice(
+                Conversions.tickToSqrtPriceX96(floorPosition.upperTick),
+                decimals
+            ),
             Utils.addBips(
-                lowerAnchorPrice,
+                Conversions.sqrtPriceX96ToPrice(
+                    Conversions.tickToSqrtPriceX96(floorPosition.upperTick),
+                    decimals
+                ),
                 int256(deployParams.bips)
             ),
             deployParams.tickSpacing
         );
 
-        require(upperTick > lowerTick, "deployAnchor: invalid ticks LD");
-
-        // uint256 balanceToken0 = ERC20(IUniswapV3Pool(pool).token0()).balanceOf(
-        //     address(this)
-        // );
-        // uint256 balanceToken1 = ERC20(IUniswapV3Pool(pool).token1()).balanceOf(
-        //     address(this)
-        // );
+        if (upperTick <= lowerTick) {
+            revert InvalidTicks();
+        }
 
         (newPosition) = _deployPosition(
             pool,
@@ -86,9 +81,9 @@ library LiquidityDeployer {
     function deployDiscovery(
         address pool,
         address receiver,
-        LiquidityPosition memory anchorPosition,
         uint256 upperDiscoveryPrice,
-        int24 tickSpacing
+        int24 discoveryTickSpacing,
+        LiquidityPosition memory anchorPosition
     )
         internal
         returns (
@@ -96,9 +91,11 @@ library LiquidityDeployer {
             LiquidityType liquidityType
         )
     {
+        uint8 decimals = ERC20(address(IUniswapV3Pool(pool).token0())).decimals();
+
         uint256 lowerDiscoveryPrice = Conversions.sqrtPriceX96ToPrice(
             Conversions.tickToSqrtPriceX96(anchorPosition.upperTick),
-            18 // decimals hardcoded for now
+            decimals
         );
 
         lowerDiscoveryPrice = Utils.addBips(lowerDiscoveryPrice, 50);
@@ -106,10 +103,12 @@ library LiquidityDeployer {
         (int24 lowerTick, int24 upperTick) = Conversions.computeRangeTicks(
             lowerDiscoveryPrice,
             upperDiscoveryPrice,
-            tickSpacing
+            discoveryTickSpacing
         );
 
-        require(lowerTick >= anchorPosition.upperTick, "some msg 2");
+        if (lowerTick <= anchorPosition.upperTick) {
+            revert InvalidTicks();
+        }
 
         uint256 balanceToken0 = ERC20(IUniswapV3Pool(pool).token0()).balanceOf(
             address(this)
@@ -150,7 +149,7 @@ library LiquidityDeployer {
             (int24 lowerTick, int24 upperTick) = 
             Conversions.computeSingleTick(
                 newFloorPrice,
-                60
+                tickSpacing
             );
 
             uint128 newLiquidity = LiquidityAmounts
@@ -190,7 +189,7 @@ library LiquidityDeployer {
             }
 
         } else {
-            revert("empty floorPosition");
+            revert EmptyFloor();
         }
 
         return newPosition;
@@ -264,7 +263,9 @@ library LiquidityDeployer {
         LiquidityPosition[3] memory positions
     ) internal returns (LiquidityPosition memory newPosition) {
         // Ensuring valid tick range
-        require(positions[0].upperTick > positions[0].lowerTick, "invalid ticks LD2");
+        if (positions[0].upperTick <= positions[0].lowerTick) {
+            revert InvalidTicks();
+        }
 
         // Deploying the new liquidity position
         newPosition = _deployPosition(
@@ -299,12 +300,14 @@ library LiquidityDeployer {
         uint256 anchorCapacity,
         LiquidityPosition[3] memory positions
     ) internal pure returns (uint256) {
-        require(
-            positions[0].liquidity > 0 &&
-            positions[1].liquidity > 0 &&  
-            positions[2].liquidity > 0, 
-            "computeNewFloorPrice: no liquidity in positions"
-        );
+
+        if (
+            positions[0].liquidity == 0  || 
+            positions[1].liquidity == 0 || 
+            positions[2].liquidity == 0
+        ) {
+            revert NoLiquidity();
+        }
 
         uint256 newFloorPrice = DecimalMath.divideDecimal(
             floorNewToken1Balance + toSkim,

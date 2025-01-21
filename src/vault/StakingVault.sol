@@ -141,7 +141,7 @@ contract StakingVault is BaseVault {
                 .tickToSqrtPriceX96(
                     positions[0].upperTick
                 ), 
-            18);
+            ERC20(address(IUniswapV3Pool(addresses.pool).token0())).decimals());
             
             // Bump floor if necessary
             if (newFloorPrice > currentFloorPrice) {
@@ -211,7 +211,7 @@ contract StakingVault is BaseVault {
                     .tickToSqrtPriceX96(
                         positions[0].upperTick
                     ), 
-                18), 
+                ERC20(address(IUniswapV3Pool(addresses.pool).token0())).decimals()), 
                 newFloorPrice,
                 floorToken1Balance + toMint,
                 floorToken1Balance,
@@ -234,8 +234,13 @@ contract StakingVault is BaseVault {
             .reDeploy(
                 addresses,
                 Utils.nearestUsableTick(
-                    Utils.addBipsToTick(positions[1].upperTick, 150)
+                    Utils.addBipsToTick(
+                        positions[1].upperTick, 
+                        150, 
+                        ERC20(address(IUniswapV3Pool(addresses.pool).token0())).decimals()
+                    )
                 ),
+                // TODO remove hardcoded
                 Utils.nearestUsableTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96) * 3     
                 ),                

@@ -53,28 +53,29 @@ contract AdaptiveSupply {
 
     event VolatilityThresholdsUpdated(uint256[4] newThresholds);
 
+    // Custom errors
+    error InvalidVolatilityThresholds();
+
     constructor(
         address _modelHelper,
         uint256[4] memory _volatilityThresholds
     ) {
-        require(
-            _volatilityThresholds[0] < _volatilityThresholds[1] &&
+        if (!(_volatilityThresholds[0] < _volatilityThresholds[1] &&
             _volatilityThresholds[1] < _volatilityThresholds[2] &&
-            _volatilityThresholds[2] < _volatilityThresholds[3],
-            "Invalid volatility thresholds"
-        );
+            _volatilityThresholds[2] < _volatilityThresholds[3])) {
+            revert InvalidVolatilityThresholds();
+        }
 
         modelHelper = IModelHelper(_modelHelper);
         volatilityThresholds = _volatilityThresholds;
     }
 
     function setVolatilityThresholds(uint256[4] memory _newThresholds) public {
-        require(
-            _newThresholds[0] < _newThresholds[1] &&
+        if (!(_newThresholds[0] < _newThresholds[1] &&
             _newThresholds[1] < _newThresholds[2] &&
-            _newThresholds[2] < _newThresholds[3],
-            "Invalid volatility thresholds"
-        );
+            _newThresholds[2] < _newThresholds[3])) {
+            revert InvalidVolatilityThresholds();
+        }
 
         volatilityThresholds = _newThresholds;
         emit VolatilityThresholdsUpdated(_newThresholds);

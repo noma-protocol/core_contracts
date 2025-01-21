@@ -257,7 +257,7 @@ contract NomaFactory {
 
     function _deployLiquidity(
         uint256 _IDOPrice, 
-        uint256 _totalSupply, 
+        uint256 _totalSupply,
         LiquidityStructureParameters memory _liquidityParams
         ) internal {
         _n.deployer.deployFloor(_IDOPrice, _totalSupply * _liquidityParams.floorPercentage / 100);  

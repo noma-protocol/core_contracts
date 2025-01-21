@@ -51,6 +51,10 @@ contract Deployer is Owned {
     event FloorDeployed(LiquidityPosition position);
     event AnchorDeployed(LiquidityPosition position);
     event DiscoveryDeployed(LiquidityPosition position);
+    
+    error OnlyFactoryAllowed();
+    error NotDeployed();
+    error Locked();
 
     constructor(address _owner, address _resolver) Owned(_owner) {
         resolver = _resolver;
@@ -120,14 +124,14 @@ contract Deployer is Owned {
         emit FloorDeployed(newPosition);
     }
 
-    function deployAnchor(uint256 _bipsBelowSpot, uint256 _bipsWidth, uint256 amount0) public 
+    function deployAnchor(uint256 _bipsBelowSpot, uint256 _bipsWidth, uint256 _amount0) public 
     onlyFactory {
 
         (LiquidityPosition memory newPosition,) = LiquidityDeployer
         .deployAnchor(
             address(pool),
             vault,
-            amount0,
+            _amount0,
             floorPosition,
             DeployLiquidityParameters({
                 bips: _bipsWidth,
@@ -153,9 +157,9 @@ contract Deployer is Owned {
         .deployDiscovery(
             address(pool), 
             vault,
-            anchorPosition, 
             _upperDiscoveryPrice, 
-            tickSpacing
+            tickSpacing,
+            anchorPosition
         );
 
         liquidityType = LiquidityType.Discovery;
@@ -230,12 +234,13 @@ contract Deployer is Owned {
      * @notice Finalize function to clear the state after deployment
      */
     function finalize() public onlyFactory lock {
-        require(
-            floorPosition.upperTick != 0 &&
-            anchorPosition.upperTick != 0 &&
-            discoveryPosition.upperTick != 0,
-            "not deployed"
-        );
+        if (
+            floorPosition.upperTick == 0     || 
+            anchorPosition.upperTick == 0    || 
+            discoveryPosition.upperTick == 0
+        ) {
+            revert NotDeployed();
+        }
 
         LiquidityPosition[3] memory positions = [floorPosition, anchorPosition, discoveryPosition];
 
@@ -248,7 +253,7 @@ contract Deployer is Owned {
      * @dev Lock modifier to prevent reentrancy
      */
     modifier lock() {
-        require(!locked, "Deployer: Locked");
+        if (locked) revert Locked();
         locked = true;
         _;
         locked = false;
@@ -269,7 +274,7 @@ contract Deployer is Owned {
     }
 
     modifier onlyFactory() {
-        require(msg.sender == factory, "only factory");
+        if (msg.sender != factory) revert OnlyFactoryAllowed();
         _;
     }
 

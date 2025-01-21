@@ -21,6 +21,10 @@ abstract contract OwnableUninitialized {
 
     event OwnershipTransferred(address indexed previousManager, address indexed newManager);
 
+    // Custom errors
+    error ZeroAddress();
+    error NotManager();
+
     /// @dev Initializes the contract setting the deployer as the initial manager.
     /// CONSTRUCTOR EMPTY - USE INITIALIZIABLE INSTEAD
     // solhint-disable-next-line no-empty-blocks
@@ -39,7 +43,9 @@ abstract contract OwnableUninitialized {
      * @dev Throws if called by any account other than the manager.
      */
     modifier onlyManager() {
-        require(manager() == msg.sender, "Ownable: caller is not the manager");
+        if (manager() != msg.sender) {
+            revert NotManager();
+        }
         _;
     }
 
@@ -60,7 +66,9 @@ abstract contract OwnableUninitialized {
      * Can only be called by the current manager.
      */
     function transferOwnership(address newOwner) public virtual onlyManager {
-        require(newOwner != address(0), "Ownable: new manager is the zero address");
+        if (newOwner == address(0)) {
+            revert ZeroAddress();
+        }
         emit OwnershipTransferred(_manager, newOwner);
         _manager = newOwner;
     }

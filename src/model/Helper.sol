@@ -56,11 +56,12 @@ contract ModelHelper {
 
         (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
 
+        uint8 decimals = ERC20(address(IUniswapV3Pool(pool).token0())).decimals();
         uint256 anchorUpperPrice = Conversions.sqrtPriceX96ToPrice(
                 Conversions.tickToSqrtPriceX96(positions[1].upperTick),
-            18);
+            decimals);
             
-        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, 18);
+        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, decimals);
         liquidityRatio = DecimalMath.divideDecimal(anchorUpperPrice, spotPrice);
     }
 
