@@ -13,7 +13,12 @@ library Utils {
     int24 public constant MIN_TICK = -887272;
     int24 public constant MAX_TICK = 887272;
 
-    function calculateLoanFees(uint256 amount) public view returns (uint256) {
+    error OutOfRange();
+    error NegativeValue();
+    error InvalidChars();
+    error InvalidTickSpacing();
+
+    function calculateLoanFees(uint256 amount) public pure returns (uint256) {
         uint256 fee = (amount * 3) / 100;
         return fee;
     }
@@ -49,7 +54,10 @@ library Utils {
         );
 
         // Ensure the new tick value is within the range of int24 and within Uniswap's tick range
-        require(newTickValue >= MIN_TICK && newTickValue <= MAX_TICK, "Resulting tick value out of range");
+        if (newTickValue < MIN_TICK || newTickValue > MAX_TICK) {
+            revert OutOfRange();
+        }
+
         return newTickValue;
     }
 
@@ -114,14 +122,16 @@ library Utils {
             if (b[i] >= 0x30 && b[i] <= 0x39) { // 0x30 is '0' and 0x39 is '9'
                 result = result * 10 + (uint8(b[i]) - 0x30);
             } else {
-                revert("Invalid character in string: non-numeric character encountered");
+                revert InvalidChars();
             }
         }
         return result;
     }
 
     function int24ToUint256(int24 _value) public pure returns (uint256) {
-        require(_value >= 0, "Value is negative");
+        if (_value < 0) {
+            revert NegativeValue();
+        }
         return uint256(uint24(_value));
     }
 
@@ -162,10 +172,14 @@ library Utils {
     }
 
     // TICK CALCULATION FUNCTIONS
-
     function nearestUsableTick(int24 tick) public pure returns (int24) {
-        require(tickSpacing > 0, "TICK_SPACING");
-        require(tick >= MIN_TICK && tick <= MAX_TICK, "TICK_BOUND");
+        if (tickSpacing == 0) {
+            revert InvalidTickSpacing();
+        }
+
+        if (tick < MIN_TICK || tick > MAX_TICK) {
+            revert OutOfRange();
+        }
         
         int24 remainder = tick % tickSpacing;
         int24 rounded = tick - remainder;

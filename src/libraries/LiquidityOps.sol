@@ -32,7 +32,7 @@ interface IVault {
     function updatePositions(LiquidityPosition[3] memory newPositions) external;
     function setFees(uint256 _feesAccumulatedToken0, uint256 _feesAccumulatedToken1) external;
     function mintTokens(address to, uint256 amount) external;
-    function liquidityStructureParameters() external view returns (LiquidityStructureParameters memory _params);
+    function getLiquidityStructureParameters() external view returns (LiquidityStructureParameters memory _params);
 }
 
 interface IAdaptiveSupplyController {
@@ -74,7 +74,7 @@ library LiquidityOps {
             uint256 discoveryToken0Balance
         ) = getVaulData(addresses);
 
-        if (currentLiquidityRatio <= IVault(address(this)).liquidityStructureParameters().shiftRatio) {
+        if (currentLiquidityRatio <= IVault(address(this)).getLiquidityStructureParameters().shiftRatio) {
             
             // Shift --> ETH after skim at floor = 
             // ETH before skim at anchor - (liquidity ratio * ETH before skim at anchor)
@@ -123,9 +123,6 @@ library LiquidityOps {
                     newPositions
                 ); 
 
-                // IModelHelper(addresses.modelHelper)
-                // .enforceSolvencyInvariant(address(this));   
-
                 return (currentLiquidityRatio, newPositions);
             }
 
@@ -139,7 +136,6 @@ library LiquidityOps {
         LiquidityPosition[3] memory _positions
     ) internal returns (LiquidityPosition[3] memory newPositions) {
 
-        address modelHelper = params.addresses.modelHelper;
         address deployer = params.addresses.deployer;
         address pool = params.addresses.pool;
 
@@ -281,14 +277,18 @@ library LiquidityOps {
                 newPositions[1].upperTick + tickSpacing,
                 Utils.addBipsToTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                    25000, // todo remove hardcoded value
+                    IVault(address(this)).getLiquidityStructureParameters().discoveryBips,
                     decimals
                 ),           
                 0,
                 LiquidityType.Discovery 
             );   
             
-            if (newPositions[0].liquidity == 0 || newPositions[1].liquidity == 0 || newPositions[2].liquidity == 0) {
+            if (
+                newPositions[0].liquidity == 0 || 
+                newPositions[1].liquidity == 0 || 
+                newPositions[2].liquidity == 0
+            ) {
                 revert NoLiquidity();
             }
 
@@ -319,7 +319,7 @@ library LiquidityOps {
                 
         (, uint256 anchorToken1Balance,, ) = getVaulData(addresses);
 
-        if (currentLiquidityRatio >= IVault(address(this)).liquidityStructureParameters().slideRatio) {
+        if (currentLiquidityRatio >= IVault(address(this)).getLiquidityStructureParameters().slideRatio) {
             
             (
                 uint256 feesPosition0Token0,
@@ -377,7 +377,7 @@ library LiquidityOps {
                 newPositions[1].upperTick + tickSpacing, 
                 Utils.addBipsToTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                    25000,
+                    IVault(address(this)).getLiquidityStructureParameters().discoveryBips,
                     decimals
                 ),              
                 0,
@@ -391,9 +391,6 @@ library LiquidityOps {
             .updatePositions(
                 newPositions
             );    
-
-            // IModelHelper(addresses.modelHelper)
-            // .enforceSolvencyInvariant(address(this));   
 
         } else {
             revert BelowThreshold();
