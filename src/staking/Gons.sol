@@ -4,6 +4,10 @@ pragma solidity ^0.8.23;
 import "../libraries/SafeMath.sol";
 import "../types/ERC20Permit.sol";
 
+error AlreadyInitialized();
+error InvalidAmount();
+error InvalidAddress();
+
 contract GonsToken is ERC20Permit {
     // PLEASE READ BEFORE CHANGING ANY ACCOUNTING OR MATH
     // Anytime there is division, there is a risk of numerical instability from rounding errors. In
@@ -59,7 +63,9 @@ contract GonsToken is ERC20Permit {
      * @param _stakingContract The address of the staking contract.
      */
     function initialize(address _stakingContract) external  {
-        require(stakingContract == address(0), "Already initialized");
+        if (stakingContract != address(0)) {
+            revert AlreadyInitialized();
+        }
         stakingContract = _stakingContract;
         transfer(stakingContract, _totalSupply);
     }
@@ -70,7 +76,9 @@ contract GonsToken is ERC20Permit {
      * @param amount The amount of tokens to mint.
      */
     function mint(address to, uint256 amount) external {
-        require(amount > 0, "Amount must be greater than 0");
+        if (amount == 0) {
+            revert InvalidAmount();
+        }
 
         uint256 gonAmount = amount.mul(_gonsPerFragment);
         _totalSupply = _totalSupply.add(amount);
@@ -126,10 +134,19 @@ contract GonsToken is ERC20Permit {
     * @return A boolean that indicates if the operation was successful.
     */
     function burnFor(address from, uint256 value) public returns (bool) {
-        require(from != address(0), "ERC20: burn from the zero address");
-        require(value <= balanceOf(from), "ERC20: burn amount exceeds balance");
-        require(value <= allowance(from, msg.sender), "ERC20: burn amount exceeds allowance");
 
+        if (from == address(0)) {
+            revert InvalidAddress();
+        }
+
+        if (value > balanceOf(from)) {
+            revert InvalidAmount();
+        }
+
+        if (value > allowance(from, msg.sender)) {
+            revert InvalidAmount();
+        }
+        
         uint256 gonValue = value.mul(_gonsPerFragment);
         _gonBalances[from] = _gonBalances[from].sub(gonValue);
         _totalSupply = _totalSupply.sub(value);
