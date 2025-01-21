@@ -6,11 +6,12 @@ libs = ["lib"]
 remappings = ["ds-test/=lib/forge-std/lib/ds-test/src/",
             "forge-std/=lib/forge-std/src/",
             "solmate/=lib/solmate/src/",
+            "solidity-stringutils/=lib/solidity-stringutils/",
             "@uniswap/v3-core/=lib/v3-core/contracts/",
             "@uniswap/v3-periphery/=lib/v3-periphery/contracts/",
             "openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
             "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
             "openzeppelin-contracts/=lib/openzeppelin-contracts/",
-            "v3-core/=lib/v3-core/",
+            "v3-core/=lib/v3-core/contracts",
             "v3-periphery/=lib/v3-periphery/contracts/",
             "abdk/=lib/abdk-libraries-solidity"]
