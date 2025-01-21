@@ -2,12 +2,9 @@
 pragma solidity ^0.8.20;
 
 import "./abstract/OwnableUninitialized.sol";
-import "./libraries/LibAppStorage.sol";
 
 contract Resolver is OwnableUninitialized {
     
-    IAddressResolver resolver;
-
     mapping(bytes32 => address) private addressCache;
     mapping(bytes32 => address) private repository;
     mapping(bytes32 => uint256) private uintSettings;
