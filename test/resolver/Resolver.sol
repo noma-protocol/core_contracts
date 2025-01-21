@@ -18,8 +18,8 @@ contract TestResolver is OwnableUninitialized {
     error AddressNotFound(string reason);
     error OnlyFactoryOrManagerAllowed();
 
-    constructor() {
-        _manager = msg.sender;
+    constructor(address _deployer) {
+        _manager = _deployer;
     }
 
     function initFactory(address _factory) external onlyManager {
@@ -38,7 +38,7 @@ contract TestResolver is OwnableUninitialized {
         }
     }
 
-    function configureDeployerACL(address _vault) external {
+    function configureDeployerACL(address _vault) external onlyFactoryOrManager {
         deployerACL[_vault] = true;
     }
 
