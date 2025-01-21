@@ -15,34 +15,29 @@ import {IDiamondCut} from "../interfaces/IDiamondCut.sol";
 import {IERC173} from "../interfaces/IERC173.sol";
 import {IERC165} from "../interfaces/IERC165.sol";
 
-// It is expected that this contract is customized if you want to deploy your diamond
-// with data from a deployment script. Use the init function to initialize state variables
-// of your diamond. Add parameters to the init funciton if you need to.
-
 error AlreadyInitialized();
+error InvalidResolver();
 
 contract DiamondInit {
-    // You can add parameters to this function in order to pass in
-    // data to set your own state variables
-    function init() external {
+
+    function init(address _resolver) external {
         // adding ERC165 data
         LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
         ds.supportedInterfaces[type(IERC165).interfaceId] = true;
         ds.supportedInterfaces[type(IDiamondCut).interfaceId] = true;
         ds.supportedInterfaces[type(IDiamondLoupe).interfaceId] = true;
         ds.supportedInterfaces[type(IERC173).interfaceId] = true;
+        
+        if (_resolver == address(0)) {
+            revert InvalidResolver();
+        }
 
-        // add your own state variables
-        // EIP-2535 specifies that the `diamondCut` function takes two optional
-        // arguments: address _init and bytes calldata _calldata
-        // These arguments are used to execute an arbitrary function using delegatecall
-        // in order to set state variables in the diamond during deployment or an upgrade
-        // More info here: https://eips.ethereum.org/EIPS/eip-2535#diamond-interface
+        ds.resolver = _resolver;
     }
 
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](1);
-        selectors[0] = bytes4(keccak256(bytes("init()")));
+        selectors[0] = bytes4(keccak256(bytes("init(address)")));
         return selectors;
     }
 }
