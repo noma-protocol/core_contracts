@@ -5,6 +5,7 @@ import "./abstract/OwnableUninitialized.sol";
 import "./libraries/LibAppStorage.sol";
 
 contract Resolver is OwnableUninitialized {
+    
     IAddressResolver resolver;
 
     mapping(bytes32 => address) private addressCache;
@@ -18,8 +19,8 @@ contract Resolver is OwnableUninitialized {
     error AddressNotFound(string reason);
     error OnlyFactoryOrManagerAllowed();
 
-    constructor() {
-        _manager = msg.sender;
+    constructor(address _deployer) {
+        _manager = _deployer;
     }
 
     function initFactory(address _factory) external onlyManager {
