@@ -57,7 +57,7 @@ contract BaseVault is OwnableUninitialized {
         external
     {
         if (msg.sender != address(_v.pool)) revert CallbackCaller();
-        
+
         uint256 token0Balance = IERC20(_v.tokenInfo.token0).balanceOf(address(this));
         uint256 token1Balance = IERC20(_v.tokenInfo.token1).balanceOf(address(this));
 
@@ -193,7 +193,7 @@ contract BaseVault is OwnableUninitialized {
     }
 
     modifier onlyInternalCalls() {
-        if (msg.sender != _v.factory && msg.sender != _v.stakingContract) revert OnlyInternalCalls();
+        if (msg.sender != _v.factory && msg.sender != address(this)) revert OnlyInternalCalls();
         _;        
     }
 
