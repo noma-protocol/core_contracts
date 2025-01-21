@@ -4,46 +4,15 @@
 pragma solidity ^0.8.0;
 
 import { IUniswapV3Pool } from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { 
     TokenInfo, 
     LiquidityPosition, 
     LoanPosition, 
-    VaultDescription, 
     LiquidityStructureParameters
 }  from "../types/Types.sol";
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import { Deployer } from "../Deployer.sol";
-
-interface IAdaptiveSupplyController {
-    function adjustSupply(address pool, address vault, int256 volatility) external returns (uint256, uint256);
-}
-
-/**
- * @notice Storage structure for factory-related information.
- */
-struct NomaFactoryStorage {
-    // Noma Factory state
-    IAddressResolver resolver;
-    Deployer deployer;
-
-    address deploymentFactory;
-    address extFactory;
-    address authority;
-    address uniswapV3Factory;
-
-    uint256 totalVaults;
-    
-    bool permissionlessDeployEnabled;    
-
-    LiquidityStructureParameters liquidityStructureParameters;
-
-    EnumerableSet.AddressSet deployers;    
-    mapping(address => EnumerableSet.AddressSet) _vaults;
-    mapping(address => VaultDescription) vaultsRepository;
-    mapping(bytes32 => bool) deployedTokenHashes;
-}
 
 /**
  * @notice Storage structure for vault-related information.
@@ -63,7 +32,6 @@ struct VaultStorage {
     mapping(address => LoanPosition) loanPositions;
     mapping(address => uint256) totalLoansPerUser;
 
-
     address[] loanAddresses;
     uint256 totalLoans;
     uint256 collateralAmount;
@@ -82,6 +50,7 @@ struct VaultStorage {
     address adaptiveSupplyController;
 
     IUniswapV3Pool pool;
+    IAddressResolver resolver;
 
     // Uniswap Fees
     uint256 feesAccumulatorToken0;
@@ -106,15 +75,4 @@ library LibAppStorage {
             vs.slot := keccak256(add(0x20, "noma.money.vaultstorage"), 32)
         }
     }
-
-    /**
-     * @notice Get the factory storage.
-     * @return fs The factory storage.
-     */
-    function factoryStorage() internal pure returns (NomaFactoryStorage storage fs) {
-        assembly {
-            fs.slot := keccak256(add(0x20, "noma.money.factorystorage"), 32)
-        }
-    }
-
 }
