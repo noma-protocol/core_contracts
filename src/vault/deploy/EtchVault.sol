@@ -30,7 +30,9 @@ contract EtchVault {
         resolver = IAddressResolver(_resolver);
     }
 
-    function preDeployVault()
+    function preDeployVault(
+        address _resolver
+    )
         public
         onlyFactory
         returns (address vault, address vaultUpgrade)
@@ -81,7 +83,7 @@ contract EtchVault {
         IDiamond(address(diamond)).transferOwnership(vaultUpgrade);
             
         //Initialization
-        DiamondInit(address(diamond)).init();
+        DiamondInit(address(diamond)).init(_resolver);
         vault = address(diamond);
 
         return (vault, vaultUpgrade);
