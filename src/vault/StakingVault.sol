@@ -51,7 +51,6 @@ contract StakingVault is BaseVault {
         }
 
         uint256 stakedBalance = IERC20(_v.pool.token0()).balanceOf(_v.stakingContract);
-        
         uint256 BASE_VALUE = 100e18;
         uint256 SCALING_FACTOR = 1e12; // New scaling factor
 
@@ -250,7 +249,7 @@ contract StakingVault is BaseVault {
                     Utils.addBipsToTick(
                         positions[1].upperTick, 
                         // TODO remove hardcoded
-                        150, 
+                        IVault(address(this)).getLiquidityStructureParameters().discoveryBips, 
                         ERC20(address(IUniswapV3Pool(addresses.pool).token0())).decimals()
                     )
                 ),
@@ -278,7 +277,7 @@ contract StakingVault is BaseVault {
         _v.feesAccumulatorToken1 += _feesAccumulatedToken1;
     }
 
-    function liquidityStructureParameters() public view returns 
+    function getLiquidityStructureParameters() public view returns 
     (LiquidityStructureParameters memory ) {
         return _v.liquidityStructureParameters;
     }
@@ -290,7 +289,7 @@ contract StakingVault is BaseVault {
     function getFunctionSelectors() external pure  override returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](4);
         selectors[0] = bytes4(keccak256(bytes("mintAndDistributeRewards((address,address,address,address,address))"))); 
-        selectors[1] = bytes4(keccak256(bytes("liquidityStructureParameters()")));  
+        selectors[1] = bytes4(keccak256(bytes("getLiquidityStructureParameters()")));  
         selectors[2] = bytes4(keccak256(bytes("setStakingContract(address)")));
         selectors[3] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));
         return selectors;

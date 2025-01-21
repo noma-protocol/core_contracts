@@ -5,17 +5,15 @@ import { IModelHelper } from "../interfaces/IModelHelper.sol";
 import { IDeployer } from "../interfaces/IDeployer.sol";
 import { LiquidityOps } from "../libraries/LiquidityOps.sol";
 import {
+    LiquidityStructureParameters,
     LiquidityPosition, 
     ProtocolAddresses
 } from "../types/Types.sol";
 
+import { IVault } from "../interfaces/IVault.sol";
+
 interface IStakingVault {
     function mintAndDistributeRewards(ProtocolAddresses memory addresses) external;
-}
-
-interface IVault {
-    function getPositions() external view returns (LiquidityPosition[3] memory positions);
-    function getProtocolAddresses() external view returns (ProtocolAddresses memory addresses);
 }
 
 interface ILendingVault {
