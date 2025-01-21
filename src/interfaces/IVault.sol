@@ -3,7 +3,9 @@ pragma solidity ^0.8.23;
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {
     VaultInfo,
-    LiquidityPosition
+    LiquidityPosition,
+    ProtocolAddresses,
+    LiquidityStructureParameters
 } from "../types/Types.sol";
 
 interface IVault  {
@@ -19,4 +21,6 @@ interface IVault  {
     function getExcessReserveToken1() external view returns (uint256);
     function getCollateralAmount() external view returns (uint256);
     function getAccumulatedFees() external view returns (uint256,uint256);  
+    function getProtocolAddresses() external view returns (ProtocolAddresses memory);
+    function getLiquidityStructureParameters() external view returns (LiquidityStructureParameters memory );    
 }
