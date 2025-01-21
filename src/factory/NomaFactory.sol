@@ -57,6 +57,7 @@ error InvalidTokenAddressError();
 error SupplyTransferFailedError();
 error TokenAlreadyExistsError();
 error OnlyOneVaultError();
+error InvalidSymbol();
 
 contract NomaFactory {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -82,11 +83,6 @@ contract NomaFactory {
         VaultDeployParams memory _params
     ) external checkDeployAuthority returns (address, address, address) {
         _validateToken1(_params.token1);
-
-        // Ensure deployer has not already deployed a vault
-        if (_n.vaultsRepository[msg.sender].vault != address(0)) {
-            revert OnlyOneVaultError();
-        }
 
         MockNomaToken nomaToken = _deployNomaToken(
             _params._name,
@@ -130,7 +126,8 @@ contract NomaFactory {
         
         IVaultUpgrade(vaultUpgrade).doUpgradeStart(
             vaultAddress, 
-            _n.resolver.requireAndGetAddress(
+            _n.resolver
+            .requireAndGetAddress(
                 Utils.stringToBytes32("VaultUpgradeFinalize"), 
                 "no vaultUpgradeFinalize"
             )
@@ -158,18 +155,23 @@ contract NomaFactory {
             vault: vaultAddress
         });
 
-        _n.vaultsRepository[msg.sender] = vaultDesc;
-
         IERC20Metadata(address(nomaToken)).transfer(address(_n.deployer), _params._totalSupply);
 
         if (nomaToken.balanceOf(address(_n.deployer)) != _params._totalSupply) revert SupplyTransferFailedError();
 
         _deployLiquidity(_params._IDOPrice, _params._totalSupply, getLiquidityStructureParameters());
 
-        _n.deployers.add(msg.sender);
-        _n.totalVaults += 1;
+        require(address(this) == _n.resolver
+            .requireAndGetAddress("NomaFactory", "NomaFactoryNotFound")
+        );
+
         _n.resolver.configureDeployerACL(vaultAddress);        
         _n.deployer.finalize();
+
+        _n.vaultsRepository[vaultAddress] = vaultDesc;
+        _n._vaults[msg.sender].add(vaultAddress);
+        _n.deployers.add(msg.sender);
+        _n.totalVaults += 1;
 
         return (vaultAddress, address(pool), address(nomaToken));
     }
@@ -287,7 +289,7 @@ contract NomaFactory {
         bytes memory symbol32 = bytes(symbol);
 
         if (symbol32.length == 0) {
-            revert("IT");
+            revert InvalidSymbol();
         }
 
         assembly {
@@ -305,12 +307,47 @@ contract NomaFactory {
         return _n.vaultsRepository[deployer];
     }
 
-    function getDeployers() external view returns (address[] memory) {
-        address[] memory deployers = new address[](_n.deployers.length());
-        for (uint256 i = 0; i < _n.deployers.length(); i++) {
-            deployers[i] = _n.deployers.at(i);
+    function getDeployers() public view returns (address[] memory) {
+        uint256 length = numDeployers();
+        address[] memory deployers = new address[](length);
+        for (uint256 i = 0; i < length; i++) {
+            deployers[i] = _getDeployer(i);
         }
+
         return deployers;
+    }
+
+    function getVaults(address deployer) public view returns (address[] memory) {
+        uint256 length = numVaults(deployer);
+        address[] memory vaults = new address[](length);
+        for (uint256 i = 0; i < length; i++) {
+            vaults[i] = _getVault(deployer, i);
+        }
+
+        return vaults;
+    }
+
+    function numVaults() public view returns (uint256 result) {
+        address[] memory deployers = getDeployers();
+        for (uint256 i = 0; i < deployers.length; i++) {
+            result += numVaults(deployers[i]);
+        }
+    }
+
+    function numDeployers() public view returns (uint256) {
+        return _n.deployers.length();
+    }
+
+    function numVaults(address deployer) public view returns (uint256) {
+        return _n._vaults[deployer].length();
+    }
+
+    function _getDeployer(uint256 index) internal view returns (address) {
+        return _n.deployers.at(index);
+    }
+
+    function _getVault(address deployer, uint256 index) internal view returns (address) {
+        return _n._vaults[deployer].at(index);
     }
 
     function modelHelper() public view returns (address) {
