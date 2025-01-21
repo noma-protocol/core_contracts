@@ -56,6 +56,8 @@ struct LiquidityStructureParameters {
     uint16[2] floorBips;
     uint256 shiftRatio;
     uint256 slideRatio;
+    int24 discoveryBips;
+    
 }
 
 struct ShiftParameters {
