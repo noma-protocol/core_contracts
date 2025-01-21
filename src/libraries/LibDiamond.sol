@@ -49,6 +49,8 @@ library LibDiamond {
         mapping(bytes4 => bool) supportedInterfaces;
         // owner of the contract
         address contractOwner;
+        // resolver
+        address resolver;
     }
 
     function diamondStorage() internal pure returns (DiamondStorage storage ds) {

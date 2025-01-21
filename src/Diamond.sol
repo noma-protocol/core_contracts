@@ -11,7 +11,6 @@ pragma solidity ^0.8.20;
  */
 import {LibDiamond} from "./libraries/LibDiamond.sol";
 import {IDiamondCut} from "./interfaces/IDiamondCut.sol";
-// import "./libraries/Utils.sol";
 
 contract Diamond {
     constructor(address _contractOwner, address _diamondCutFacet) payable {
