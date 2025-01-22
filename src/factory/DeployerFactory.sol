@@ -12,7 +12,7 @@ contract DeployerFactory {
     address public owner;
     address public factory;
 
-    Deployer public deployerContract;
+    Deployer public deployer;
     
     constructor () {
         owner = msg.sender;
