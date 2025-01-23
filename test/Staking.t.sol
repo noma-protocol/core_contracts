@@ -60,12 +60,12 @@ contract TestStaking is Test {
         }
 
         // Simulate some rewards
-        vm.prank(deployer);
+        vm.prank(address(staking));
         staking.notifyRewardAmount(0);
 
         uint256 rewardAmount = 1000e18;
         NOMA.mintTest(address(staking), rewardAmount);
-        vm.prank(deployer);
+        vm.prank(address(staking));
         staking.notifyRewardAmount(rewardAmount);
 
         // All users unstake
@@ -102,14 +102,14 @@ contract TestStaking is Test {
             staking.stake(users[i], STAKE_AMOUNT);
         }
         
-        vm.prank(deployer);
+        vm.prank(address(staking));
         staking.notifyRewardAmount(0);
 
         // Simulate multiple rebases
         uint256 rewardAmount = 1000e18;
         for (uint i = 0; i < 10; i++) {
             NOMA.mintTest(address(staking), rewardAmount);
-            vm.prank(deployer);
+            vm.prank(address(staking));
             staking.notifyRewardAmount(rewardAmount);
         }
 
@@ -148,12 +148,12 @@ contract TestStaking is Test {
         }
 
         // Simulate some rewards
-        vm.prank(deployer);
+        vm.prank(address(staking));
         staking.notifyRewardAmount(0);
 
         uint256 rewardAmount = 500e18;
         NOMA.mintTest(address(staking), rewardAmount);
-        vm.prank(deployer);
+        vm.prank(address(staking));
         staking.notifyRewardAmount(rewardAmount);
 
         // Other half of users stake
@@ -164,7 +164,7 @@ contract TestStaking is Test {
 
         // Simulate more rewards
         NOMA.mintTest(address(staking), rewardAmount);
-        vm.prank(deployer);
+        vm.prank(address(staking));
         staking.notifyRewardAmount(rewardAmount);
 
         // All users unstake
@@ -222,7 +222,7 @@ contract TestStaking is Test {
             uint256 rewardAmount = _randomAmount(100e18, MAX_REWARD_AMOUNT);
             totalRewards += rewardAmount;
             NOMA.mintTest(address(staking), rewardAmount);
-            vm.prank(deployer);
+            vm.prank(address(staking));
             staking.notifyRewardAmount(rewardAmount);
             
             console.log("Reward distributed:", rewardAmount);
@@ -295,7 +295,7 @@ contract TestStaking is Test {
         // Simulate random rewards
         uint256 rewardAmount = _randomAmount(100e18, MAX_REWARD_AMOUNT);
         NOMA.mintTest(address(staking), rewardAmount);
-        vm.prank(deployer);
+        vm.prank(address(staking));
         staking.notifyRewardAmount(rewardAmount);
         // console.log("First reward distributed:", rewardAmount);
 
@@ -317,7 +317,7 @@ contract TestStaking is Test {
         uint256 additionalReward = _randomAmount(100e18, MAX_REWARD_AMOUNT);
         rewardAmount += additionalReward;
         NOMA.mintTest(address(staking), additionalReward);
-        vm.prank(deployer);
+        vm.prank(address(staking));
         staking.notifyRewardAmount(additionalReward);
         // console.log("Second reward distributed:", additionalReward);
 

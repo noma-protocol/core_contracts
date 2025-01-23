@@ -40,9 +40,12 @@ contract TestRebase is Test {
 
         uint256 profit = 150e18;
 
-        vm.prank(deployer);
+        vm.prank(address(staking));
         staking.notifyRewardAmount(0);
+
         mockNomaToken.approve(address(staking), profit);
+
+        vm.prank(address(staking));
         staking.notifyRewardAmount(profit);
 
         uint256 expectedTotalSupply = totalSupplyBefore + profit;
@@ -130,10 +133,12 @@ contract TestRebase is Test {
         vm.stopPrank();
 
         uint256 profit = 3000e18;
-
-        vm.prank(deployer);
-        staking.notifyRewardAmount(0);
         mockNomaToken.approve(address(staking), profit);
+
+        vm.prank(address(staking));
+        staking.notifyRewardAmount(0);
+        
+        vm.prank(address(staking));
         staking.notifyRewardAmount(profit); 
 
         uint256 balanceAfterProfitUserA = rebaseToken.balanceOf(userA);
@@ -185,13 +190,13 @@ contract TestRebase is Test {
         // Distribute profit
         uint256 profit = 1000e18; // Scale profit with number of users
 
-        vm.prank(deployer);
+        vm.prank(address(staking));
         staking.notifyRewardAmount(0);
         vm.stopPrank();
 
         mockNomaToken.approve(address(staking), profit);
         
-        vm.prank(deployer);
+        vm.prank(address(staking));
         staking.notifyRewardAmount(profit);
         vm.stopPrank();
 
@@ -256,14 +261,14 @@ contract TestRebase is Test {
         uint256 profit = 300_000e18; // Set profit to 50% of total staked amount
         mockNomaToken.mintTest(address(staking), profit);
 
-        vm.prank(deployer);
+        vm.prank(address(staking));
         staking.notifyRewardAmount(0);
         vm.stopPrank();
 
         vm.prank(address(staking));
         mockNomaToken.approve(address(staking), profit);
 
-        vm.prank(deployer);
+        vm.prank(address(staking));
         staking.notifyRewardAmount(profit);
         vm.stopPrank();
         
@@ -334,7 +339,8 @@ contract TestRebase is Test {
         // console.log(rebaseToken.totalSupply());
         // console.log("Circulating supply:");
         // console.log(rebaseToken.circulatingSupply());
-        vm.prank(deployer);
+
+        vm.prank(address(staking));
         staking.notifyRewardAmount(0);
 
         // console.log("After first notifyRewardAmount(0):");
@@ -360,7 +366,7 @@ contract TestRebase is Test {
         vm.prank(address(staking));
         mockNomaToken.approve(address(staking), profit);
 
-        vm.prank(deployer);
+        vm.prank(address(staking));
         staking.notifyRewardAmount(profit);
 
         // console.log("After second notifyRewardAmount(profit):");
