@@ -6,6 +6,7 @@ import {BaseVault} from "./BaseVault.sol";
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
 import {IDeployer} from "../interfaces/IDeployer.sol";
 import {LiquidityOps} from "../libraries/LiquidityOps.sol";
+import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 
 import "../libraries/Conversions.sol";
 import "../libraries/DecimalMath.sol";
@@ -17,7 +18,8 @@ import {
     LiquidityPosition, 
     LiquidityType,
     ProtocolAddresses,
-    LiquidityStructureParameters
+    LiquidityStructureParameters,
+    RewardParams
 } from "../types/Types.sol";
 
 interface IERC20 {
@@ -25,10 +27,15 @@ interface IERC20 {
     function transfer(address recipient, uint256 amount) external returns (bool);
     function mint(address receiver, uint256 amount) external;
     function approve(address spender, uint256 amount) external;
+    function totalSupply() external view returns (uint256);
 }
 
 interface IStakingRewards {
     function notifyRewardAmount(uint256 reward) external;
+}
+
+interface IRewardsCalculator {
+    function calculateRewards(RewardParams memory params) external pure returns (uint256);
 }
 
 error NotInitialized();
@@ -38,31 +45,13 @@ error Unauthorized();
 
 contract StakingVault is BaseVault {
 
-    //TODO move this to LibAppStorage
-    uint256 public constant BASE_VALUE = 100e18;
-
-    function calculateMintAmount(int256 currentLiquidityRatio, uint256 excessTokens) public view returns (uint256) {
-        return _calculateMintAmont(currentLiquidityRatio, excessTokens);
-    }
-
-    function _calculateMintAmont(int256 currentLiquidityRatio, uint256 excessTokens) internal view returns (uint256) {
-        if (currentLiquidityRatio < -1e18 || currentLiquidityRatio > 1e18 * 10) {
-            revert LiquidityRatioOutOfRange();
-        }
-
-        uint256 stakedBalance = IERC20(_v.pool.token0()).balanceOf(_v.stakingContract);
-        uint256 BASE_VALUE = 100e18;
-        uint256 SCALING_FACTOR = 1e12; // New scaling factor
-
-        uint256 adjustedRatio = BASE_VALUE - uint256(currentLiquidityRatio);
-        uint256 mintAmount = (adjustedRatio * excessTokens * SCALING_FACTOR) / 1e18;
-
-        return mintAmount;
-    }
-
     function mintAndDistributeRewards(ProtocolAddresses memory addresses) public {
         if (msg.sender != address(this)) {
             revert Unauthorized();
+        }
+
+        if (_v.stakingContract == address(0)) {
+            revert StakingContractNotSet();
         }
 
         LiquidityPosition[3] memory positions = [
@@ -78,37 +67,42 @@ contract StakingVault is BaseVault {
             false
         );
 
-        uint256 currentLiquidityRatio = IModelHelper(_v.modelHelper)
-        .getLiquidityRatio(address(_v.pool), addresses.vault);
-        
-        uint256 toMintScaledToken1 = _calculateMintAmont(int256(currentLiquidityRatio), excessReservesToken1);
-
         uint256 intrinsicMinimumValue = IModelHelper(_v.modelHelper)
         .getIntrinsicMinimumValue(addresses.vault) * 1e18;
 
-        uint256 toMintConverted = DecimalMath.divideDecimal(toMintScaledToken1, intrinsicMinimumValue);
+        uint256 circulatingSupply = IModelHelper(_v.modelHelper).getCirculatingSupply(addresses.pool, addresses.vault);
+        uint256 totalSupply = IERC20(IUniswapV3Pool(addresses.pool).token0()).totalSupply();
+
+        uint256 toMint = IRewardsCalculator(rewardsCalculator()).
+        calculateRewards(
+            RewardParams(
+                excessReservesToken1,
+                intrinsicMinimumValue,
+                circulatingSupply,
+                totalSupply,
+                1e18, // volatility
+                10e8, // sensitivity for r 
+                1e18  // sensitivity for v
+            )
+        );
         
-        if (toMintConverted == 0) {
+        if (toMint == 0) {
             return;
         } 
-        
-        if (_v.stakingContract == address(0)) {
-            revert StakingContractNotSet();
-        }
-        
-        IERC20(_v.tokenInfo.token0).approve(_v.stakingContract, toMintConverted);
+    
+        IERC20(_v.tokenInfo.token0).approve(_v.stakingContract, toMint);
         
         // TODO enable minting
-        // mintTokens(_v.stakingContract, toMintConverted);
+        mintTokens(_v.stakingContract, toMint);
 
         // Update total minted (NOMA)
-        _v.totalMinted += toMintConverted;
+        _v.totalMinted += toMint;
 
         // Call notifyRewardAmount 
-        IStakingRewards(_v.stakingContract).notifyRewardAmount(toMintConverted);  
+        IStakingRewards(_v.stakingContract).notifyRewardAmount(toMint);  
 
         // Send tokens to Floor
-        _sendToken1ToFloor(positions, addresses, toMintConverted);
+        _sendToken1ToFloor(positions, addresses, toMint);
     }
 
     function _sendToken1ToFloor(
@@ -282,16 +276,26 @@ contract StakingVault is BaseVault {
         return _v.liquidityStructureParameters;
     }
 
+    function rewardsCalculator() public view returns (address) {
+        return _v.resolver
+        .requireAndGetAddress("RewardsCalculator", "No rewards calculator");
+    }
+
     function setStakingContract(address _stakingContract) external onlyManager {
         _v.stakingContract = _stakingContract;
     }
 
+    function getStakingContract() external view returns (address) {
+        return _v.stakingContract;
+    }
+
     function getFunctionSelectors() external pure  override returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](4);
+        bytes4[] memory selectors = new bytes4[](5);
         selectors[0] = bytes4(keccak256(bytes("mintAndDistributeRewards((address,address,address,address,address))"))); 
         selectors[1] = bytes4(keccak256(bytes("getLiquidityStructureParameters()")));  
         selectors[2] = bytes4(keccak256(bytes("setStakingContract(address)")));
         selectors[3] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));
+        selectors[4] = bytes4(keccak256(bytes("getStakingContract()")));
         return selectors;
     }
 }
