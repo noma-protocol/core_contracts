@@ -67,7 +67,7 @@ contract NomaFactoryTest is Test {
         );
 
         // Resolver
-        resolver = new TestResolver();
+        resolver = new TestResolver(deployer);
 
         expectedAddressesInResolver.push(
             ContractInfo("Resolver", address(resolver))
@@ -82,12 +82,10 @@ contract NomaFactoryTest is Test {
             ContractInfo("AdaptiveSupply", address(adaptiveSupply))
         );
 
-        configureResolver();
-
         // Deployer contracts factory
-        DeployerFactory deploymentFactory = new DeployerFactory();
+        DeployerFactory deploymentFactory = new DeployerFactory(address(resolver));
         // External contracts factory
-        ExtFactory extFactory = new ExtFactory();
+        ExtFactory extFactory = new ExtFactory(address(resolver));
 
         vm.prank(deployer);
         // Noma Factory
@@ -97,6 +95,10 @@ contract NomaFactoryTest is Test {
             address(deploymentFactory),
             address(extFactory),
             false
+        );
+
+        expectedAddressesInResolver.push(
+            ContractInfo("NomaFactory", address(nomaFactory))
         );
         
         vm.prank(deployer);
@@ -127,6 +129,9 @@ contract NomaFactoryTest is Test {
             ContractInfo("EtchVault", address(etchVault))
         );
 
+        vm.prank(deployer);
+        configureResolver();
+
         LiquidityStructureParameters memory _params =
         LiquidityStructureParameters(
             10, // Floor percentage of total supply
@@ -134,7 +139,8 @@ contract NomaFactoryTest is Test {
             3, // IDO price multiplier
             [200, 500], // Floor bips
             90e16, // Shift liquidity ratio
-            120e16 // Slide liquidity ratio
+            120e16, // Slide liquidity ratio
+            25000 // Discovery bips
         );
 
         vm.prank(deployer);
@@ -239,7 +245,8 @@ contract NomaFactoryTest is Test {
             3, // IDO price multiplier
             [200, 500], // Floor bips
             90e16, // Shift liquidity ratio
-            120e16 // Slide liquidity ratio
+            120e16, // Slide liquidity ratio
+            25000 // Discovery bips
         );
 
         vm.prank(deployer);
@@ -335,8 +342,11 @@ contract NomaFactoryTest is Test {
         // Check deployers
         address[] memory deployersList = nomaFactory.getDeployers();
 
+        // Get Vaults
+        address[] memory vaults = nomaFactory.getVaults(deployer);
+
         // Check vaults
-        VaultDescription memory vaultDesc = nomaFactory.getVaultDescription(deployer);     
+        VaultDescription memory vaultDesc = nomaFactory.getVaultDescription(vaults[0]);     
 
         assertEq(deployersList.length, 1);
         assertEq(vaultDesc.deployer, deployersList[0]);
@@ -361,72 +371,138 @@ contract NomaFactoryTest is Test {
         // Check deployers
         deployersList = nomaFactory.getDeployers();
 
-        for (uint256 i = 0; i < deployersList.length; i++) {
-            console.log("Deployer %d: %s", i, deployersList[i]);
-        }
+        // Get Vaults
+        vaults = nomaFactory.getVaults(user);
 
         // Check vaults
-        vaultDesc = nomaFactory.getVaultDescription(user);     
+        vaultDesc = nomaFactory.getVaultDescription(vaults[0]); 
 
         assertEq(deployersList.length, 2);
         assertEq(vaultDesc.deployer, deployersList[1]);
         assertEq(deployersList[1], user);
         assertEq(vaultDesc.token1, WETH);
+
     }
 
-    function testOnlyOneVaultPerDeployer() public {
+    function testDeployerCanDeployMultipleVaults() public {
+        // Prepare Resolver
         expectedAddressesInResolver.push(
             ContractInfo("WETH", WETH)
         );
+        configureResolver();
 
-        configureResolver();    
+        // Vault 1 parameters
+        VaultDeployParams memory vault1Params = VaultDeployParams(
+            "Vault One Token",  // Name
+            "V1",               // Symbol
+            18,                 // Decimals
+            100e18,             // Total supply
+            10,                 // Percentage for sale
+            1e18,               // IDO Price
+            WETH                // Token1 address
+        );
 
-        VaultDeployParams memory vaultDeployParams = 
-            VaultDeployParams(
-                "Noma Token", // Name
-                "NOMA",       // Symbol
-                18,           // Decimals
-                100e18,       // Total supply
-                10,           // Percentage for sale
-                1e18,         // IDO Price
-                WETH          // Token1 address
-            );
+        // Vault 2 parameters
+        VaultDeployParams memory vault2Params = VaultDeployParams(
+            "Vault Two Token",  // Name
+            "V2",               // Symbol
+            18,                 // Decimals
+            200e18,             // Total supply
+            15,                 // Percentage for sale
+            2e18,               // IDO Price
+            WETH                // Token1 address
+        );
 
+        // Set permissionless deploy to allow multiple vaults
         vm.prank(deployer);
         nomaFactory.setPermissionlessDeploy(true);
 
-        // 1. Call the function
+        // Deploy Vault 1
         vm.prank(deployer);
-        nomaFactory.deployVault(vaultDeployParams);
+        nomaFactory.deployVault(vault1Params);
 
-        // Check deployers
+        // Deploy Vault 2
+        vm.prank(deployer);
+        nomaFactory.deployVault(vault2Params);
+
+        // Retrieve deployer's vaults
+        address[] memory vaults = nomaFactory.getVaults(deployer);
+
+        // Validate number of vaults
+        assertEq(vaults.length, 2);
+
+        // Validate Vault 1 details
+        VaultDescription memory vault1Desc = nomaFactory.getVaultDescription(vaults[0]);
+
+        assertEq(vault1Desc.token1, WETH);
+
+        // Validate Vault 2 details
+        VaultDescription memory vault2Desc = nomaFactory.getVaultDescription(vaults[1]);
+
+        assertEq(vault2Desc.token1, WETH);
+
+        // Validate deployers list
         address[] memory deployersList = nomaFactory.getDeployers();
-
-        // Check vaults
-        VaultDescription memory vaultDesc = nomaFactory.getVaultDescription(deployer);     
-
         assertEq(deployersList.length, 1);
-        assertEq(vaultDesc.deployer, deployersList[0]);
         assertEq(deployersList[0], deployer);
-        assertEq(vaultDesc.token1, WETH);
-
-        vaultDeployParams = 
-            VaultDeployParams(
-                "Test Token", // Name
-                "TEST",       // Symbol
-                18,           // Decimals
-                100e18,       // Total supply
-                10,           // Percentage for sale
-                1e18,         // IDO Price
-                WETH          // Token1 address
-            );
-
-        // 1. Call the function
-        vm.expectRevert(abi.encodeWithSignature("OnlyOneVaultError()"));
-
-        vm.prank(deployer);
-        nomaFactory.deployVault(vaultDeployParams);
     }
+
+    // function testOnlyOneVaultPerDeployer() public {
+    //     expectedAddressesInResolver.push(
+    //         ContractInfo("WETH", WETH)
+    //     );
+
+    //     configureResolver();    
+
+    //     VaultDeployParams memory vaultDeployParams = 
+    //         VaultDeployParams(
+    //             "Noma Token", // Name
+    //             "NOMA",       // Symbol
+    //             18,           // Decimals
+    //             100e18,       // Total supply
+    //             10,           // Percentage for sale
+    //             1e18,         // IDO Price
+    //             WETH          // Token1 address
+    //         );
+
+    //     vm.prank(deployer);
+    //     nomaFactory.setPermissionlessDeploy(true);
+
+    //     // 1. Call the function
+    //     vm.prank(deployer);
+    //     nomaFactory.deployVault(vaultDeployParams);
+
+    //     // Check deployers
+    //     address[] memory deployersList = nomaFactory.getDeployers();
+
+    //     // Get Vaults
+    //     address[] memory vaults = nomaFactory.getVaults(deployer);
+
+    //     // Check vaults
+    //     VaultDescription memory vaultDesc = nomaFactory.getVaultDescription(vaults[0]);  
+
+    //     assertEq(deployersList.length, 1);
+    //     assertEq(vaultDesc.deployer, deployersList[0]);
+    //     assertEq(deployersList[0], deployer);
+    //     assertEq(vaultDesc.token1, WETH);
+
+    //     vaultDeployParams = 
+    //         VaultDeployParams(
+    //             "Test Token", // Name
+    //             "TEST",       // Symbol
+    //             18,           // Decimals
+    //             100e18,       // Total supply
+    //             10,           // Percentage for sale
+    //             1e18,         // IDO Price
+    //             WETH          // Token1 address
+    //         );
+
+    //     // 1. Call the function
+    //     vm.expectRevert(abi.encodeWithSignature("OnlyOneVaultError()"));
+
+    //     vm.prank(deployer);
+    //     nomaFactory.deployVault(vaultDeployParams);
+    // }
 
     function configureResolver() internal {
         bytes32[] memory names = new bytes32[](expectedAddressesInResolver.length);
@@ -440,6 +516,7 @@ contract NomaFactoryTest is Test {
         bool areAddressesInResolver = resolver.areAddressesImported(names, addresses);
 
         if (!areAddressesInResolver) {
+            vm.prank(deployer);
             resolver.importAddresses(names, addresses);
         }
 
