@@ -22,32 +22,11 @@ import {
     VaultInfo
 } from "../types/Types.sol";
 
-error AlreadyInitialized();
-error InvalidCaller();
+
 error NoLiquidity();
 error InsolvencyInvariant();
 
-interface IStakingContract {
-    function totalStaked() external view returns (uint256);
-}
-
 contract ModelHelper {
-    bool private initialized;
-    address private stakingContract;
-    address private initializer;
-    
-    constructor() {
-        initializer = msg.sender;
-    }
-
-    function initialize(address _stakingContract) public onlyInitializer {
-        if (initialized) {
-            revert AlreadyInitialized();
-        }
-
-        stakingContract = _stakingContract;
-        initialized = true;
-    }
 
     function getLiquidityRatio(
         address pool,
@@ -163,7 +142,6 @@ contract ModelHelper {
         address pool,
         address vault
     ) public view returns (uint256) {
-        
         LiquidityPosition[3] memory positions = IVault(vault).getPositions();
         uint256 totalSupply = ERC20(address(IUniswapV3Pool(pool).token0())).totalSupply();
 
@@ -173,13 +151,20 @@ contract ModelHelper {
 
         uint256 protocolUnusedBalanceToken0 = ERC20(address(IUniswapV3Pool(pool).token0())).balanceOf(vault);
         
+        address stakingContract = IVault(vault).getStakingContract();
+
+        uint256 staked = stakingContract != address(0) ? 
+                ERC20(address(IUniswapV3Pool(pool).token0())).balanceOf(stakingContract) :
+                0;
+
         return (
             (totalSupply) - 
             (
                 amount0CurrentFloor + 
                 amount0CurrentAnchor + 
                 amount0CurrentDiscovery + 
-                protocolUnusedBalanceToken0
+                protocolUnusedBalanceToken0 + 
+                staked
             )
         );
     } 
@@ -234,12 +219,5 @@ contract ModelHelper {
         if (anchorCapacity + floorCapacity <= circulatingSupply) {
             revert InsolvencyInvariant();
         }
-    }
-
-    modifier onlyInitializer() {
-        if (msg.sender != initializer) {
-            revert InvalidCaller();
-        }
-        _;
     }
 }
