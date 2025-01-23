@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../src/interfaces/IVault.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
-import {AmphorToken} from  "../src/token/AmphorToken.sol";
+import {MockNomaToken} from  "../src/token/MockNomaToken.sol";
 import {ModelHelper} from  "../src/model/Helper.sol";
 import {BaseVault} from  "../src/vault/BaseVault.sol";
 import {LendingVault} from  "../src/vault/LendingVault.sol";
@@ -35,9 +35,7 @@ contract LendingVaultTest is Test {
 
     address WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
     address payable idoManager = payable(0x7D6Cb1678d761C100566eC1D25ceC421e4F3A0a7);
-    address nomaToken = 0x61F91A57677988def3dfD9c04b4411a023F105b8;
-    address sNomaToken = 0x18Bb36A90984B43e8c5c07F461720394bA533134;
-    address stakingContract = 0xeB0beC62AA5AB0e1dBEcDd8ae4CE70DAC36C1db3;
+    address nomaToken = 0x4BD7E04d90E59ecb3F84EaFF3a2F1f87e463ee9D;
     address modelHelperContract = 0x0E90A3D616F9Fe2405325C3a7FB064837817F45F;
     address vaultAddress;
 
@@ -47,14 +45,14 @@ contract LendingVaultTest is Test {
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address deployer = vm.envAddress("DEPLOYER");
 
-    AmphorToken private noma;
+    MockNomaToken private noma;
     ModelHelper private modelHelper;
 
     function setUp() public {
         IDOManager managerContract = IDOManager(idoManager);
         require(address(managerContract) != address(0), "Manager contract address is zero");
 
-        noma = AmphorToken(nomaToken);
+        noma = MockNomaToken(nomaToken);
         require(address(noma) != address(0), "Noma token address is zero");
         
         modelHelper = ModelHelper(modelHelperContract);
@@ -86,7 +84,7 @@ contract LendingVaultTest is Test {
         uint256 balanceBeforeToken1 = token1.balanceOf(deployer);
 
         vm.prank(deployer);
-        vault.borrow(deployer, borrowAmount);
+        vault.borrow(deployer, borrowAmount, duration);
 
         uint256 fees = calculateLoanFees(borrowAmount, duration);
 
@@ -117,13 +115,14 @@ contract LendingVaultTest is Test {
 
     function testRollLoan() public {
         uint256 borrowAmount = 5 ether;
+        uint256 duration = 30 days;
 
         vm.prank(deployer);
         token0.approve(vaultAddress, MAX_INT);
 
         // Borrow first
         vm.prank(deployer);
-        vault.borrow(deployer, borrowAmount);
+        vault.borrow(deployer, borrowAmount, duration);
         
         uint256 balanceBeforePaybackToken1 = token1.balanceOf(deployer);
         uint256 balanceBeforePaybackToken0 = token0.balanceOf(deployer);
