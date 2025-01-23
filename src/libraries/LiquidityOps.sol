@@ -428,6 +428,7 @@ library LiquidityOps {
             );
 
             if (balanceToken0 < circulatingSupply / 100) {
+
                 // Mint unbacked supply
                 (uint256 mintAmount, ) = IAdaptiveSupplyController(
                     addresses.adaptiveSupplyController
@@ -437,7 +438,7 @@ library LiquidityOps {
                     1e18 // 100% volatility
                 );
 
-                if (mintAmount > 0) {
+                if (mintAmount == 0) {
                     revert MintAmount();
                 }
 
