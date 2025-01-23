@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./ScalingAlgorithms.sol";
+import "../../libraries/ScalingAlgorithms.sol";
 
 /// @title Adaptive Supply Contract
 /// @notice This contract manages the dynamic supply adjustment of tokens based on market volatility.
@@ -18,68 +18,6 @@ interface IModelHelper {
     /// @param flag A boolean flag for additional calculation logic.
     /// @return The total supply as a uint256 value.
     function getTotalSupply(address pool, bool flag) external view returns (uint256);
-}
-
-/**
- * @title MockModelHelper
- * @dev A mock implementation of the IModelHelper interface for testing purposes.
- */
-contract MockModelHelper is IModelHelper {
-    /**
-     * @notice Retrieves the circulating supply for a given pool and vault.
-     * @param pool The address of the pool.
-     * @param vault The address of the vault.
-     * @return The circulating supply as a uint256 value.
-     */
-    function getCirculatingSupply(address pool, address vault) public view override returns (uint256) {
-        return _getCirculatingSupply(pool, vault);
-    }
-
-    /**
-     * @notice Retrieves the total supply for a given pool.
-     * @param pool The address of the pool.
-     * @param flag A boolean flag for additional calculation logic.
-     * @return The total supply as a uint256 value.
-     */
-    function getTotalSupply(address pool, bool flag) public pure override returns (uint256) {
-        return _getTotalSupply(pool, flag);
-    }
-
-    /**
-     * @dev Internal function to simulate total supply retrieval.
-     * @param pool The address of the pool.
-     * @param flag A boolean flag for additional calculation logic.
-     * @return A fixed total supply of 1,000,000 tokens (for testing purposes).
-     */
-    function _getTotalSupply(address pool, bool flag) internal pure returns (uint256) {
-        return 1_000_000e18; // Fixed total supply for testing purposes
-    }
-
-    /**
-     * @dev Internal function to simulate circulating supply retrieval.
-     * @param pool The address of the pool.
-     * @param vault The address of the vault.
-     * @return A pseudo-random circulating supply based on the total supply.
-     */
-    function _getCirculatingSupply(address pool, address vault) internal view returns (uint256) {
-        uint256 totalSupply = _getTotalSupply(pool, true);
-        uint256 randomFactor = _random();
-
-        uint256 circulatingSupply = totalSupply * (100 - randomFactor) / 100;
-
-        return circulatingSupply;
-    }
-
-    /**
-     * @dev Generates a pseudo-random number between 0 and 19.
-     * @return A pseudo-random uint256 value.
-     */
-    function _random() private view returns (uint256) {
-        uint256 randomHash = uint256(keccak256(
-            abi.encodePacked(block.prevrandao, block.timestamp)
-        ));
-        return randomHash % 20; // Random number between 0 and 19
-    }
 }
 
 /// @title Adaptive Supply Manager
@@ -159,48 +97,52 @@ contract AdaptiveSupply {
 
         if (markedCondition == MarketConditions.LowVolatility) {
             mintAmount = ScalingAlgorithms.harmonicUpdate(
-                totalSupply,
+                deltaSupply,
                 volatility,
                 1,
                 false
             );
             burnAmount = ScalingAlgorithms.harmonicUpdate(
-                totalSupply,
+                deltaSupply,
                 volatility,
                 1,
                 true
             );
         } else if (markedCondition == MarketConditions.MediumVolatility) {
             mintAmount = ScalingAlgorithms.harmonicUpdate(
-                totalSupply,
+                deltaSupply,
                 volatility,
                 10,
                 false
             );
             burnAmount = ScalingAlgorithms.harmonicUpdate(
-                totalSupply,
+                deltaSupply,
                 volatility,
                 10,
                 true
             );
         } else if (markedCondition == MarketConditions.HighVolatility) {
             mintAmount = ScalingAlgorithms.boundedQuadraticUpdate(
-                totalSupply,
+                deltaSupply,
                 volatility,
                 true
             );
             burnAmount = ScalingAlgorithms.boundedQuadraticUpdate(
-                totalSupply,
+                deltaSupply,
                 volatility,
                 false
             );
         } else if (markedCondition == MarketConditions.ExtremeVolatility) {
-            mintAmount = ScalingAlgorithms.exponentialUpdate(
-                totalSupply,
-                volatility,
-                1
+            mintAmount = ScalingAlgorithms.polynomialUpdate(
+                deltaSupply,
+                volatility / 1e18, 
+                true
             );
-            burnAmount = mintAmount;
+            burnAmount = ScalingAlgorithms.polynomialUpdate(
+                deltaSupply,
+                volatility / 1e18,
+                false
+            );
         }
 
         return (mintAmount, burnAmount);
