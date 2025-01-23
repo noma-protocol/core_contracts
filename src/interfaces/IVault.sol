@@ -103,4 +103,10 @@ interface IVault {
      * @return A `LiquidityStructureParameters` object containing the vault's liquidity parameters.
      */
     function getLiquidityStructureParameters() external view returns (LiquidityStructureParameters memory);
+
+    /**
+     * @notice Retrieves the address of the staking contract associated with the vault.
+     * @return The address of the staking contract.
+     */
+    function getStakingContract() external view returns (address);
 }
