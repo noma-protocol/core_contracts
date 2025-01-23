@@ -3,21 +3,20 @@ pragma solidity ^0.8.0;
 
 import { GonsToken } from "../staking/Gons.sol";
 import { Staking } from "../staking/Staking.sol";
+import { IAddressResolver }  from "../interfaces/IAddressResolver.sol";
+import "../libraries/Utils.sol";
 
 contract ExtFactory {
     event DeployerCreated(address deployerAddress);
 
-    error OnlyOwner();
     error OnlyFactory();
     
-    address public owner;
-    address public factory;
-
+    IAddressResolver public resolver;
     Staking public stakingContract;
     GonsToken public gonsToken;
-    
-    constructor () {
-        owner = msg.sender;
+
+    constructor (address _resolver) {
+        resolver = IAddressResolver(_resolver);
     }
 
     function deployAll(
@@ -38,18 +37,12 @@ contract ExtFactory {
         return (address(gonsToken), address(stakingContract));
     }    
 
-    function setFactory(address _factory) public onlyOwner {
-        factory = _factory;
-    }
-
-    modifier onlyOwner() {
-        if (msg.sender != owner) {
-            revert OnlyOwner();
-        }
-        _;
-    }
-
     modifier onlyFactory() {
+        address factory = resolver
+                .requireAndGetAddress(
+                    Utils.stringToBytes32("NomaFactory"), 
+                    "no factory"
+                );        
         if (msg.sender != factory) {
             revert OnlyFactory();
         }

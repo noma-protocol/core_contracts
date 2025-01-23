@@ -2,6 +2,8 @@
 pragma solidity ^0.8.0;
 
 import { Deployer } from "../Deployer.sol";
+import { IAddressResolver }  from "../interfaces/IAddressResolver.sol";
+import "../libraries/Utils.sol";
 
 contract DeployerFactory {
     
@@ -9,13 +11,11 @@ contract DeployerFactory {
     error OnlyOwner();
     error OnlyFactory();
     
-    address public owner;
-    address public factory;
-
     Deployer public deployer;
-    
-    constructor () {
-        owner = msg.sender;
+    IAddressResolver public resolver;
+
+    constructor (address _resolver) {
+        resolver = IAddressResolver(_resolver);
     }
 
     /**
@@ -32,18 +32,13 @@ contract DeployerFactory {
         return deployerAddress;
     }
 
-    function setFactory(address _factory) public onlyOwner {
-        factory = _factory;
-    }
-
-    modifier onlyOwner() {
-        if (msg.sender != owner) {
-            revert OnlyOwner();
-        }
-        _;
-    }
 
     modifier onlyFactory() {
+        address factory = resolver
+                .requireAndGetAddress(
+                    Utils.stringToBytes32("NomaFactory"), 
+                    "no factory"
+                );        
         if (msg.sender != factory) {
             revert OnlyFactory();
         }
