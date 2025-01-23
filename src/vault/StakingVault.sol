@@ -248,14 +248,14 @@ contract StakingVault is BaseVault {
                 Utils.nearestUsableTick(
                     Utils.addBipsToTick(
                         positions[1].upperTick, 
-                        // TODO remove hardcoded
                         IVault(address(this)).getLiquidityStructureParameters().discoveryBips, 
                         ERC20(address(IUniswapV3Pool(addresses.pool).token0())).decimals()
                     )
                 ),
                 // TODO remove hardcoded
                 Utils.nearestUsableTick(
-                    TickMath.getTickAtSqrtRatio(sqrtRatioX96) * 3     
+                    TickMath.getTickAtSqrtRatio(sqrtRatioX96) * 
+                    int8(IVault(address(this)).getLiquidityStructureParameters().idoPriceMultiplier)    
                 ),                
                 0,
                 LiquidityType.Discovery 

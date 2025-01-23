@@ -45,7 +45,7 @@ contract LendingVault is BaseVault {
     
     uint256 public constant SECONDS_IN_DAY = 86400;
 
-    function _getCollateralAmount(uint256 borrowAmount) internal view returns (uint256, uint256) {
+    function _getTotalCollateral(uint256 borrowAmount) internal view returns (uint256, uint256) {
         uint256 intrinsicMinimumValue = IModelHelper(_v.modelHelper).getIntrinsicMinimumValue(address(this));
         return (DecimalMath.divideDecimal(borrowAmount, intrinsicMinimumValue), intrinsicMinimumValue);
     }
@@ -59,7 +59,7 @@ contract LendingVault is BaseVault {
     function borrowFromFloor(address who, uint256 borrowAmount, uint256 duration) public onlyVault {
         if (borrowAmount == 0) revert InsufficientLoanAmount(); 
         
-        (uint256 collateralAmount,) = _getCollateralAmount(borrowAmount);
+        (uint256 collateralAmount,) = _getTotalCollateral(borrowAmount);
         if (collateralAmount == 0) revert InsufficientCollateral();
 
         (,,, uint256 floorToken1Balance) = IModelHelper(_v.modelHelper)

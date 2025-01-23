@@ -26,13 +26,14 @@ contract ExtVault {
 
     function borrow(
         address who,
-        uint256 borrowAmount
+        uint256 borrowAmount,
+        uint256 duration
     ) external {
         ILendingVault(address(this))
         .borrowFromFloor(
             who,
             borrowAmount,
-            30 days
+            duration
         );
     }
 
@@ -82,7 +83,7 @@ contract ExtVault {
         bytes4[] memory selectors = new bytes4[](5);
         selectors[0] = bytes4(keccak256(bytes("shift()")));
         selectors[1] = bytes4(keccak256(bytes("slide()")));  
-        selectors[2] = bytes4(keccak256(bytes("borrow(address,uint256)")));  
+        selectors[2] = bytes4(keccak256(bytes("borrow(address,uint256,uint256)")));  
         selectors[3] = bytes4(keccak256(bytes("payback(address)")));
         selectors[4] = bytes4(keccak256(bytes("roll(address)")));              
         return selectors;
