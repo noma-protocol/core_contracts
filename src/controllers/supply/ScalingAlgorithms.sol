@@ -68,8 +68,10 @@ library ScalingAlgorithms {
      */
     function sigmoidUpdate(uint256 value, int256 input, int256 k, int256 midpoint) public pure returns (uint256) {
         int256 exponent = -k * (input - midpoint); // Compute exponent
-        int256 sigmoid = int256(1e18) / (int256(1e18) + exp(exponent)); // Sigmoid scaling factor
-        return uint256((int256(value) * sigmoid) / 1e18);
+        uint256 expResult = exp(exponent); // Compute exponential as uint256
+        int256 scaledExpResult = int256(expResult); // Convert exp result to int256 for consistency
+        int256 sigmoid = int256(1e18) * int256(1e18) / (int256(1e18) + scaledExpResult); // Compute sigmoid factor
+        return uint256((int256(value) * sigmoid) / int256(1e18)); // Apply sigmoid scaling and return
     }
 
     /**
@@ -119,10 +121,21 @@ library ScalingAlgorithms {
     /**
      * @notice Helper function to compute the exponential value (e^x) with fixed-point arithmetic
      */
-    function exp(int256 x) internal pure returns (int256) {
-        // Approximation for e^x using series expansion
-        // This is a simple placeholder. Replace with a proper library for production use.
-        int256 result = int256(1e18) + x + (x * x) / 2e18 + (x * x * x) / 6e18;
+    function exp(int256 x) internal pure returns (uint256) {
+        // Use a Taylor series approximation for e^x
+        if (x > 2454971259878909886679) return type(uint256).max; // Prevent overflow
+        if (x < -818323753292969962227) return 0; // Values too small to matter
+
+        uint256 result = 1e18; // e^0 = 1 scaled to 18 decimals
+        uint256 term = 1e18;
+        uint256 absX = uint256(x < 0 ? -x : x); // Absolute value of x
+        for (uint256 i = 1; i < 50; ++i) { // Limit series to 50 iterations for gas efficiency
+            term = (term * absX) / (i * 1e18);
+            if (x < 0) result -= term; // Handle negative exponents
+            else result += term;
+            if (term < 1) break; // Stop when terms are too small to matter
+        }
         return result;
     }
+
 }
