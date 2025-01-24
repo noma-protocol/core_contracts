@@ -32,6 +32,7 @@ interface IVault {
     function updatePositions(LiquidityPosition[3] memory newPositions) external;
     function setFees(uint256 _feesAccumulatedToken0, uint256 _feesAccumulatedToken1) external;
     function mintTokens(address to, uint256 amount) external;
+    function burnTokens(uint256 amount) external;
     function getLiquidityStructureParameters() external view returns (LiquidityStructureParameters memory _params);
     function getTimeSinceLastMint() external view returns (uint256);
 }
@@ -268,7 +269,8 @@ library LiquidityOps {
                     decimals
                 ),
                 (params.anchorToken1Balance + params.discoveryToken1Balance) - params.toSkim, 
-                LiquidityType.Anchor
+                LiquidityType.Anchor,
+                true
             );
 
             newPositions[2] = reDeploy(
@@ -286,7 +288,8 @@ library LiquidityOps {
                     decimals
                 ),           
                 0,
-                LiquidityType.Discovery 
+                LiquidityType.Discovery,
+                true
             );   
             
             if (
@@ -368,7 +371,8 @@ library LiquidityOps {
                     decimals
                 ),
                 anchorToken1Balance, 
-                LiquidityType.Anchor
+                LiquidityType.Anchor,
+                false
             );
 
             newPositions[2] = reDeploy(
@@ -386,7 +390,8 @@ library LiquidityOps {
                     decimals
                 ),              
                 0,
-                LiquidityType.Discovery
+                LiquidityType.Discovery,
+                false
             );
 
             // restore floor
@@ -408,7 +413,8 @@ library LiquidityOps {
         int24 lowerTick,
         int24 upperTick,
         uint256 amount1ToDeploy,
-        LiquidityType liquidityType
+        LiquidityType liquidityType,
+        bool isShift
     ) internal returns (LiquidityPosition memory newPosition) {
         if (upperTick <= lowerTick) {
             revert InvalidTick();
@@ -435,33 +441,63 @@ library LiquidityOps {
             uint256 totalSupply = ERC20(IUniswapV3Pool(addresses.pool).token0()).totalSupply();
 
             if (balanceToken0 < circulatingSupply / 100) {
+                if (isShift) {
+                    // Mint unbacked supply
+                    (uint256 mintAmount) = IAdaptiveSupply(
+                        addresses.adaptiveSupplyController
+                    ).calculateMintAmount(
+                        totalSupply,
+                        1e18, // 100% volatility
+                        IVault(address(this)).getTimeSinceLastMint() > 0 ? 
+                        IVault(address(this)).getTimeSinceLastMint() : 
+                        1 
+                    );
 
-                // Mint unbacked supply
-                (uint256 mintAmount) = IAdaptiveSupply(
-                    addresses.adaptiveSupplyController
-                ).calculateMintAmount(
-                    totalSupply,
-                    1e18, // 100% volatility
-                    IVault(address(this)).getTimeSinceLastMint() > 0 ? 
-                    IVault(address(this)).getTimeSinceLastMint() : 
-                    1 
-                );
+                    if (mintAmount == 0) {
+                      // Fallback to minting 1% of circulating supply
+                        mintAmount = circulatingSupply / 100;
+                    }
 
-                if (mintAmount == 0) {
-                    revert MintAmount();
+                    IVault(address(this))
+                    .mintTokens(
+                        address(this),
+                        mintAmount
+                    );                     
                 }
-
-                IVault(address(this))
-                .mintTokens(
-                    address(this), 
-                    mintAmount
-                );                
             }
 
-            // check balance after minting
+                if (balanceToken0 >= circulatingSupply / 100) {
+                    if (!isShift) {
+     
+                        uint256 toBurn = balanceToken0;
+                        IVault(address(this))
+                        .burnTokens(
+                            toBurn
+                        );
+
+                        IVault(address(this))
+                        .mintTokens(
+                            address(this),
+                            circulatingSupply / 100
+                        );   
+                }                
+            }
+
+            // check balance after minting or burning
             balanceToken0 = ERC20(IUniswapV3Pool(addresses.pool).token0()).balanceOf(address(this));
+            
             if (balanceToken0 == 0) {
-                revert BalanceToken0();
+                IVault(address(this))
+                .mintTokens(
+                    address(this),
+                    circulatingSupply * 2 / 100
+                );
+
+                balanceToken0 = ERC20(IUniswapV3Pool(addresses.pool).token0()).balanceOf(address(this));
+
+                if (balanceToken0 == 0) {
+                    revert BalanceToken0();
+                }
             }
         }
         
