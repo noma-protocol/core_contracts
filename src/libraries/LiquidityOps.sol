@@ -33,10 +33,15 @@ interface IVault {
     function setFees(uint256 _feesAccumulatedToken0, uint256 _feesAccumulatedToken1) external;
     function mintTokens(address to, uint256 amount) external;
     function getLiquidityStructureParameters() external view returns (LiquidityStructureParameters memory _params);
+    function getTimeSinceLastMint() external view returns (uint256);
 }
 
-interface IAdaptiveSupplyController {
-    function adjustSupply(address pool, address vault, int256 volatility) external returns (uint256, uint256);
+interface IAdaptiveSupply {
+    function calculateMintAmount(
+        uint256 deltaSupply,
+        uint256 volatility,
+        uint256 timeElapsed
+    ) external pure returns (uint256 mintAmount);
 }
 
 error InvalidTick();
@@ -427,15 +432,19 @@ library LiquidityOps {
                 addresses.vault
             );
 
+            uint256 totalSupply = ERC20(IUniswapV3Pool(addresses.pool).token0()).totalSupply();
+
             if (balanceToken0 < circulatingSupply / 100) {
 
                 // Mint unbacked supply
-                (uint256 mintAmount, ) = IAdaptiveSupplyController(
+                (uint256 mintAmount) = IAdaptiveSupply(
                     addresses.adaptiveSupplyController
-                ).adjustSupply(
-                    addresses.pool, 
-                    address(this), 
-                    1e18 // 100% volatility
+                ).calculateMintAmount(
+                    totalSupply,
+                    1e18, // 100% volatility
+                    IVault(address(this)).getTimeSinceLastMint() > 0 ? 
+                    IVault(address(this)).getTimeSinceLastMint() : 
+                    1 
                 );
 
                 if (mintAmount == 0) {
