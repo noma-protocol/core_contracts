@@ -38,7 +38,8 @@ struct VaultStorage {
 
     // Staking rewards
     uint256 totalMinted;
-
+    uint256 timeLastMinted;
+    
     // Token information
     TokenInfo tokenInfo;
 
