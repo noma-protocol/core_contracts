@@ -101,6 +101,7 @@ interface IERC20 {
      * @param amount The amount of tokens to be minted.
      */
     function mint(address to, uint256 amount) external;
+    function burn(address from, uint256 amount) external;
 }
 
 /**
@@ -322,17 +323,17 @@ contract NomaFactory {
         deployedTokenHashes[tokenHash] = true;
         uint256 nonce = uint256(tokenHash);
 
-        MockNomaToken nomaToken;
+        MockNomaToken _nomaToken;
         do {
-            nomaToken = new MockNomaToken{salt: bytes32(nonce)}();
+            _nomaToken = new MockNomaToken{salt: bytes32(nonce)}();
             nonce++;
-        } while (address(nomaToken) >= _token1);
+        } while (address(_nomaToken) >= _token1);
 
-        nomaToken.initialize(authority, _totalSupply, _name, _symbol, address(resolver));
+        _nomaToken.initialize(authority, _totalSupply, _name, _symbol, address(resolver));
 
-        if (address(nomaToken) >= _token1) revert InvalidTokenAddressError();
+        if (address(_nomaToken) >= _token1) revert InvalidTokenAddressError();
 
-        return nomaToken;
+        return _nomaToken;
     }
 
     /**
@@ -349,28 +350,30 @@ contract NomaFactory {
         address token1
     ) internal returns (IUniswapV3Pool pool) {
         IUniswapV3Factory factory = IUniswapV3Factory(uniswapV3Factory);
-        IUniswapV3Pool pool = IUniswapV3Pool(
+        IUniswapV3Pool _pool = IUniswapV3Pool(
             factory.getPool(token0, token1, feeTier)
         );
+        uint8 decimals = IERC20Metadata(token0).decimals();
 
-        if (address(pool) == address(0)) {
-            pool = IUniswapV3Pool(
+        if (address(_pool) == address(0)) {
+            _pool = IUniswapV3Pool(
                 factory.createPool(
                     token0, 
                     token1, 
                     feeTier
                 )
             );
-            pool.initialize(
+            _pool.initialize(
                 Conversions
                 .priceToSqrtPriceX96(
                     int256(_initPrice), 
-                    tickSpacing
+                    tickSpacing,
+                    decimals
                 )
             );            
         }
 
-        return pool;
+        return _pool;
     }
  
     /**
@@ -444,6 +447,16 @@ contract NomaFactory {
     }
 
     /**
+    * @notice Burns tokens from the specified address.
+    * @param from The address from which to burn tokens.
+    * @param amount The amount of tokens to burn.
+    * @dev This function can only be called by authorized vaults.
+    */
+    function burnFor(address from, uint256 amount) public onlyVaults {
+        IERC20(vaultsRepository[msg.sender].token0).burn(from, amount);
+    }
+
+    /**
     * @notice Sets the parameters for the liquidity structure.
     * @param _params The new liquidity structure parameters.
     * @dev This function can only be called by the authority.
@@ -495,11 +508,11 @@ contract NomaFactory {
 
     /**
     * @notice Retrieves the description of a vault deployed by a specific deployer.
-    * @param deployer The address of the deployer.
+    * @param _deployer The address of the deployer.
     * @return The vault description associated with the deployer.
     */
-    function getVaultDescription(address deployer) external view returns (VaultDescription memory) {
-        return vaultsRepository[deployer];
+    function getVaultDescription(address _deployer) external view returns (VaultDescription memory) {
+        return vaultsRepository[_deployer];
     }
 
     /**
@@ -508,24 +521,24 @@ contract NomaFactory {
     */
     function getDeployers() public view returns (address[] memory) {
         uint256 length = numDeployers();
-        address[] memory deployers = new address[](length);
+        address[] memory _deployers = new address[](length);
         for (uint256 i = 0; i < length; i++) {
-            deployers[i] = _getDeployer(i);
+            _deployers[i] = _getDeployer(i);
         }
 
-        return deployers;
+        return _deployers;
     }
 
     /**
     * @notice Retrieves the list of vaults deployed by a specific deployer.
-    * @param deployer The address of the deployer.
+    * @param _deployer The address of the deployer.
     * @return An array containing the addresses of the deployer's vaults.
     */
-    function getVaults(address deployer) public view returns (address[] memory) {
-        uint256 length = numVaults(deployer);
+    function getVaults(address _deployer) public view returns (address[] memory) {
+        uint256 length = numVaults(_deployer);
         address[] memory vaults = new address[](length);
         for (uint256 i = 0; i < length; i++) {
-            vaults[i] = _getVault(deployer, i);
+            vaults[i] = _getVault(_deployer, i);
         }
 
         return vaults;
@@ -536,9 +549,9 @@ contract NomaFactory {
     * @return result The total number of vaults.
     */
     function numVaults() public view returns (uint256 result) {
-        address[] memory deployers = getDeployers();
-        for (uint256 i = 0; i < deployers.length; i++) {
-            result += numVaults(deployers[i]);
+        address[] memory _deployers = getDeployers();
+        for (uint256 i = 0; i < _deployers.length; i++) {
+            result += numVaults(_deployers[i]);
         }
     }
 
@@ -552,11 +565,11 @@ contract NomaFactory {
 
     /**
     * @notice Retrieves the number of vaults deployed by a specific deployer.
-    * @param deployer The address of the deployer.
+    * @param _deployer The address of the deployer.
     * @return The number of vaults deployed by the specified deployer.
     */
-    function numVaults(address deployer) public view returns (uint256) {
-        return _vaults[deployer].length();
+    function numVaults(address _deployer) public view returns (uint256) {
+        return _vaults[_deployer].length();
     }
 
     /**
@@ -570,12 +583,12 @@ contract NomaFactory {
 
     /**
      * @notice Retrieves the address of a vault deployed by a specific deployer at a given index.
-     * @param deployer The address of the deployer.
+     * @param _deployer The address of the deployer.
      * @param index The index position of the vault in the deployer's EnumerableSet.
      * @return The address of the vault.
      */
-    function _getVault(address deployer, uint256 index) internal view returns (address) {
-        return _vaults[deployer].at(index);
+    function _getVault(address _deployer, uint256 index) internal view returns (address) {
+        return _vaults[_deployer].at(index);
     }
 
     /**
