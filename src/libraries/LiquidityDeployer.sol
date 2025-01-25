@@ -56,7 +56,8 @@ library LiquidityDeployer {
                 ),
                 int256(deployParams.bips)
             ),
-            deployParams.tickSpacing
+            deployParams.tickSpacing,
+            decimals
         );
 
         if (upperTick <= lowerTick) {
@@ -100,10 +101,12 @@ library LiquidityDeployer {
 
         lowerDiscoveryPrice = Utils.addBips(lowerDiscoveryPrice, 50);
 
-        (int24 lowerTick, int24 upperTick) = Conversions.computeRangeTicks(
+        (int24 lowerTick, int24 upperTick) = Conversions
+        .computeRangeTicks(
             lowerDiscoveryPrice,
             upperDiscoveryPrice,
-            discoveryTickSpacing
+            discoveryTickSpacing,
+            decimals
         );
 
         if (lowerTick <= anchorPosition.upperTick) {
@@ -143,13 +146,15 @@ library LiquidityDeployer {
         }
 
         (uint160 sqrtRatioX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
+        uint8 decimals = ERC20(address(IUniswapV3Pool(pool).token0())).decimals();
 
         if (floorPosition.liquidity > 0) {
             
             (int24 lowerTick, int24 upperTick) = 
             Conversions.computeSingleTick(
                 newFloorPrice,
-                tickSpacing
+                tickSpacing,
+                decimals
             );
 
             uint128 newLiquidity = LiquidityAmounts

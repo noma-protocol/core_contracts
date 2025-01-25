@@ -33,11 +33,14 @@ library DeployHelper {
             LiquidityType liquidityType
         ) {
             
-        (uint160 sqrtRatioX96,,,,,,) = pool.slot0();        
+        (uint160 sqrtRatioX96,,,,,,) = pool.slot0();   
+        uint8 decimals = ERC20(address(pool.token0())).decimals();
+
         int24 lowerTick = TickMath.getTickAtSqrtRatio(
             Conversions.priceToSqrtPriceX96(
                 int256(_floorPrice), 
-                tickSpacing
+                tickSpacing,
+                decimals
             )
         );
         

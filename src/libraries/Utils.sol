@@ -50,7 +50,8 @@ library Utils {
         int24 newTickValue = Conversions
         .priceToTick(
             int256(newPrice), 
-            tickSpacing
+            tickSpacing,
+            _decimals
         );
 
         // Ensure the new tick value is within the range of int24 and within Uniswap's tick range
