@@ -25,7 +25,8 @@ import {
     ProtocolAddresses,
     PreShiftParameters,
     tickSpacing,
-    LiquidityStructureParameters
+    LiquidityStructureParameters,
+    LiquidityInternalPars
 } from "../types/Types.sol";
 
 interface IVault {
@@ -40,8 +41,9 @@ interface IVault {
 interface IAdaptiveSupply {
     function calculateMintAmount(
         uint256 deltaSupply,
-        uint256 volatility,
-        uint256 timeElapsed
+        uint256 timeElapsed,
+        uint256 spotPrice,
+        uint256 imv
     ) external pure returns (uint256 mintAmount);
 }
 
@@ -262,14 +264,16 @@ library LiquidityOps {
                     deployer: addresses.deployer,
                     adaptiveSupplyController: addresses.adaptiveSupplyController
                 }),
-                newPositions[0].upperTick,               
-                Utils.addBipsToTick(
-                    TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                    10,
-                    decimals
-                ),
-                (params.anchorToken1Balance + params.discoveryToken1Balance) - params.toSkim, 
-                LiquidityType.Anchor,
+                LiquidityInternalPars({
+                    lowerTick: newPositions[0].upperTick,
+                        upperTick: Utils.addBipsToTick(
+                        TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
+                        10,
+                        decimals
+                    ),
+                    amount1ToDeploy: (params.anchorToken1Balance + params.discoveryToken1Balance) - params.toSkim,
+                    liquidityType: LiquidityType.Anchor
+                }),
                 true
             );
 
@@ -281,14 +285,16 @@ library LiquidityOps {
                     deployer: addresses.deployer,
                     adaptiveSupplyController: addresses.adaptiveSupplyController
                 }),
-                newPositions[1].upperTick + tickSpacing,
-                Utils.addBipsToTick(
-                    TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                    IVault(address(this)).getLiquidityStructureParameters().discoveryBips,
-                    decimals
-                ),           
-                0,
-                LiquidityType.Discovery,
+                LiquidityInternalPars({
+                    lowerTick: newPositions[1].upperTick + tickSpacing,
+                    upperTick: Utils.addBipsToTick(
+                        TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
+                        IVault(address(this)).getLiquidityStructureParameters().discoveryBips,
+                        decimals
+                    ),
+                    amount1ToDeploy: 0,
+                    liquidityType: LiquidityType.Discovery
+                }),
                 true
             );   
             
@@ -361,17 +367,19 @@ library LiquidityOps {
                 positions[2].upperTick
             ); 
 
-            //Slide anchor position
+            //Slide anchor position TODO remove hardcoded
             newPositions[1] = reDeploy(
                 addresses,
-                positions[0].upperTick,                                
-                Utils.addBipsToTick(
-                    TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                    300,
-                    decimals
-                ),
-                anchorToken1Balance, 
-                LiquidityType.Anchor,
+                LiquidityInternalPars({
+                    lowerTick: positions[0].upperTick,
+                    upperTick: Utils.addBipsToTick(
+                        TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
+                        300,
+                        decimals
+                    ),
+                    amount1ToDeploy: anchorToken1Balance,
+                    liquidityType: LiquidityType.Anchor
+                }),
                 false
             );
 
@@ -383,14 +391,16 @@ library LiquidityOps {
                     deployer: addresses.deployer,
                     adaptiveSupplyController: addresses.adaptiveSupplyController
                 }),
-                newPositions[1].upperTick + tickSpacing, 
-                Utils.addBipsToTick(
-                    TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                    IVault(address(this)).getLiquidityStructureParameters().discoveryBips,
-                    decimals
-                ),              
-                0,
-                LiquidityType.Discovery,
+                LiquidityInternalPars({
+                    lowerTick: newPositions[1].upperTick + tickSpacing,
+                    upperTick: Utils.addBipsToTick(
+                        TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
+                        IVault(address(this)).getLiquidityStructureParameters().discoveryBips,
+                        decimals
+                    ),
+                    amount1ToDeploy: 0,
+                    liquidityType: LiquidityType.Discovery
+                }),
                 false
             );
 
@@ -410,13 +420,10 @@ library LiquidityOps {
 
     function reDeploy(
         ProtocolAddresses memory addresses,
-        int24 lowerTick,
-        int24 upperTick,
-        uint256 amount1ToDeploy,
-        LiquidityType liquidityType,
+        LiquidityInternalPars memory params,
         bool isShift
     ) internal returns (LiquidityPosition memory newPosition) {
-        if (upperTick <= lowerTick) {
+        if (params.upperTick <= params.lowerTick) {
             revert InvalidTick();
         }
         
@@ -428,17 +435,17 @@ library LiquidityOps {
         }
 
         // TODO check this
-        ERC20(IUniswapV3Pool(addresses.pool).token1()).approve(addresses.deployer, amount1ToDeploy > 0 ? amount1ToDeploy : 1);
+        ERC20(IUniswapV3Pool(addresses.pool).token1()).approve(addresses.deployer, params.amount1ToDeploy > 0 ? params.amount1ToDeploy : 1);
 
-        if (liquidityType == LiquidityType.Discovery) {
+        if (params.liquidityType == LiquidityType.Discovery) {
 
             uint256 circulatingSupply = IModelHelper(addresses.modelHelper)
             .getCirculatingSupply(
                 addresses.pool,
                 addresses.vault
-            );
-
-            uint256 totalSupply = ERC20(IUniswapV3Pool(addresses.pool).token0()).totalSupply();
+            );                
+            
+            (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(addresses.pool).slot0();
 
             if (balanceToken0 < circulatingSupply / 100) {
                 if (isShift) {
@@ -446,15 +453,19 @@ library LiquidityOps {
                     (uint256 mintAmount) = IAdaptiveSupply(
                         addresses.adaptiveSupplyController
                     ).calculateMintAmount(
-                        totalSupply,
-                        1e18, // 100% volatility
+                        ERC20(IUniswapV3Pool(addresses.pool).token0()).totalSupply(),
                         IVault(address(this)).getTimeSinceLastMint() > 0 ? 
                         IVault(address(this)).getTimeSinceLastMint() : 
-                        1 
+                        1,
+                        Conversions.sqrtPriceX96ToPrice(
+                            sqrtRatioX96,
+                            18
+                        ),
+                        IModelHelper(addresses.modelHelper).getIntrinsicMinimumValue(address(this))
                     );
 
-                    if (mintAmount == 0) {
-                      // Fallback to minting 1% of circulating supply
+                    if (mintAmount == 0 || mintAmount > ERC20(IUniswapV3Pool(addresses.pool).token0()).totalSupply()) {
+                        // Fallback to minting 1% of circulating supply
                         mintAmount = circulatingSupply / 100;
                     }
 
@@ -465,14 +476,14 @@ library LiquidityOps {
                     );                     
                 }
             }
-
-                if (balanceToken0 >= circulatingSupply / 100) {
+        
+            // TODO add check balance before minting
+            if (balanceToken0 >= circulatingSupply / 100) {
                     if (!isShift) {
-     
-                        uint256 toBurn = balanceToken0;
+    
                         IVault(address(this))
                         .burnTokens(
-                            toBurn
+                            balanceToken0
                         );
 
                         IVault(address(this))
@@ -487,10 +498,11 @@ library LiquidityOps {
             balanceToken0 = ERC20(IUniswapV3Pool(addresses.pool).token0()).balanceOf(address(this));
             
             if (balanceToken0 == 0) {
+                // Fallback to minting 1% of circulating supply
                 IVault(address(this))
                 .mintTokens(
                     address(this),
-                    circulatingSupply * 2 / 100
+                    circulatingSupply / 100
                 );
 
                 balanceToken0 = ERC20(IUniswapV3Pool(addresses.pool).token0()).balanceOf(address(this));
@@ -499,18 +511,19 @@ library LiquidityOps {
                     revert BalanceToken0();
                 }
             }
+
         }
         
         newPosition = IDeployer(addresses.deployer)
         .deployPosition(
             addresses.pool, 
             address(this), 
-            lowerTick,
-            upperTick,
-            liquidityType, 
+            params.lowerTick,
+            params.upperTick,
+            params.liquidityType, 
             AmountsToMint({
                 amount0: balanceToken0,
-                amount1: liquidityType == LiquidityType.Anchor ? amount1ToDeploy : 1
+                amount1: params.liquidityType == LiquidityType.Anchor ? params.amount1ToDeploy : 1
             })
         );     
     }
