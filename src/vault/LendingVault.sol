@@ -31,6 +31,12 @@ interface IStakingRewards {
     function notifyRewardAmount(uint256 reward) external;
 }
 
+interface INomaFactory {
+    function mintTokens(address to, uint256 amount) external;
+    function burnFor(address from, uint256 amount) external;
+    function teamMultiSig() external view returns (address);
+}
+
 error NotInitialized();
 error InsufficientLoanAmount();
 error InsufficientFloorBalance();
@@ -196,19 +202,24 @@ contract LendingVault is BaseVault {
         ];
     }
 
+    function teamMultiSig() public view returns (address) {
+        return INomaFactory(_v.factory).teamMultiSig();
+    }
+
     modifier onlyVault() {
         if (msg.sender != address(this)) revert OnlyVault();
         _;
     }
 
     function getFunctionSelectors() external pure override returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](6);
+        bytes4[] memory selectors = new bytes4[](7);
         selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,uint256)")));    
         selectors[1] = bytes4(keccak256(bytes("paybackLoan(address)")));
         selectors[2] = bytes4(keccak256(bytes("rollLoan(address)")));
         selectors[3] = bytes4(keccak256(bytes("defaultLoans()")));
         selectors[4] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256)[3])")));
         selectors[5] = bytes4(keccak256(bytes("getPositions()")));
+        selectors[6] = bytes4(keccak256(bytes("teamMultiSig()")));
         return selectors;
     }
 }

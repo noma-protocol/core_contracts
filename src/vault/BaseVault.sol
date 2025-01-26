@@ -28,6 +28,7 @@ interface IERC20 {
 interface INomaFactory {
     function mintTokens(address to, uint256 amount) external;
     function burnFor(address from, uint256 amount) external;
+    function teamMultiSig() external view returns (address);
 }
 
 interface IAdaptiveSupplyController {
@@ -96,7 +97,7 @@ contract BaseVault is OwnableUninitialized {
         _v.tokenInfo.token0 = _v.pool.token0();
         _v.tokenInfo.token1 = _v.pool.token1();
         _v.initialized = false;
-        _v.lastLiquidityRatio = 0;
+        _v.stakingEnabled = false;
         _v.stakingContract = _stakingContract;
         _v.proxyAddress = _proxyAddress;
         _v.adaptiveSupplyController = _adaptiveSupplyController;
@@ -234,6 +235,7 @@ contract BaseVault is OwnableUninitialized {
     function getTimeSinceLastMint() public view returns (uint256) {
         return block.timestamp - _v.timeLastMinted;
     }
+
 
     modifier onlyDeployer() {
         if (msg.sender != _v.deployerContract) revert OnlyDeployer();
