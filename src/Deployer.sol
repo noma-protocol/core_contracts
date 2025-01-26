@@ -2,8 +2,8 @@
 pragma solidity ^0.8.0;
 
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
-import {ERC20} from "solmate/tokens/ERC20.sol";
-import {Owned} from "solmate/auth/Owned.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {LiquidityDeployer} from "./libraries/LiquidityDeployer.sol";
 import {DeployHelper} from "./libraries/DeployHelper.sol";
 import {
@@ -31,7 +31,7 @@ interface IVault {
 /// @title Liquidity Deployment Contract
 /// @notice This contract manages the deployment of liquidity positions, including floor, anchor, and discovery positions.
 /// @dev Integrates with Uniswap V3 for liquidity management and includes safety mechanisms like reentrancy protection.
-contract Deployer is Owned {
+contract Deployer is Ownable {
 
     /// @notice Stores the floor liquidity position details.
     LiquidityPosition private floorPosition;
@@ -93,7 +93,7 @@ contract Deployer is Owned {
     /// @notice Initializes the contract with the owner and resolver addresses.
     /// @param _owner Address of the contract owner.
     /// @param _resolver Address of the address resolver.
-    constructor(address _owner, address _resolver) Owned(_owner) {
+    constructor(address _owner, address _resolver) Ownable(_owner) {
         resolver = _resolver;
     }
 
@@ -129,21 +129,21 @@ contract Deployer is Owned {
     ) external {
         if (msg.sender != address(pool)) revert CallBackCaller();
 
-        uint256 token0Balance = ERC20(token0).balanceOf(address(this));
-        uint256 token1Balance = ERC20(token1).balanceOf(address(this));
+        uint256 token0Balance = IERC20(token0).balanceOf(address(this));
+        uint256 token1Balance = IERC20(token1).balanceOf(address(this));
 
         if (token0Balance >= amount0Owed) {
-            if (amount0Owed > 0) ERC20(token0).transfer(msg.sender, amount0Owed);
+            if (amount0Owed > 0) IERC20(token0).transfer(msg.sender, amount0Owed);
         } else {
-            ERC20(token0).transferFrom(vault, address(this), amount0Owed);
-            ERC20(token0).transfer(msg.sender, amount0Owed);
+            IERC20(token0).transferFrom(vault, address(this), amount0Owed);
+            IERC20(token0).transfer(msg.sender, amount0Owed);
         }
 
         if (token1Balance >= amount1Owed) {
-            if (amount1Owed > 0) ERC20(token1).transfer(msg.sender, amount1Owed);
+            if (amount1Owed > 0) IERC20(token1).transfer(msg.sender, amount1Owed);
         } else {
-            ERC20(token1).transferFrom(vault, address(this), amount1Owed);
-            ERC20(token1).transfer(msg.sender, amount1Owed);
+            IERC20(token1).transferFrom(vault, address(this), amount1Owed);
+            IERC20(token1).transfer(msg.sender, amount1Owed);
         }
     }
 
@@ -314,8 +314,8 @@ contract Deployer is Owned {
 
         LiquidityPosition[3] memory positions = [floorPosition, anchorPosition, discoveryPosition];
 
-        uint256 balanceToken0 = ERC20(token0).balanceOf(address(this));
-        ERC20(token0).transfer(vault, balanceToken0);
+        uint256 balanceToken0 = IERC20(token0).balanceOf(address(this));
+        IERC20(token0).transfer(vault, balanceToken0);
         IVault(vault).initializeLiquidity(positions);
     }
 

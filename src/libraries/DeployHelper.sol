@@ -6,7 +6,7 @@ pragma solidity ^0.8.0;
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {LiquidityAmounts} from "@uniswap/v3-periphery/libraries/LiquidityAmounts.sol";
 import {TickMath} from '@uniswap/v3-core/libraries/TickMath.sol';
-import {ERC20} from "solmate/tokens/ERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {Uniswap} from "./Uniswap.sol";
 import {Utils} from "./Utils.sol";
@@ -33,7 +33,7 @@ library DeployHelper {
         ) {
             
         (uint160 sqrtRatioX96,,,,,,) = pool.slot0();   
-        uint8 decimals = ERC20(address(pool.token0())).decimals();
+        uint8 decimals = IERC20Metadata(address(pool.token0())).decimals();
 
         int24 lowerTick = TickMath.getTickAtSqrtRatio(
             Conversions.priceToSqrtPriceX96(

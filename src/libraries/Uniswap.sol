@@ -4,9 +4,8 @@
 pragma solidity ^0.8.0;
 
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
-import {ERC20} from "solmate/tokens/ERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {LiquidityType} from "../types/Types.sol";
-// import {Utils} from "./Utils.sol";
 
 library Uniswap {
 
@@ -110,7 +109,7 @@ library Uniswap {
         bool isLimitOrder
     ) internal {
         
-        uint256 balanceBeforeSwap = ERC20(zeroForOne ? token1 : token0).balanceOf(receiver);
+        uint256 balanceBeforeSwap = IERC20Metadata(zeroForOne ? token1 : token0).balanceOf(receiver);
         uint160 slippagePrice = zeroForOne ? basePrice - (basePrice / 25) : basePrice + (basePrice / 25);
 
         try IUniswapV3Pool(pool).swap(
@@ -120,7 +119,7 @@ library Uniswap {
             isLimitOrder ? basePrice : slippagePrice,
             ""
         ) {
-            uint256 balanceAfterSwap = ERC20(zeroForOne ? token1 : token0).balanceOf(receiver);
+            uint256 balanceAfterSwap = IERC20Metadata(zeroForOne ? token1 : token0).balanceOf(receiver);
             if (balanceBeforeSwap == balanceAfterSwap) {
                 revert("no tokens exchanged");
             }

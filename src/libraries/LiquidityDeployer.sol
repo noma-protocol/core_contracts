@@ -4,14 +4,14 @@ pragma solidity ^0.8.0;
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {LiquidityAmounts} from "@uniswap/v3-periphery/libraries/LiquidityAmounts.sol";
 import {TickMath} from "@uniswap/v3-core/libraries/TickMath.sol";
-import {ERC20} from "solmate/tokens/ERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {Uniswap} from "./Uniswap.sol";
 import {Utils} from "./Utils.sol";
 import {Conversions} from "./Conversions.sol";
 import {DecimalMath} from "./DecimalMath.sol";
 
-import "../interfaces/IVault.sol";
+import {IVault} from "../interfaces/IVault.sol";
 
 import {
     LiquidityPosition, 
@@ -41,7 +41,7 @@ library LiquidityDeployer {
             LiquidityType liquidityType
         )
     {
-        uint8 decimals = ERC20(address(IUniswapV3Pool(pool).token0())).decimals();
+        uint8 decimals = IERC20Metadata(address(IUniswapV3Pool(pool).token0())).decimals();
 
         (int24 lowerTick, int24 upperTick) = Conversions
         .computeRangeTicks(
@@ -92,7 +92,7 @@ library LiquidityDeployer {
             LiquidityType liquidityType
         )
     {
-        uint8 decimals = ERC20(address(IUniswapV3Pool(pool).token0())).decimals();
+        uint8 decimals = IERC20Metadata(address(IUniswapV3Pool(pool).token0())).decimals();
 
         uint256 lowerDiscoveryPrice = Conversions.sqrtPriceX96ToPrice(
             Conversions.tickToSqrtPriceX96(anchorPosition.upperTick),
@@ -113,7 +113,7 @@ library LiquidityDeployer {
             revert InvalidTicks();
         }
 
-        uint256 balanceToken0 = ERC20(IUniswapV3Pool(pool).token0()).balanceOf(
+        uint256 balanceToken0 = IERC20Metadata(IUniswapV3Pool(pool).token0()).balanceOf(
             address(this)
         );
 
@@ -146,7 +146,7 @@ library LiquidityDeployer {
         }
 
         (uint160 sqrtRatioX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
-        uint8 decimals = ERC20(address(IUniswapV3Pool(pool).token0())).decimals();
+        uint8 decimals = IERC20Metadata(address(IUniswapV3Pool(pool).token0())).decimals();
 
         if (floorPosition.liquidity > 0) {
             

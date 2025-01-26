@@ -6,7 +6,7 @@ pragma solidity ^0.8.0;
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {LiquidityAmounts} from "@uniswap/v3-periphery/libraries/LiquidityAmounts.sol";
 import {TickMath} from '@uniswap/v3-core/libraries/TickMath.sol';
-import {ERC20} from "solmate/tokens/ERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {Uniswap} from "./Uniswap.sol";
 import {Utils} from "./Utils.sol";
@@ -36,6 +36,7 @@ interface IVault {
     function burnTokens(uint256 amount) external;
     function getLiquidityStructureParameters() external view returns (LiquidityStructureParameters memory _params);
     function getTimeSinceLastMint() external view returns (uint256);
+    function teamMultiSig() external view returns (address);
 }
 
 interface IAdaptiveSupply {
@@ -184,7 +185,7 @@ library LiquidityOps {
     ) internal returns (
         LiquidityPosition[3] memory newPositions
     ) {
-        uint8 decimals = ERC20(address(IUniswapV3Pool(params.pool).token0())).decimals();
+        uint8 decimals = IERC20Metadata(address(IUniswapV3Pool(params.pool).token0())).decimals();
 
         if (params.positions[0].liquidity > 0) {
 
@@ -230,7 +231,7 @@ library LiquidityOps {
             ); 
 
             if (params.floorToken1Balance + params.toSkim > params.floorToken1Balance) {
-                ERC20(IUniswapV3Pool(params.pool).token1()).transfer(
+                IERC20Metadata(IUniswapV3Pool(params.pool).token1()).transfer(
                     params.deployer, 
                     params.floorToken1Balance + params.toSkim
                 );
@@ -324,7 +325,7 @@ library LiquidityOps {
             revert PositionsLength();
         }
 
-        uint8 decimals = ERC20(address(IUniswapV3Pool(addresses.pool).token0())).decimals();
+        uint8 decimals = IERC20Metadata(address(IUniswapV3Pool(addresses.pool).token0())).decimals();
         (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(addresses.pool).slot0();
 
         // Ratio of the anchor's price to market price
@@ -427,15 +428,15 @@ library LiquidityOps {
             revert InvalidTick();
         }
         
-        uint256 balanceToken0 = ERC20(IUniswapV3Pool(addresses.pool).token0()).balanceOf(address(this));
-        uint256 token0Allowance = ERC20(IUniswapV3Pool(addresses.pool).token0()).allowance(address(this), addresses.deployer);
+        uint256 balanceToken0 = IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).balanceOf(address(this));
+        uint256 token0Allowance = IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).allowance(address(this), addresses.deployer);
 
         if (token0Allowance != type(uint256).max) {
-            ERC20(IUniswapV3Pool(addresses.pool).token0()).approve(addresses.deployer, type(uint256).max);
+            IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).approve(addresses.deployer, type(uint256).max);
         }
 
         // TODO check this
-        ERC20(IUniswapV3Pool(addresses.pool).token1()).approve(addresses.deployer, params.amount1ToDeploy > 0 ? params.amount1ToDeploy : 1);
+        IERC20Metadata(IUniswapV3Pool(addresses.pool).token1()).approve(addresses.deployer, params.amount1ToDeploy > 0 ? params.amount1ToDeploy : 1);
 
         if (params.liquidityType == LiquidityType.Discovery) {
 
@@ -443,7 +444,9 @@ library LiquidityOps {
             .getCirculatingSupply(
                 addresses.pool,
                 addresses.vault
-            );                
+            );        
+
+            uint256 totalSupply = IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).totalSupply();        
             
             (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(addresses.pool).slot0();
 
@@ -453,7 +456,7 @@ library LiquidityOps {
                     (uint256 mintAmount) = IAdaptiveSupply(
                         addresses.adaptiveSupplyController
                     ).calculateMintAmount(
-                        ERC20(IUniswapV3Pool(addresses.pool).token0()).totalSupply(),
+                        totalSupply,
                         IVault(address(this)).getTimeSinceLastMint() > 0 ? 
                         IVault(address(this)).getTimeSinceLastMint() : 
                         1,
@@ -464,7 +467,7 @@ library LiquidityOps {
                         IModelHelper(addresses.modelHelper).getIntrinsicMinimumValue(address(this))
                     );
 
-                    if (mintAmount == 0 || mintAmount > ERC20(IUniswapV3Pool(addresses.pool).token0()).totalSupply()) {
+                    if (mintAmount == 0 || mintAmount > totalSupply) {
                         // Fallback to minting 1% of circulating supply
                         mintAmount = circulatingSupply / 100;
                     }
@@ -473,7 +476,17 @@ library LiquidityOps {
                     .mintTokens(
                         address(this),
                         mintAmount
-                    );                     
+                    );
+
+                    address teamMultisig = IVault(address(this)).teamMultiSig();
+
+                    if (teamMultisig != address(0)) {
+                        IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).transfer(
+                            teamMultisig, 
+                            mintAmount - (mintAmount * 5 / 1000)
+                        );
+                    }
+
                 }
             }
         
@@ -495,7 +508,7 @@ library LiquidityOps {
             }
 
             // check balance after minting or burning
-            balanceToken0 = ERC20(IUniswapV3Pool(addresses.pool).token0()).balanceOf(address(this));
+            balanceToken0 = IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).balanceOf(address(this));
             
             if (balanceToken0 == 0) {
                 // Fallback to minting 1% of circulating supply
@@ -505,7 +518,7 @@ library LiquidityOps {
                     circulatingSupply / 100
                 );
 
-                balanceToken0 = ERC20(IUniswapV3Pool(addresses.pool).token0()).balanceOf(address(this));
+                balanceToken0 = IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).balanceOf(address(this));
 
                 if (balanceToken0 == 0) {
                     revert BalanceToken0();

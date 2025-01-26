@@ -7,12 +7,15 @@ import {IModelHelper} from "../interfaces/IModelHelper.sol";
 import {IDeployer} from "../interfaces/IDeployer.sol";
 import {LiquidityOps} from "../libraries/LiquidityOps.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import "../libraries/Conversions.sol";
-import "../libraries/DecimalMath.sol";
-import "../libraries/Utils.sol";
-import "../libraries/Uniswap.sol";
-import "../libraries/LiquidityDeployer.sol";
+import {Conversions} from "../libraries/Conversions.sol";
+import {DecimalMath} from "../libraries/DecimalMath.sol";
+import {Utils} from "../libraries/Utils.sol";
+import {Uniswap} from "../libraries/Uniswap.sol";
+import {LiquidityDeployer} from "../libraries/LiquidityDeployer.sol";
+import {IVault} from "../interfaces/IVault.sol";
+import {TickMath} from '@uniswap/v3-core/libraries/TickMath.sol';
 
 import {
     LiquidityPosition, 
@@ -23,20 +26,12 @@ import {
     LiquidityInternalPars
 } from "../types/Types.sol";
 
-interface IERC20 {
-    function balanceOf(address account) external view returns (uint256);
-    function transfer(address recipient, uint256 amount) external returns (bool);
-    function mint(address receiver, uint256 amount) external;
-    function approve(address spender, uint256 amount) external;
-    function totalSupply() external view returns (uint256);
-}
-
 interface IStakingRewards {
     function notifyRewardAmount(uint256 reward) external;
 }
 
 interface IRewardsCalculator {
-    function calculateRewards(RewardParams memory params) external pure returns (uint256);
+    function calculateRewards(RewardParams memory params, uint256 timeElapsed) external pure returns (uint256);
 }
 
 error NotInitialized();
@@ -44,6 +39,7 @@ error LiquidityRatioOutOfRange();
 error StakingContractNotSet();
 error Unauthorized();
 error NoStakingRewards();
+error StakingNotEnabled();
 
 contract StakingVault is BaseVault {
 
@@ -54,6 +50,11 @@ contract StakingVault is BaseVault {
 
         if (_v.stakingContract == address(0)) {
             revert StakingContractNotSet();
+        }
+
+        if (!_v.stakingEnabled) {
+            // revert StakingNotEnabled();
+            return;
         }
 
         LiquidityPosition[3] memory positions = [
@@ -73,23 +74,28 @@ contract StakingVault is BaseVault {
         .getIntrinsicMinimumValue(addresses.vault);
 
         uint256 circulatingSupply = IModelHelper(_v.modelHelper).getCirculatingSupply(addresses.pool, addresses.vault);
-        uint256 totalSupply = IERC20(IUniswapV3Pool(addresses.pool).token0()).totalSupply();
+        uint256 totalSupply = IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).totalSupply();
+
+        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(addresses.pool).slot0();
 
         uint256 toMint = IRewardsCalculator(rewardsCalculator()).
         calculateRewards(
             RewardParams(
                 excessReservesToken1,
                 intrinsicMinimumValue,
+                Conversions.sqrtPriceX96ToPrice(
+                    sqrtRatioX96, 
+                    IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).decimals()
+                ),
                 circulatingSupply,
                 totalSupply,
-                1e18, // volatility
-                10e8, // sensitivity for r 
-                1e18  // sensitivity for v
-            )
+                10e8 // sensitivity for r TODO remove hardcoded
+            ),
+            block.timestamp - _v.timeLastMinted
         );
                 
         if (toMint > 0) {        
-            IERC20(_v.tokenInfo.token0).approve(_v.stakingContract, toMint);
+            IERC20Metadata(_v.tokenInfo.token0).approve(_v.stakingContract, toMint);
             mintTokens(_v.stakingContract, toMint);
             // Update total minted (NOMA)
             _v.totalMinted += toMint;
@@ -154,7 +160,7 @@ contract StakingVault is BaseVault {
                 .tickToSqrtPriceX96(
                     positions[0].upperTick
                 ), 
-            ERC20(address(IUniswapV3Pool(addresses.pool).token0())).decimals());
+            IERC20Metadata(address(IUniswapV3Pool(addresses.pool).token0())).decimals());
             
             // Bump floor if necessary
             if (newFloorPrice > currentFloorPrice) {
@@ -234,7 +240,7 @@ contract StakingVault is BaseVault {
     }
 
     function transferExcessBalance(ProtocolAddresses memory addresses, uint256 totalAmount) internal {
-        ERC20 token1 = ERC20(IUniswapV3Pool(addresses.pool).token1());
+        IERC20Metadata token1 = IERC20Metadata(IUniswapV3Pool(addresses.pool).token1());
         token1.transfer(addresses.deployer, totalAmount);
     }
 
@@ -282,7 +288,7 @@ contract StakingVault is BaseVault {
         uint256 floorToken1Balance,
         uint256 toMint
     ) internal returns (LiquidityPosition memory) {
-        uint8 decimals = ERC20(IUniswapV3Pool(addresses.pool).token0()).decimals();
+        uint8 decimals = IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).decimals();
         uint256 price = Conversions.sqrtPriceX96ToPrice(
             Conversions.tickToSqrtPriceX96(floorPosition.upperTick),
             decimals
@@ -327,7 +333,7 @@ contract StakingVault is BaseVault {
         uint256 discoveryToken1Balance,
         uint160 sqrtRatioX96
     ) internal returns (LiquidityPosition memory) {
-        uint8 decimals = ERC20(IUniswapV3Pool(addresses.pool).token0()).decimals();
+        uint8 decimals = IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).decimals();
         int24 discoveryLowerTick = Utils.nearestUsableTick(
             Utils.addBipsToTick(
                 anchorUpperTick,
@@ -379,13 +385,18 @@ contract StakingVault is BaseVault {
         return _v.stakingContract;
     }
 
+    function stakingEnabled() external view returns (bool) {
+        return _v.stakingEnabled;
+    }
+
     function getFunctionSelectors() external pure  override returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](5);
+        bytes4[] memory selectors = new bytes4[](6);
         selectors[0] = bytes4(keccak256(bytes("mintAndDistributeRewards((address,address,address,address,address))"))); 
         selectors[1] = bytes4(keccak256(bytes("getLiquidityStructureParameters()")));  
         selectors[2] = bytes4(keccak256(bytes("setStakingContract(address)")));
         selectors[3] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));
         selectors[4] = bytes4(keccak256(bytes("getStakingContract()")));
+        selectors[5] = bytes4(keccak256(bytes("stakingEnabled()")));
         return selectors;
     }
 }
