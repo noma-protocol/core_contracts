@@ -19,7 +19,8 @@ import {
     LiquidityType,
     ProtocolAddresses,
     LiquidityStructureParameters,
-    RewardParams
+    RewardParams,
+    LiquidityInternalPars
 } from "../types/Types.sol";
 
 interface IERC20 {
@@ -42,6 +43,7 @@ error NotInitialized();
 error LiquidityRatioOutOfRange();
 error StakingContractNotSet();
 error Unauthorized();
+error NoStakingRewards();
 
 contract StakingVault is BaseVault {
 
@@ -68,7 +70,7 @@ contract StakingVault is BaseVault {
         );
 
         uint256 intrinsicMinimumValue = IModelHelper(_v.modelHelper)
-        .getIntrinsicMinimumValue(addresses.vault) * 1e18;
+        .getIntrinsicMinimumValue(addresses.vault);
 
         uint256 circulatingSupply = IModelHelper(_v.modelHelper).getCirculatingSupply(addresses.pool, addresses.vault);
         uint256 totalSupply = IERC20(IUniswapV3Pool(addresses.pool).token0()).totalSupply();
@@ -85,24 +87,29 @@ contract StakingVault is BaseVault {
                 1e18  // sensitivity for v
             )
         );
-        
-        if (toMint == 0) {
-            return;
-        } 
-    
-        IERC20(_v.tokenInfo.token0).approve(_v.stakingContract, toMint);
-        
-        // TODO enable minting
-        mintTokens(_v.stakingContract, toMint);
+                
+        if (toMint > 0) {        
+            IERC20(_v.tokenInfo.token0).approve(_v.stakingContract, toMint);
+            mintTokens(_v.stakingContract, toMint);
+            // Update total minted (NOMA)
+            _v.totalMinted += toMint;
 
-        // Update total minted (NOMA)
-        _v.totalMinted += toMint;
+            // Call notifyRewardAmount 
+            IStakingRewards(_v.stakingContract).notifyRewardAmount(toMint);  
 
-        // Call notifyRewardAmount 
-        IStakingRewards(_v.stakingContract).notifyRewardAmount(toMint);  
-
-        // Send tokens to Floor
-        _sendToken1ToFloor(positions, addresses, toMint);
+            // Send tokens to Floor
+            _sendToken1ToFloor(positions, addresses, toMint);
+        } else {
+            revert(
+                string(
+                    abi.encodePacked(
+                        "mintAndDistributeRewards: toMint is 0 : ", 
+                        Utils._uint2str(uint256(toMint))
+                    )
+                )
+            );
+            // revert NoStakingRewards();
+        }
     }
 
     function _sendToken1ToFloor(
@@ -162,26 +169,17 @@ contract StakingVault is BaseVault {
         }        
     }
 
-    function _shiftPositions(
-        LiquidityPosition[3] memory positions, 
-        ProtocolAddresses memory addresses,
-        uint256 newFloorPrice,
-        uint256 toMint,
-        uint256 floorToken1Balance
+    function collectLiquidity(
+        LiquidityPosition[3] memory positions,
+        ProtocolAddresses memory addresses
     ) internal {
-        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(addresses.pool).slot0();
-        
-        ( , uint256 anchorToken1Balance, 
-            uint256 discoveryToken1Balance,
-        ) = LiquidityOps.getVaulData(addresses);
-
         // Collect floor liquidity
         Uniswap.collect(
             addresses.pool, 
             address(this), 
             positions[0].lowerTick, 
             positions[0].upperTick
-        ); 
+        );
 
         // Collect discovery liquidity
         Uniswap.collect(
@@ -197,70 +195,162 @@ contract StakingVault is BaseVault {
             address(this), 
             positions[1].lowerTick, 
             positions[1].upperTick
-        ); 
+        );
+    }
+
+    function _shiftPositions(
+        LiquidityPosition[3] memory positions, 
+        ProtocolAddresses memory addresses,
+        uint256 newFloorPrice,
+        uint256 toMint,
+        uint256 floorToken1Balance
+    ) internal {
+        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(addresses.pool).slot0();
+
+        ( , uint256 anchorToken1Balance, 
+            uint256 discoveryToken1Balance,
+        ) = LiquidityOps.getVaulData(addresses);
+
+        // Collect all liquidity
+        collectLiquidity(positions, addresses);
 
         if (floorToken1Balance + toMint > floorToken1Balance) {
-            ERC20(IUniswapV3Pool(addresses.pool).token1()).transfer(
-                addresses.deployer, 
-                floorToken1Balance + toMint
-            );
+            transferExcessBalance(addresses, floorToken1Balance + toMint);
         }
 
-        {
-            positions[0] = IDeployer(addresses.deployer) 
-            .shiftFloor(
-                addresses.pool, 
-                addresses.vault, 
-                Conversions
-                .sqrtPriceX96ToPrice(
-                    Conversions
-                    .tickToSqrtPriceX96(
-                        positions[0].upperTick
-                    ), 
-                ERC20(address(IUniswapV3Pool(addresses.pool).token0())).decimals()), 
-                newFloorPrice,
-                floorToken1Balance + toMint,
-                floorToken1Balance,
-                positions[0]
-            );   
+        _deployNewPositions(
+            positions, 
+            addresses, 
+            newFloorPrice, 
+            toMint, 
+            floorToken1Balance, 
+            anchorToken1Balance, 
+            discoveryToken1Balance, 
+            sqrtRatioX96
+        );
 
-            // Deploy new anchor position
-            positions[1] = LiquidityOps
-            .reDeploy(
-                addresses,
-                positions[0].upperTick,                
-                Utils.nearestUsableTick(
-                    TickMath.getTickAtSqrtRatio(sqrtRatioX96)      
-                ),
-                (anchorToken1Balance + discoveryToken1Balance) - toMint, 
-                LiquidityType.Anchor
-            );
-
-            positions[2] = LiquidityOps
-            .reDeploy(
-                addresses,
-                Utils.nearestUsableTick(
-                    Utils.addBipsToTick(
-                        positions[1].upperTick, 
-                        IVault(address(this)).getLiquidityStructureParameters().discoveryBips, 
-                        ERC20(address(IUniswapV3Pool(addresses.pool).token0())).decimals()
-                    )
-                ),
-                // TODO remove hardcoded
-                Utils.nearestUsableTick(
-                    TickMath.getTickAtSqrtRatio(sqrtRatioX96) * 
-                    int8(IVault(address(this)).getLiquidityStructureParameters().idoPriceMultiplier)    
-                ),                
-                0,
-                LiquidityType.Discovery 
-            ); 
-
-            IVault(addresses.vault).updatePositions(positions);  
-
-            IModelHelper(_v.modelHelper)
+        IModelHelper(_v.modelHelper)
             .enforceSolvencyInvariant(address(this));   
-        }
     }
+
+    function transferExcessBalance(ProtocolAddresses memory addresses, uint256 totalAmount) internal {
+        ERC20 token1 = ERC20(IUniswapV3Pool(addresses.pool).token1());
+        token1.transfer(addresses.deployer, totalAmount);
+    }
+
+    function _deployNewPositions(
+        LiquidityPosition[3] memory positions, 
+        ProtocolAddresses memory addresses,
+        uint256 newFloorPrice,
+        uint256 toMint,
+        uint256 floorToken1Balance,
+        uint256 anchorToken1Balance,
+        uint256 discoveryToken1Balance,
+        uint160 sqrtRatioX96
+    ) internal {
+        positions[0] = _shiftFloorPosition(
+            positions[0],
+            addresses,
+            newFloorPrice,
+            floorToken1Balance,
+            toMint
+        );
+
+        positions[1] = _deployAnchorPosition(
+            positions[0].upperTick,
+            addresses,
+            anchorToken1Balance,
+            discoveryToken1Balance,
+            toMint,
+            sqrtRatioX96
+        );
+
+        positions[2] = _deployDiscoveryPosition(
+            positions[1].upperTick,
+            addresses,
+            discoveryToken1Balance,
+            sqrtRatioX96
+        );
+
+        IVault(addresses.vault).updatePositions(positions);  
+    }
+
+    function _shiftFloorPosition(
+        LiquidityPosition memory floorPosition,
+        ProtocolAddresses memory addresses,
+        uint256 newFloorPrice,
+        uint256 floorToken1Balance,
+        uint256 toMint
+    ) internal returns (LiquidityPosition memory) {
+        uint8 decimals = ERC20(IUniswapV3Pool(addresses.pool).token0()).decimals();
+        uint256 price = Conversions.sqrtPriceX96ToPrice(
+            Conversions.tickToSqrtPriceX96(floorPosition.upperTick),
+            decimals
+        );
+
+        return IDeployer(addresses.deployer).shiftFloor(
+            addresses.pool,
+            addresses.vault,
+            price,
+            newFloorPrice,
+            floorToken1Balance + toMint,
+            floorToken1Balance,
+            floorPosition
+        );
+    }
+
+    function _deployAnchorPosition(
+        int24 upperTick,
+        ProtocolAddresses memory addresses,
+        uint256 anchorToken1Balance,
+        uint256 discoveryToken1Balance,
+        uint256 toMint,
+        uint160 sqrtRatioX96
+    ) internal returns (LiquidityPosition memory) {
+        return LiquidityOps.reDeploy(
+            addresses,
+            LiquidityInternalPars({
+                lowerTick: upperTick,
+                upperTick: Utils.nearestUsableTick(
+                    TickMath.getTickAtSqrtRatio(sqrtRatioX96)
+                ),
+                amount1ToDeploy: (anchorToken1Balance + discoveryToken1Balance) - toMint,
+                liquidityType: LiquidityType.Anchor
+            }),
+            true
+        );
+    }
+
+    function _deployDiscoveryPosition(
+        int24 anchorUpperTick,
+        ProtocolAddresses memory addresses,
+        uint256 discoveryToken1Balance,
+        uint160 sqrtRatioX96
+    ) internal returns (LiquidityPosition memory) {
+        uint8 decimals = ERC20(IUniswapV3Pool(addresses.pool).token0()).decimals();
+        int24 discoveryLowerTick = Utils.nearestUsableTick(
+            Utils.addBipsToTick(
+                anchorUpperTick,
+                IVault(address(this)).getLiquidityStructureParameters().discoveryBips,
+                decimals
+            )
+        );
+
+        return LiquidityOps.reDeploy(
+            addresses,
+            LiquidityInternalPars({
+                lowerTick: discoveryLowerTick,
+                upperTick: Utils.nearestUsableTick(
+                    TickMath.getTickAtSqrtRatio(sqrtRatioX96) * 
+                    int8(IVault(address(this)).getLiquidityStructureParameters().idoPriceMultiplier)
+                ),
+                amount1ToDeploy: discoveryToken1Balance,
+                liquidityType: LiquidityType.Discovery
+            }),
+            true
+        );
+    }
+
 
     function setFees(
         uint256 _feesAccumulatedToken0, 
