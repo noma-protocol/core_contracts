@@ -249,15 +249,13 @@ struct LoanPosition {
 /// @param expiry Expiry timestamp of the loan.
 /// @param duration Duration of the loan.
 struct RewardParams {
-    uint256 ethAmount;   // Amount of ETH provided (18 decimals)
-    uint256 imv;         // Token price in ETH (18 decimals)
-    uint256 circulating; // Circulating supply (18 decimals)
-    uint256 totalSupply; // Total supply (18 decimals)
-    uint256 volatility;  // Volatility in percentage (e.g., 180% = 1.8e18)
+    uint256 ethAmount;   // Amount of ETH provided 
+    uint256 imv;         // Token price in ETH 
+    uint256 spotPrice;   // Spot price in ETH 
+    uint256 circulating; // Circulating supply
+    uint256 totalSupply; // Total supply 
     uint256 kr;          // Sensitivity for r adjustment (e.g., 10e18)
-    uint256 kv;          // Sensitivity for volatility adjustment (e.g., 1e18)
 }
-
 
 struct LiquidityInternalPars {
     int24 lowerTick;

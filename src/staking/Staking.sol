@@ -5,6 +5,7 @@ import {Utils} from "../libraries/Utils.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../interfaces/IsNomaToken.sol";
+import "../interfaces/IVault.sol";
 
 contract Staking {
     using SafeERC20 for IERC20;
@@ -38,6 +39,12 @@ contract Staking {
 
     mapping(address => Claim) public infos;
 
+    error StakingNotEnabled();
+    error InvalidParameters();
+    error NotEnoughBalance();
+    error InvalidReward();
+    error OnlyVault();
+
     constructor(    
         address _noma,
         address _sNoma,
@@ -62,7 +69,13 @@ contract Staking {
         address _to,
         uint256 _amount
     ) external {
-        require(_amount > 0 && _to != address(0), "Stake: invalid parameters");
+        if (_amount == 0 || _to == address(0)) {
+            revert InvalidParameters();
+        }
+
+        if (IVault(vault).stakingEnabled() == false) {
+            revert StakingNotEnabled();
+        }
 
         NOMA.safeTransferFrom(_to, address(this), _amount);
         sNOMA.mint(_to, _amount);
@@ -72,12 +85,23 @@ contract Staking {
     function unstake(
         address _from
     ) external {
-        require(_from != address(0), "Unstake: invalid parameters");
+        if (_from == address(0)) {
+            revert InvalidParameters();
+        }
 
+        if (IVault(vault).stakingEnabled() == false) {
+            revert StakingNotEnabled();
+        }
+        
         uint256 balance = sNOMA.balanceOf(_from);
 
-        require(balance > 0, "not enough sNoma balance");
-        require(NOMA.balanceOf(address(this)) >= balance, "Unstake: insufficient balance"); 
+        if (balance == 0) {
+            revert NotEnoughBalance();
+        }
+
+        if (NOMA.balanceOf(address(this)) < balance) {
+            revert NotEnoughBalance();
+        }
 
         sNOMA.burnFor(_from, balance);
         NOMA.safeTransfer(_from, balance);
@@ -85,13 +109,22 @@ contract Staking {
     }  
 
     function notifyRewardAmount(uint256 _reward) public onlyVault {
-        require(_reward < type(uint256).max, "invalid reward");
-        
+        if (_reward == type(uint256).max) {
+            revert InvalidReward();
+        }
+
+        if (IVault(vault).stakingEnabled() == false) {
+            revert StakingNotEnabled();
+        }        
+
         _reward = totalEpochs == 1 ? epoch.distribute : _reward;
         
         // Save current epoch with the reward distributed
         if (totalEpochs > 1) {
-            require(_reward > 0, "epoch > 1, invalid reward");
+            // require(_reward > 0, "epoch > 1, invalid reward");
+            if (_reward == 0) {
+                revert InvalidReward();
+            }
             epoch.distribute = _reward;
         }
 
@@ -113,10 +146,10 @@ contract Staking {
         totalEpochs++;
     }
 
-
-
     modifier onlyVault() {
-        require(msg.sender == vault || msg.sender == address(this), "Caller is not the vault");
+        if (msg.sender != vault && msg.sender != address(this)) {
+            revert OnlyVault();
+        }
         _;
     }
 }
