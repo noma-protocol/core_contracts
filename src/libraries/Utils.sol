@@ -172,30 +172,6 @@ library Utils {
         return (keccak256(abi.encodePacked((a))) == keccak256(abi.encodePacked((b))));
     }
 
-    // TICK CALCULATION FUNCTIONS
-    function nearestUsableTick(int24 tick) public pure returns (int24) {
-        if (tickSpacing == 0) {
-            revert InvalidTickSpacing();
-        }
-
-        if (tick < MIN_TICK || tick > MAX_TICK) {
-            revert OutOfRange();
-        }
-        
-        int24 remainder = tick % tickSpacing;
-        int24 rounded = tick - remainder;
-        
-        if (remainder * 2 >= tickSpacing) {
-            rounded += tickSpacing;
-        } else if (remainder * 2 <= -tickSpacing) {
-            rounded -= tickSpacing;
-        }
-
-        if (rounded < MIN_TICK) return rounded + tickSpacing;
-        else if (rounded > MAX_TICK) return rounded - tickSpacing;
-        else return rounded;
-    }
-
     function stringToBytes32(string memory source) public pure returns (bytes32 result) {
         bytes memory tempEmptyStringTest = bytes(source);
         if (tempEmptyStringTest.length == 0) {
@@ -215,5 +191,40 @@ library Utils {
 
     function abs(int x) pure private returns (uint) {
         return uint(x >= 0 ? x : -x);
-    }    
+    } 
+
+    // TICK CALCULATION FUNCTIONS
+    function nearestUsableTick(int24 tick) public pure returns (int24) {
+        require(tickSpacing > 0, "Invalid tick spacing");
+        require(tick >= MIN_TICK && tick <= MAX_TICK, "Out of range");
+
+        int24 remainder = tick % tickSpacing;
+        int24 rounded = _roundTick(tick, remainder);
+
+        return _clampTick(rounded);
+    }
+
+    function _roundTick(int24 tick, int24 remainder) internal pure returns (int24) {
+        int24 rounded = tick - remainder;
+
+        if (remainder * 2 >= tickSpacing) {
+            rounded += tickSpacing;
+        } else if (remainder * 2 <= -tickSpacing) {
+            rounded -= tickSpacing;
+        }
+
+        return rounded;
+    }
+
+    function _clampTick(int24 rounded) internal pure returns (int24) {
+        if (rounded < MIN_TICK) {
+            return rounded + tickSpacing;
+        } else if (rounded > MAX_TICK) {
+            return rounded - tickSpacing;
+        } else {
+            return rounded;
+        }
+    }
+
+   
 }
