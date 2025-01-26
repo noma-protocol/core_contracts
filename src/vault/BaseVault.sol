@@ -27,6 +27,7 @@ interface IERC20 {
 
 interface INomaFactory {
     function mintTokens(address to, uint256 amount) external;
+    function burnFor(address from, uint256 amount) external;
 }
 
 interface IAdaptiveSupplyController {
@@ -146,7 +147,22 @@ contract BaseVault is OwnableUninitialized {
             to,
             amount
         );
+
+        _v.timeLastMinted = block.timestamp;
     }
+
+    function burnTokens(
+        uint256 amount
+    ) public onlyInternalCalls {
+
+        IERC20(_v.pool.token0()).approve(address(_v.factory), amount);
+        INomaFactory(_v.factory)
+        .burnFor(
+            address(this),
+            amount
+        );
+    }
+    
 
     function getVaultInfo() public view 
     returns (
@@ -215,6 +231,10 @@ contract BaseVault is OwnableUninitialized {
         }
     }
 
+    function getTimeSinceLastMint() public view returns (uint256) {
+        return block.timestamp - _v.timeLastMinted;
+    }
+
     modifier onlyDeployer() {
         if (msg.sender != _v.deployerContract) revert OnlyDeployer();
         _;
@@ -226,7 +246,7 @@ contract BaseVault is OwnableUninitialized {
     }
 
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](11);
+        bytes4[] memory selectors = new bytes4[](13);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
         selectors[1] = bytes4(keccak256(bytes("pool()")));
         selectors[2] = bytes4(keccak256(bytes("initialize(address,address,address,address,address,address,address,address,(uint8,uint8,uint8,uint16[2],uint256,uint256,int24))")));
@@ -238,6 +258,8 @@ contract BaseVault is OwnableUninitialized {
         selectors[8] = bytes4(keccak256(bytes("getCollateralAmount()")));
         selectors[9] = bytes4(keccak256(bytes("getProtocolAddresses()")));
         selectors[10] = bytes4(keccak256(bytes("mintTokens(address,uint256)")));
+        selectors[11] = bytes4(keccak256(bytes("getTimeSinceLastMint()")));
+        selectors[12] = bytes4(keccak256(bytes("burnTokens(uint256)")));
         return selectors;
     }
 
