@@ -109,4 +109,6 @@ interface IVault {
      * @return The address of the staking contract.
      */
     function getStakingContract() external view returns (address);
+
+    function stakingEnabled() external view returns (bool);
 }

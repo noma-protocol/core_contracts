@@ -49,7 +49,7 @@ struct VaultStorage {
     address stakingContract;
     address proxyAddress;
     address adaptiveSupplyController;
-
+    
     IUniswapV3Pool pool;
     IAddressResolver resolver;
 
@@ -58,8 +58,9 @@ struct VaultStorage {
     uint256 feesAccumulatorToken1;
 
     // System parameters
-    bool initialized; 
-    uint256 lastLiquidityRatio;
+    bool initialized;
+    bool stakingEnabled; 
+    // uint256 lastLiquidityRatio;
 }
 
 
