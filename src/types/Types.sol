@@ -257,3 +257,11 @@ struct RewardParams {
     uint256 kr;          // Sensitivity for r adjustment (e.g., 10e18)
     uint256 kv;          // Sensitivity for volatility adjustment (e.g., 1e18)
 }
+
+
+struct LiquidityInternalPars {
+    int24 lowerTick;
+    int24 upperTick;
+    uint256 amount1ToDeploy;
+    LiquidityType liquidityType;
+}
