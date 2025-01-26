@@ -4,8 +4,7 @@ pragma solidity ^0.8.0;
 import {
     LiquidityPosition,
     AmountsToMint,
-    LiquidityType,
-    ProtocolAddresses
+    LiquidityType
 } from "../types/Types.sol";
 
 /**

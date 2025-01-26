@@ -4,18 +4,14 @@ pragma solidity ^0.8.0;
 import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {Owned} from "solmate/auth/Owned.sol";
-import {Utils} from "./libraries/Utils.sol";
-import {IWETH} from "./interfaces/IWETH.sol";
 import {LiquidityDeployer} from "./libraries/LiquidityDeployer.sol";
 import {DeployHelper} from "./libraries/DeployHelper.sol";
 import {
-    feeTier,
     AmountsToMint, 
     tickSpacing, 
     LiquidityPosition, 
     LiquidityType, 
-    DeployLiquidityParameters,
-    ProtocolAddresses
+    DeployLiquidityParameters
 } from "./types/Types.sol";
 import {IAddressResolver} from "./interfaces/IAddressResolver.sol";
 
