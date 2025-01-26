@@ -20,7 +20,7 @@ interface IWETH {
      * @dev Converts WETH back to Ether and sends it to the caller. The caller must have at least `wad` amount of WETH.
      * Emits a `Withdrawal` event with the receiver's address and the amount withdrawn.
      */
-    function withdraw(uint wad) external;
+    function withdraw(uint256 wad) external;
 
     /**
      * @notice Transfer WETH tokens to a specified address.
@@ -30,5 +30,5 @@ interface IWETH {
      * @dev Transfers `value` amount of WETH from the caller's account to the `to` address.
      * Emits a `Transfer` event as defined in the ERC20 standard.
      */
-    function transfer(address to, uint value) external returns (bool success);
+    function transfer(address to, uint256 value) external returns (bool success);
 }
