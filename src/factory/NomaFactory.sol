@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import { IUniswapV3Factory } from "@uniswap/v3-core/interfaces/IUniswapV3Factory.sol";
@@ -159,6 +159,7 @@ contract NomaFactory {
     address extFactory;
     address authority;
     address uniswapV3Factory;
+    address teamMultisigAddress;
 
     uint256 totalVaults;
     
@@ -178,14 +179,12 @@ contract NomaFactory {
      * @param _resolver The address of the Address Resolver contract.
      * @param _deploymentFactory The address of the Deployment Factory contract.
      * @param _extFactory The address of the External Factory contract.
-     * @param _permissionlessDeployEnabled Boolean flag to enable or disable permissionless deployment.
      */
     constructor(
         address _uniswapV3Factory,
         address _resolver,
         address _deploymentFactory,
-        address _extFactory,
-        bool _permissionlessDeployEnabled
+        address _extFactory
     ) {
         authority = msg.sender;
         uniswapV3Factory = _uniswapV3Factory;
@@ -622,6 +621,10 @@ contract NomaFactory {
                     Utils.stringToBytes32("AdaptiveSupply"), 
                     "no AdaptiveSupply"
                 );
+    }
+
+    function teamMultisig() public view returns (address) {
+        return teamMultisigAddress;
     }
 
     /**
