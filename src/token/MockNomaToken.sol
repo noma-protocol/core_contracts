@@ -12,6 +12,8 @@ contract MockNomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, U
 
     IAddressResolver public resolver;
 
+    error OnlyFactory();
+
     function initialize(
         address _deployer,
         uint256 _totalSupply, 
@@ -30,8 +32,8 @@ contract MockNomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, U
         _mint(_recipient, _amount);
     }
     
-    function mintTo(address to, uint256 amount) public onlyFactory  {
-        _mint(to, amount);
+    function burn(address account, uint256 amount) public onlyFactory {
+        _burn(account, amount);
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
@@ -61,7 +63,8 @@ contract MockNomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, U
     }    
 
     modifier onlyFactory() {
-        require(msg.sender == nomaFactory(), "Only factory");
+        // require(msg.sender == nomaFactory(), "Only factory");
+        if (msg.sender != nomaFactory()) revert OnlyFactory();
         _;
     }
 }
