@@ -13,6 +13,8 @@ contract Resolver is Ownable {
 
     /// @dev Repository mapping for storing key-value pairs of addresses.
     mapping(bytes32 => address) private repository;
+    
+    mapping(address => mapping(bytes32 => address)) private vaultAddressCache;
 
     /// @dev Maps configuration names (as bytes32) to their uint256 settings.
     mapping(bytes32 => uint256) private uintSettings;
@@ -62,6 +64,20 @@ contract Resolver is Ownable {
         }
     }
 
+    function importVaultAddress(
+        address _vault, bytes32[] calldata names, 
+        address[] calldata destinations
+    ) external onlyFactoryOrOwner {
+        if (names.length != destinations.length) revert InputLengthsMismatch();
+
+        for (uint256 i = 0; i < names.length; i++) {
+            bytes32 name = names[i];
+            address destination = destinations[i];
+            vaultAddressCache[_vault][name] = destination;
+            emit AddressImported(name, destination);
+        }
+    }
+
     /// @notice Configures the deployer ACL for a specific vault address.
     /// @dev Grants deployer permissions for a given address.
     /// @param _vault Address of the vault to grant ACL permissions.
@@ -97,6 +113,10 @@ contract Resolver is Ownable {
         return repository[name];
     }
 
+    function getVaultAddress(address _vault, bytes32 name) external view returns (address) {
+        return vaultAddressCache[_vault][name];
+    }
+
     /// @notice Verifies that the provided vault address has deployer ACL permissions.
     /// @dev Reverts with `NotAllowed()` if the vault does not have ACL permissions.
     /// @param _vault Address of the vault to verify.
@@ -110,9 +130,15 @@ contract Resolver is Ownable {
     /// @param reason The reason for the address lookup (used in the revert message).
     /// @return The address associated with the provided name.
     function requireAndGetAddress(bytes32 name, string calldata reason) external view returns (address) {
-        address _foundAddress = repository[name];
-        if (_foundAddress == address(0)) revert AddressNotFound(reason);
-        return _foundAddress;
+        // Check first if the vault has a specific address
+        address vaultAddress = vaultAddressCache[msg.sender][name];
+        if (vaultAddress != address(0)) {
+            return vaultAddress;
+        } else  {
+            address _foundAddress = repository[name];
+            if (_foundAddress == address(0)) revert AddressNotFound(reason);
+            return _foundAddress;
+        }
     }
 
     /* ========== MODIFIERS ========== */

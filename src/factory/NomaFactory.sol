@@ -289,7 +289,16 @@ contract NomaFactory {
 
         _deployLiquidity(_params._IDOPrice, _params._totalSupply, getLiquidityStructureParameters());
 
-        resolver.configureDeployerACL(vaultAddress);        
+        bytes32 name = Utils.stringToBytes32("AdaptiveSupply");
+        bytes32[] memory names = new bytes32[](1);
+        names[0] = name;
+
+        address _adaptiveSupply = adaptiveSupply();
+        address[] memory destinations  = new address[](1);
+        destinations[0] = _adaptiveSupply;
+
+        resolver.configureDeployerACL(vaultAddress);  
+        resolver.importVaultAddress(vaultAddress, names, destinations);
         deployer.finalize();
 
         vaultsRepository[vaultAddress] = vaultDesc;
