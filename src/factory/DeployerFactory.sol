@@ -28,7 +28,6 @@ contract DeployerFactory {
         address deployerAddress = address(deployer);
 
         emit DeployerCreated(deployerAddress);
-
         return deployerAddress;
     }
 

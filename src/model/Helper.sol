@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
-import {LiquidityAmounts} from "@uniswap/v3-periphery/libraries/LiquidityAmounts.sol";
-import {TickMath} from '@uniswap/v3-core/libraries/TickMath.sol';
+import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
+import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
+import {TickMath} from 'v3-core/libraries/TickMath.sol';
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {Uniswap} from "../libraries/Uniswap.sol";

@@ -5,14 +5,11 @@ libs = ["lib"]
 skip_dependencies = true
 fs_permissions = [{ access = "read", path = "./"}]
 
-
 remappings = [
     "ds-test/=lib/forge-std/lib/ds-test/src/",
     "forge-std/=lib/forge-std/src/",
     "solmate/=lib/solmate/src/",
     "solidity-stringutils/=lib/solidity-stringutils/",
-    "@uniswap/v3-core/=lib/v3-core/contracts/",
-    "@uniswap/v3-periphery/=lib/v3-periphery/contracts/",
     "openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
     "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",

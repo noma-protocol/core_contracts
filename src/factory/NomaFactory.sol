@@ -4,8 +4,8 @@ pragma solidity ^0.8.0;
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import { IUniswapV3Factory } from "@uniswap/v3-core/interfaces/IUniswapV3Factory.sol";
-import { IUniswapV3Pool } from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
+import { IUniswapV3Factory } from "v3-core/interfaces/IUniswapV3Factory.sol";
+import { IUniswapV3Pool } from "v3-core/interfaces/IUniswapV3Pool.sol";
 import { VaultDescription } from "../types/Types.sol";
 
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
@@ -623,7 +623,7 @@ contract NomaFactory {
                 );
     }
 
-    function teamMultisig() public view returns (address) {
+    function teamMultiSig() public view returns (address) {
         return teamMultisigAddress;
     }
 

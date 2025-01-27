@@ -3,9 +3,9 @@
 pragma solidity ^0.8.0;
 
 import {Logarithm} from "./Logarithm.sol";
-import {IUniswapV3Pool} from '@uniswap/v3-core/interfaces/IUniswapV3Pool.sol';
-import {FullMath} from '@uniswap/v3-core/libraries/FullMath.sol';
-import {TickMath} from '@uniswap/v3-core/libraries/TickMath.sol';
+import {IUniswapV3Pool} from 'v3-core/interfaces/IUniswapV3Pool.sol';
+import {FullMath} from 'v3-core/libraries/FullMath.sol';
+import {TickMath} from 'v3-core/libraries/TickMath.sol';
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 

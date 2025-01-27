@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
+import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {OwnableUninitialized} from "../abstract/OwnableUninitialized.sol";
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
 import {VaultStorage} from "../libraries/LibAppStorage.sol";

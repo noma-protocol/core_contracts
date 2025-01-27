@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import "solmate/utils/FixedPointMathLib.sol";
-import { IUniswapV3Pool } from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
+import { IUniswapV3Pool } from "v3-core/interfaces/IUniswapV3Pool.sol";
 
 interface IERC20 { 
     function decimals() external view returns (uint8);
