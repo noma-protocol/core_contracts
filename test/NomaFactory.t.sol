@@ -49,13 +49,6 @@ contract NomaFactoryTest is Test {
 
     ContractInfo[] private expectedAddressesInResolver;
 
-    uint256[4] thresholds = [
-        uint256(5e17),
-        uint256(9e17),
-        uint256(1e18),
-        uint256(2e18)
-    ];
-
     function setUp() public {
         vm.prank(deployer);
 
@@ -73,10 +66,7 @@ contract NomaFactoryTest is Test {
             ContractInfo("Resolver", address(resolver))
         );  
 
-        adaptiveSupply = new AdaptiveSupply(
-            address(modelHelper),
-            thresholds // Low, Medium, High, Extreme thresholds
-        );
+        adaptiveSupply = new AdaptiveSupply();
 
         expectedAddressesInResolver.push(
             ContractInfo("AdaptiveSupply", address(adaptiveSupply))
@@ -93,8 +83,7 @@ contract NomaFactoryTest is Test {
             uniswapFactory,
             address(resolver),
             address(deploymentFactory),
-            address(extFactory),
-            false
+            address(extFactory)
         );
 
         expectedAddressesInResolver.push(
