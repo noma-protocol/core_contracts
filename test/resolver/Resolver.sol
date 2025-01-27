@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "../../src/abstract/OwnableUninitialized.sol";
-import "../../src/libraries/LibAppStorage.sol";
+import {IAddressResolver} from "../../src/interfaces/IAddressResolver.sol";
 
 contract TestResolver is OwnableUninitialized {
     IAddressResolver resolver;
@@ -11,6 +11,7 @@ contract TestResolver is OwnableUninitialized {
     mapping(bytes32 => address) private repository;
     mapping(bytes32 => uint256) private uintSettings;
     mapping(address => bool) private deployerACL;
+    mapping(address => mapping(bytes32 => address)) private vaultAddressCache;
 
     error InvalidAddress();
     error InputLengthsMismatch();
@@ -34,6 +35,20 @@ contract TestResolver is OwnableUninitialized {
             bytes32 name = names[i];
             address destination = destinations[i];
             repository[name] = destination;
+            emit AddressImported(name, destination);
+        }
+    }
+    
+    function importVaultAddress(
+        address _vault, bytes32[] calldata names, 
+        address[] calldata destinations
+    ) external onlyFactoryOrManager {
+        if (names.length != destinations.length) revert InputLengthsMismatch();
+
+        for (uint256 i = 0; i < names.length; i++) {
+            bytes32 name = names[i];
+            address destination = destinations[i];
+            vaultAddressCache[_vault][name] = destination;
             emit AddressImported(name, destination);
         }
     }
