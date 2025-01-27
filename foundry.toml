@@ -2,8 +2,8 @@
 src = "src"
 out = "out"
 libs = ["lib"]
-skip_dependencies = true
 fs_permissions = [{ access = "read", path = "./"}]
+auto_detect_remappings = false
 
 remappings = [
     "ds-test/=lib/forge-std/lib/ds-test/src/",
