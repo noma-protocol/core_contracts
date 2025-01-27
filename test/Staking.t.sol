@@ -11,8 +11,6 @@ contract TestStaking is Test {
     GonsToken sNOMA;
     TestMockNomaToken NOMA;
 
-    address authority = address(0x1);
-    address vault = address(0x1b26D84372D1F8699a3a71801B4CA757B95C9929);
     address[] users;
     uint256 constant NUM_USERS = 100;
     uint256 constant INITIAL_NOMA_BALANCE = 1000e18;
@@ -31,10 +29,9 @@ contract TestStaking is Test {
 
         sNOMA = new GonsToken(address(this));
         vm.prank(deployer);
-        staking = new Staking(address(NOMA), address(sNOMA), authority);
+        staking = new Staking(address(NOMA), address(sNOMA), address(this));
 
         sNOMA.initialize(address(staking));
-        // staking.setup(vault, address(NOMA), address(sNOMA));
 
         // Create users and give them NOMA tokens
         for (uint i = 0; i < NUM_USERS; i++) {
@@ -363,5 +360,9 @@ contract TestStaking is Test {
 
     function _randomAmount(uint256 min, uint256 max) internal view returns (uint256) {
         return min + (uint256(keccak256(abi.encodePacked(block.timestamp, block.prevrandao))) % (max - min + 1));
+    }    
+
+    function stakingEnabled() public returns (bool) {
+        return true;
     }    
 }
