@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import "solmate/utils/FixedPointMathLib.sol";
-import "../../libraries/SafeMathInt.sol";
+import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
+import {SafeMathInt} from "../../libraries/SafeMathInt.sol";
 
-import { IUniswapV3Pool } from "v3-core/interfaces/IUniswapV3Pool.sol";
-import { RewardParams } from "../../types/Types.sol";
+import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
+import {RewardParams} from "../../types/Types.sol";
 
 interface IERC20 { 
     function decimals() external view returns (uint8);

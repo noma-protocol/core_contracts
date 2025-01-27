@@ -7,12 +7,10 @@ import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 import {TickMath} from 'v3-core/libraries/TickMath.sol';
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-import {Uniswap} from "../libraries/Uniswap.sol";
 import {Conversions} from "../libraries/Conversions.sol";
 import {DecimalMath} from "../libraries/DecimalMath.sol";
 
 import {Underlying} from "../libraries/Underlying.sol";
-import {Utils} from "../libraries/Utils.sol";
 import { IVault } from "../interfaces/IVault.sol";
 
 import {

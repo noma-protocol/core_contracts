@@ -11,8 +11,6 @@ import {
     LiquidityStructureParameters
 }  from "../types/Types.sol";
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
-import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import { Deployer } from "../Deployer.sol";
 
 /**
  * @notice Storage structure for vault-related information.

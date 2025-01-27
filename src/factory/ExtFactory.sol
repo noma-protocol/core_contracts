@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import { GonsToken } from "../staking/Gons.sol";
 import { Staking } from "../staking/Staking.sol";
 import { IAddressResolver }  from "../interfaces/IAddressResolver.sol";
-import "../libraries/Utils.sol";
+import {Utils} from "../libraries/Utils.sol";
 
 contract ExtFactory {
     event DeployerCreated(address deployerAddress);

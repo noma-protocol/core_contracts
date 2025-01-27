@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import {Utils} from "../libraries/Utils.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../interfaces/IsNomaToken.sol";
-import "../interfaces/IVault.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IsNomaToken} from "../interfaces/IsNomaToken.sol";
+import {IVault} from "../interfaces/IVault.sol";
 
 contract Staking {
     using SafeERC20 for IERC20;

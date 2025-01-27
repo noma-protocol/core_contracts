@@ -5,7 +5,6 @@ import { ExtVault } from "../ExtVault.sol";
 
 import { IDiamondCut } from "../../interfaces/IDiamondCut.sol";
 import { IFacet } from "../../interfaces/IFacet.sol";
-import { IDiamond } from "../../interfaces/IDiamond.sol";
 
 interface IDiamondInterface {
     function initialize() external;

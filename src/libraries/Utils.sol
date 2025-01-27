@@ -1,12 +1,12 @@
 
-import "./Conversions.sol";
-
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import {
     tickSpacing
 } from "../types/Types.sol";
+
+import {Conversions} from "./Conversions.sol";
 
 library Utils {
     
@@ -119,7 +119,7 @@ library Utils {
     function strToUint(string memory s) public pure returns (uint256) {
        bytes memory b = bytes(s);
         uint256 result = 0;
-        for (uint i = 0; i < b.length; i++) {
+        for (uint256 i = 0; i < b.length; i++) {
             if (b[i] >= 0x30 && b[i] <= 0x39) { // 0x30 is '0' and 0x39 is '9'
                 result = result * 10 + (uint8(b[i]) - 0x30);
             } else {
@@ -161,7 +161,7 @@ library Utils {
     function bytesToString(bytes memory byteData) internal pure returns (string memory) {
         bytes memory stringBytes = new bytes(byteData.length);
 
-        for (uint i=0; i<byteData.length; i++) {
+        for (uint256 i=0; i<byteData.length; i++) {
             stringBytes[i] = byteData[i];
         }
 
@@ -189,8 +189,8 @@ library Utils {
         }
     }
 
-    function abs(int x) pure private returns (uint) {
-        return uint(x >= 0 ? x : -x);
+    function abs(int256 x) pure private returns (uint256) {
+        return uint256(x >= 0 ? x : -x);
     } 
 
     // TICK CALCULATION FUNCTIONS

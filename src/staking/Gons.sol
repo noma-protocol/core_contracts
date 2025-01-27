@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import "../libraries/SafeMath.sol";
-import "../types/ERC20Permit.sol";
+import {SafeMath} from "../libraries/SafeMath.sol";
+import {ERC20, ERC20Permit} from "../abstract/ERC20Permit.sol";
 
 error AlreadyInitialized();
 error InvalidAmount();

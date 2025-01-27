@@ -98,6 +98,11 @@ struct LiquidityStructureParameters {
     uint256 shiftRatio;
     uint256 slideRatio;
     int24 discoveryBips;
+    int24 shiftAnchorUpperBips;
+    int24 slideAnchorUpperBips;
+    uint256 lowBalanceThresholdFactor;
+    uint256 highBalanceThresholdFactor;
+    uint256 inflationFee;
 }
 
 /// @notice Parameters for a shift operation.

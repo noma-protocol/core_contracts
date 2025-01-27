@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { IModelHelper } from "../interfaces/IModelHelper.sol";
-import { IDeployer } from "../interfaces/IDeployer.sol";
 import { LiquidityOps } from "../libraries/LiquidityOps.sol";
 import {
-    LiquidityStructureParameters,
     LiquidityPosition, 
     ProtocolAddresses
 } from "../types/Types.sol";
