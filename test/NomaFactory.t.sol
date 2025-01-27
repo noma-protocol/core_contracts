@@ -129,7 +129,12 @@ contract NomaFactoryTest is Test {
             [200, 500], // Floor bips
             90e16, // Shift liquidity ratio
             120e16, // Slide liquidity ratio
-            25000 // Discovery bips
+            25000, // Discovery bips
+            10, // shiftAnchorUpperBips
+            300, // slideAnchorUpperBips
+            100, // lowBalanceThresholdFactor
+            100, // highBalanceThresholdFactor
+            5e15 // inflationFee
         );
 
         vm.prank(deployer);
@@ -235,7 +240,12 @@ contract NomaFactoryTest is Test {
             [200, 500], // Floor bips
             90e16, // Shift liquidity ratio
             120e16, // Slide liquidity ratio
-            25000 // Discovery bips
+            25000, // Discovery bips
+            10, // shiftAnchorUpperBips
+            300, // slideAnchorUpperBips
+            100, // lowBalanceThresholdFactor
+            100, // highBalanceThresholdFactor
+            0.005e18 // inflationFee
         );
 
         vm.prank(deployer);

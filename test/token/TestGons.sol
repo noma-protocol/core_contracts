@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 import "../../src/libraries/SafeMath.sol";
-import "../../src/types/ERC20Permit.sol";
+import "../../src/abstract/ERC20Permit.sol";
 
 contract TestGons is ERC20Permit {
     using SafeMath for uint256;
