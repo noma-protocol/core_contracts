@@ -2,6 +2,7 @@
 pragma solidity ^0.8.23;
 
 import "solmate/utils/FixedPointMathLib.sol";
+import "../../libraries/SafeMathInt.sol";
 import { IUniswapV3Pool } from "v3-core/interfaces/IUniswapV3Pool.sol";
 
 interface IERC20 { 
@@ -14,7 +15,7 @@ interface IVault{
 
 contract AdaptiveSupply {
     using FixedPointMathLib for uint256;
-    using FixedPointMathLib for int256;
+    using SafeMathInt for int256;
 
     function calculateVolatilityAdjustment(uint256 volatility) internal pure returns (uint256) {
         uint256 kv = 1e18;
