@@ -2,9 +2,11 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
+import {stdJson} from "forge-std/StdJson.sol";
+
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../src/interfaces/IVault.sol";
-import {IUniswapV3Pool} from "@uniswap/v3-core/interfaces/IUniswapV3Pool.sol";
+import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {MockNomaToken} from  "../src/token/MockNomaToken.sol";
 import {ModelHelper} from  "../src/model/Helper.sol";
 import {BaseVault} from  "../src/vault/BaseVault.sol";
@@ -28,16 +30,18 @@ interface IDOManager {
     function modelHelper() external view returns (address);
 }
 
+struct ContractAddressesJson {
+    address IDOHelper;
+    address ModelHelper;
+    address Proxy;
+}
+
 contract LendingVaultTest is Test {
+    using stdJson for string;
+
     IVault vault;
     IERC20 token0;
     IERC20 token1;
-
-    address WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
-    address payable idoManager = payable(0x7D6Cb1678d761C100566eC1D25ceC421e4F3A0a7);
-    address nomaToken = 0x4BD7E04d90E59ecb3F84EaFF3a2F1f87e463ee9D;
-    address modelHelperContract = 0x0E90A3D616F9Fe2405325C3a7FB064837817F45F;
-    address vaultAddress;
 
     uint256 MAX_INT = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
     uint256 SECONDS_IN_DAY = 86400;
@@ -48,7 +52,35 @@ contract LendingVaultTest is Test {
     MockNomaToken private noma;
     ModelHelper private modelHelper;
 
+    address WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
+    address payable idoManager;
+    address nomaToken;
+    address modelHelperContract;
+    address vaultAddress;
+
     function setUp() public {
+        // Define the file path
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/deploy_helper/out/out.json");
+
+        // Read the JSON file
+        string memory json = vm.readFile(path);
+
+        string memory networkId = "1337";
+        // Parse the data for network ID `1337`
+        bytes memory data = vm.parseJson(json, string.concat(string("."), networkId));
+
+        // Decode the data into the ContractAddresses struct
+        ContractAddressesJson memory addresses = abi.decode(data, (ContractAddressesJson));
+        
+        // Log parsed addresses for verification
+        console2.log("Model Helper Address:", addresses.ModelHelper);
+
+        // Extract addresses from JSON
+        idoManager = payable(addresses.IDOHelper);
+        nomaToken = addresses.Proxy;
+        modelHelperContract = addresses.ModelHelper;
+        
         IDOManager managerContract = IDOManager(idoManager);
         require(address(managerContract) != address(0), "Manager contract address is zero");
 
