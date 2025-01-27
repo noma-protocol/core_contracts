@@ -10,10 +10,8 @@ import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {Conversions} from "../libraries/Conversions.sol";
-import {DecimalMath} from "../libraries/DecimalMath.sol";
 import {Utils} from "../libraries/Utils.sol";
 import {Uniswap} from "../libraries/Uniswap.sol";
-import {LiquidityDeployer} from "../libraries/LiquidityDeployer.sol";
 import {IVault} from "../interfaces/IVault.sol";
 import {TickMath} from 'v3-core/libraries/TickMath.sol';
 
@@ -21,7 +19,6 @@ import {
     LiquidityPosition, 
     LiquidityType,
     ProtocolAddresses,
-    LiquidityStructureParameters,
     RewardParams,
     LiquidityInternalPars
 } from "../types/Types.sol";
@@ -357,21 +354,6 @@ contract StakingVault is BaseVault {
         );
     }
 
-
-    function setFees(
-        uint256 _feesAccumulatedToken0, 
-        uint256 _feesAccumulatedToken1
-    ) public onlyInternalCalls {
-
-        _v.feesAccumulatorToken0 += _feesAccumulatedToken0;
-        _v.feesAccumulatorToken1 += _feesAccumulatedToken1;
-    }
-
-    function getLiquidityStructureParameters() public view returns 
-    (LiquidityStructureParameters memory ) {
-        return _v.liquidityStructureParameters;
-    }
-
     function rewardsCalculator() public view returns (address) {
         return _v.resolver
         .requireAndGetAddress("RewardsCalculator", "No rewards calculator");
@@ -390,13 +372,11 @@ contract StakingVault is BaseVault {
     }
 
     function getFunctionSelectors() external pure  override returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](6);
+        bytes4[] memory selectors = new bytes4[](4);
         selectors[0] = bytes4(keccak256(bytes("mintAndDistributeRewards((address,address,address,address,address))"))); 
-        selectors[1] = bytes4(keccak256(bytes("getLiquidityStructureParameters()")));  
-        selectors[2] = bytes4(keccak256(bytes("setStakingContract(address)")));
-        selectors[3] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));
-        selectors[4] = bytes4(keccak256(bytes("getStakingContract()")));
-        selectors[5] = bytes4(keccak256(bytes("stakingEnabled()")));
+        selectors[1] = bytes4(keccak256(bytes("setStakingContract(address)")));
+        selectors[2] = bytes4(keccak256(bytes("getStakingContract()")));
+        selectors[3] = bytes4(keccak256(bytes("stakingEnabled()")));
         return selectors;
     }
 }

@@ -3,20 +3,18 @@ pragma solidity ^0.8.0;
 
 import {BaseVault} from "./BaseVault.sol";
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
-import {LiquidityOps} from "../libraries/LiquidityOps.sol";
 
-import "../libraries/Conversions.sol";
-import "../libraries/DecimalMath.sol";
-import "../libraries/Utils.sol";
-import "../libraries/Uniswap.sol";
-import "../libraries/LiquidityDeployer.sol";
-import "../libraries/Underlying.sol";
+import {DecimalMath} from "../libraries/DecimalMath.sol";
+import {Uniswap} from "../libraries/Uniswap.sol";
+import {LiquidityDeployer} from "../libraries/LiquidityDeployer.sol";
+
+import {IVault} from "../interfaces/IVault.sol";
 
 import {
     LiquidityPosition, 
     LiquidityType,
-    ProtocolAddresses,
-    LoanPosition
+    LoanPosition,
+    LiquidityStructureParameters
 } from "../types/Types.sol";
 
 interface IERC20 {
@@ -206,13 +204,27 @@ contract LendingVault is BaseVault {
         return INomaFactory(_v.factory).teamMultiSig();
     }
 
+    function setFees(
+        uint256 _feesAccumulatedToken0, 
+        uint256 _feesAccumulatedToken1
+    ) public onlyInternalCalls {
+
+        _v.feesAccumulatorToken0 += _feesAccumulatedToken0;
+        _v.feesAccumulatorToken1 += _feesAccumulatedToken1;
+    }
+
+    function getLiquidityStructureParameters() public view returns 
+    (LiquidityStructureParameters memory ) {
+        return _v.liquidityStructureParameters;
+    }
+
     modifier onlyVault() {
         if (msg.sender != address(this)) revert OnlyVault();
         _;
     }
 
     function getFunctionSelectors() external pure override returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](7);
+        bytes4[] memory selectors = new bytes4[](9);
         selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,uint256)")));    
         selectors[1] = bytes4(keccak256(bytes("paybackLoan(address)")));
         selectors[2] = bytes4(keccak256(bytes("rollLoan(address)")));
@@ -220,6 +232,8 @@ contract LendingVault is BaseVault {
         selectors[4] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256)[3])")));
         selectors[5] = bytes4(keccak256(bytes("getPositions()")));
         selectors[6] = bytes4(keccak256(bytes("teamMultiSig()")));
+        selectors[7] = bytes4(keccak256(bytes("getLiquidityStructureParameters()")));  
+        selectors[8] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));
         return selectors;
     }
 }
