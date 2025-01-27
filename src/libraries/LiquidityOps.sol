@@ -4,7 +4,6 @@
 pragma solidity ^0.8.0;
 
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
-import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 import {TickMath} from 'v3-core/libraries/TickMath.sol';
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
@@ -267,9 +266,10 @@ library LiquidityOps {
                 }),
                 LiquidityInternalPars({
                     lowerTick: newPositions[0].upperTick,
-                        upperTick: Utils.addBipsToTick(
+                    upperTick: Utils.addBipsToTick(
                         TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                        10,
+                        IVault(address(this))
+                        .getLiquidityStructureParameters().shiftAnchorUpperBips,
                         decimals
                     ),
                     amount1ToDeploy: (params.anchorToken1Balance + params.discoveryToken1Balance) - params.toSkim,
@@ -290,7 +290,8 @@ library LiquidityOps {
                     lowerTick: newPositions[1].upperTick + tickSpacing,
                     upperTick: Utils.addBipsToTick(
                         TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                        IVault(address(this)).getLiquidityStructureParameters().discoveryBips,
+                        IVault(address(this))
+                        .getLiquidityStructureParameters().discoveryBips,
                         decimals
                     ),
                     amount1ToDeploy: 0,
@@ -368,14 +369,15 @@ library LiquidityOps {
                 positions[2].upperTick
             ); 
 
-            //Slide anchor position TODO remove hardcoded
+            //Slide anchor position
             newPositions[1] = reDeploy(
                 addresses,
                 LiquidityInternalPars({
                     lowerTick: positions[0].upperTick,
                     upperTick: Utils.addBipsToTick(
                         TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                        300,
+                        IVault(address(this)).getLiquidityStructureParameters()
+                        .slideAnchorUpperBips,
                         decimals
                     ),
                     amount1ToDeploy: anchorToken1Balance,
@@ -396,7 +398,8 @@ library LiquidityOps {
                     lowerTick: newPositions[1].upperTick + tickSpacing,
                     upperTick: Utils.addBipsToTick(
                         TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                        IVault(address(this)).getLiquidityStructureParameters().discoveryBips,
+                        IVault(address(this)).getLiquidityStructureParameters()
+                        .discoveryBips,
                         decimals
                     ),
                     amount1ToDeploy: 0,
@@ -450,7 +453,7 @@ library LiquidityOps {
             
             (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(addresses.pool).slot0();
 
-            if (balanceToken0 < circulatingSupply / 100) {
+            if (balanceToken0 < circulatingSupply / IVault(address(this)).getLiquidityStructureParameters().lowBalanceThresholdFactor) {
                 if (isShift) {
                     // Mint unbacked supply
                     (uint256 mintAmount) = IAdaptiveSupply(
@@ -468,8 +471,8 @@ library LiquidityOps {
                     );
 
                     if (mintAmount == 0 || mintAmount > totalSupply) {
-                        // Fallback to minting 1% of circulating supply
-                        mintAmount = circulatingSupply / 100;
+                        // Fallback to minting a % of circulating supply
+                        mintAmount = circulatingSupply / IVault(address(this)).getLiquidityStructureParameters().lowBalanceThresholdFactor;
                     }
 
                     IVault(address(this))
@@ -483,7 +486,7 @@ library LiquidityOps {
                     if (teamMultisig != address(0)) {
                         IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).transfer(
                             teamMultisig, 
-                            mintAmount - (mintAmount * 5 / 1000)
+                            mintAmount - (mintAmount * (IVault(address(this)).getLiquidityStructureParameters().inflationFee / 1e18))
                         );
                     }
 
@@ -491,7 +494,7 @@ library LiquidityOps {
             }
         
             // TODO add check balance before minting
-            if (balanceToken0 >= circulatingSupply / 100) {
+            if (balanceToken0 >= circulatingSupply / IVault(address(this)).getLiquidityStructureParameters().highBalanceThresholdFactor) {
                     if (!isShift) {
     
                         IVault(address(this))
@@ -502,7 +505,7 @@ library LiquidityOps {
                         IVault(address(this))
                         .mintTokens(
                             address(this),
-                            circulatingSupply / 100
+                            circulatingSupply / IVault(address(this)).getLiquidityStructureParameters().highBalanceThresholdFactor
                         );   
                 }                
             }
@@ -511,18 +514,14 @@ library LiquidityOps {
             balanceToken0 = IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).balanceOf(address(this));
             
             if (balanceToken0 == 0) {
-                // Fallback to minting 1% of circulating supply
+                // Fallback to minting a % of circulating supply
                 IVault(address(this))
                 .mintTokens(
                     address(this),
-                    circulatingSupply / 100
+                    circulatingSupply / IVault(address(this)).getLiquidityStructureParameters().lowBalanceThresholdFactor
                 );
 
                 balanceToken0 = IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).balanceOf(address(this));
-
-                if (balanceToken0 == 0) {
-                    revert BalanceToken0();
-                }
             }
 
         }
