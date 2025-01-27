@@ -15,7 +15,6 @@ contract TestRebase is Test {
     address userB = address(0x2);
     address userC = address(0x3);
     address userD = address(0x4);
-    address vault = address(0x1b26D84372D1F8699a3a71801B4CA757B95C9929);
 
     uint256 INITIAL_SUPPLY = 1_000e18;
 
@@ -463,6 +462,10 @@ contract TestRebase is Test {
             console.log("Rebase failed with no reason string");
             assertTrue(false, "Rebase should not revert");
         }
+    }
+
+    function stakingEnabled() public returns (bool) {
+        return true;
     }
 }
 
