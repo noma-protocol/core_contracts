@@ -9,10 +9,10 @@
 	url = https://github.com/openzeppelin/openzeppelin-contracts
 [submodule "lib/v3-core"]
 	path = lib/v3-core
-	url = https://github.com/uniswap/v3-core
+	url = https://github.com/noma-protocol/v3-core
 [submodule "lib/v3-periphery"]
 	path = lib/v3-periphery
-	url = https://github.com/uniswap/v3-periphery
+	url = https://github.com/noma-protocol/v3-periphery
 [submodule "lib/abdk-libraries-solidity"]
 	path = lib/abdk-libraries-solidity
 	url = https://github.com/abdk-consulting/abdk-libraries-solidity
