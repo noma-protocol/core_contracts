@@ -9,7 +9,7 @@ Built with [Foundry](https://github.com/foundry-rs/foundry) ❤️
 To install all dependencies and build the contracts run the following commands:
 
 ```console
-foo@bar:~$ ./install_deps.sh
+foo@bar:~/core_contracts$ ./install_deps.sh
 ```
 
 ## Local testing
@@ -17,7 +17,7 @@ foo@bar:~$ ./install_deps.sh
 1) Use anvil to fork the Arbitrum mainnet blockchain. Replace the fork-url with your rpc node. Do not forget the mnemonic phrase.
 
 ```console
-foo@bar:~$ anvil --balance 10000000000 --fork-url https://arb-mainnet.g.alchemy.com/v2/DeadBeefDeadBeefDeadBeef \
+foo@bar:~/core_contracts$ anvil --balance 10000000000 --fork-url https://arb-mainnet.g.alchemy.com/v2/DeadBeefDeadBeefDeadBeef \
 --accounts 2 -m "example some key phrase generated randomly you wish to use  goes here" --chain-id=1337 --port 8545
 ```
 
@@ -49,7 +49,7 @@ Private Keys
 3) Deploy contracts locally on the forked blockchain with the following command:
 
 ```console
-foo@bar:~$ ./deploy.sh 
+foo@bar:~/core_contracts$ ./deploy.sh 
 ```
 
 ## Testing
@@ -57,6 +57,6 @@ foo@bar:~$ ./deploy.sh
 Run tests with the following command:
 
 ```console
-foo@bar:~$ forge test --rpc-url http://localhost:8545
+foo@bar:~/core_contracts$ forge test --rpc-url http://localhost:8545
 ``` 
 
