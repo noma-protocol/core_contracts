@@ -52,11 +52,6 @@ error OnlyVaultsError();
 error NotAuthorityError();
 
 /**
- * @dev Thrown when the deployment of a token contract fails.
- */
-error TokenDeployFailedError();
-
-/**
  * @dev Thrown when an invalid token address is encountered, such as when the token address is greater than or equal to the paired token address.
  */
 error InvalidTokenAddressError();
@@ -70,11 +65,6 @@ error SupplyTransferError();
  * @dev Thrown when attempting to deploy a token that has already been deployed.
  */
 error TokenAlreadyExistsError();
-
-/**
- * @dev Thrown when an operation is attempted that requires only one vault, but multiple vaults are present.
- */
-error OnlyOneVaultError();
 
 /**
  * @dev Thrown when a token's symbol is invalid, such as being empty or not recognized.
@@ -298,8 +288,6 @@ contract NomaFactory {
             );
             nonce++;
         } while (address(proxy) >= _token1);
-
-        // _nomaToken.initialize(authority, _totalSupply, _name, _symbol, address(resolver));
 
         if (address(proxy) >= _token1) revert InvalidTokenAddressError();
 
