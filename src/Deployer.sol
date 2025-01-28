@@ -58,7 +58,7 @@ contract Deployer is Ownable {
     address private factory;
 
     /// @notice Address of the address resolver contract.
-    address private resolver;
+    address private immutable resolver;
 
     /// @notice Lock state for reentrancy protection.
     bool private locked;
@@ -90,10 +90,13 @@ contract Deployer is Ownable {
     /// @dev Error thrown when a callback is made by an unauthorized address.
     error CallBackCaller();
 
+    event Initialized();
+
     /// @notice Initializes the contract with the owner and resolver addresses.
-    /// @param _owner Address of the contract owner.
+    /// @param _ownerAddress Address of the contract owner.
     /// @param _resolver Address of the address resolver.
-    constructor(address _owner, address _resolver) Ownable(_owner) {
+    constructor(address _ownerAddress, address _resolver) Ownable(_ownerAddress) {
+        if (_resolver == address(0)) revert NotDeployed();
         resolver = _resolver;
     }
 
@@ -108,13 +111,25 @@ contract Deployer is Ownable {
         address _vault,
         address _pool,
         address _modelHelper
-    ) public onlyOwner lock {
+    ) public onlyOwner {
+        if (
+            _factory == address(0)    || 
+            _vault == address(0)      || 
+            _pool == address(0)       || 
+            _modelHelper == address(0)
+            ) {
+            revert NotDeployed();
+        }
         factory = _factory;
         pool = IUniswapV3Pool(_pool);
         vault = _vault;
         token0 = pool.token0();
         token1 = pool.token1();
+
+
         modelHelper = _modelHelper;
+        initialized = true;
+        emit Initialized();
     }
 
     /// @notice Callback function called by Uniswap V3 during mint operations.
@@ -150,7 +165,7 @@ contract Deployer is Ownable {
     /// @notice Deploys a floor liquidity position.
     /// @param _floorPrice The target floor price.
     /// @param _amount0 The amount of token0 to allocate.
-    function deployFloor(uint256 _floorPrice, uint256 _amount0) public onlyFactory {
+    function deployFloor(uint256 _floorPrice, uint256 _amount0) public lock onlyFactory {
         (LiquidityPosition memory newPosition, ) = DeployHelper.deployFloor(
             pool, 
             vault, 
@@ -167,7 +182,7 @@ contract Deployer is Ownable {
     /// @param _bipsBelowSpot Basis points below the spot price.
     /// @param _bipsWidth Width of the position in basis points.
     /// @param _amount0 Amount of token0 to allocate.
-    function deployAnchor(uint256 _bipsBelowSpot, uint256 _bipsWidth, uint256 _amount0) public onlyFactory {
+    function deployAnchor(uint256 _bipsBelowSpot, uint256 _bipsWidth, uint256 _amount0) public lock onlyFactory {
         (LiquidityPosition memory newPosition,) = LiquidityDeployer.deployAnchor(
             address(pool),
             vault,
@@ -190,7 +205,7 @@ contract Deployer is Ownable {
     /// @param _upperDiscoveryPrice The upper discovery price.
     /// @return newPosition The deployed liquidity position.
     /// @return liquidityType The type of liquidity deployed.
-    function deployDiscovery(uint256 _upperDiscoveryPrice) public onlyFactory returns (
+    function deployDiscovery(uint256 _upperDiscoveryPrice) public lock onlyFactory returns (
         LiquidityPosition memory newPosition, 
         LiquidityType liquidityType
     ) {
@@ -210,7 +225,7 @@ contract Deployer is Ownable {
     /**
      * @notice Deploys a new liquidity position on Uniswap V3.
      * @dev This function interacts with the LiquidityDeployer library to create a new liquidity position.
-     * @param pool The address of the Uniswap V3 pool where the liquidity will be deployed.
+     * @param _pool The address of the Uniswap V3 pool where the liquidity will be deployed.
      * @param receiver The address that will receive the liquidity position.
      * @param lowerTick The lower tick range for the liquidity position.
      * @param upperTick The upper tick range for the liquidity position.
@@ -219,7 +234,7 @@ contract Deployer is Ownable {
      * @return newPosition The newly deployed liquidity position.
      */
     function deployPosition(
-        address pool,
+        address _pool,
         address receiver,
         int24 lowerTick,
         int24 upperTick,
@@ -231,7 +246,7 @@ contract Deployer is Ownable {
     ) {
         return LiquidityDeployer
         ._deployPosition(
-            pool,
+            _pool,
             receiver,
             lowerTick,
             upperTick,
@@ -275,29 +290,23 @@ contract Deployer is Ownable {
     /**
      * @notice Calculates the new floor price after a liquidity adjustment.
      * @dev This function computes the floor price based on the provided parameters.
-     * @param _pool The address of the Uniswap V3 pool.
      * @param toSkim The amount of token1 to skim from the pool for floor liquidity.
      * @param floorNewToken1Balance The new balance of token1 for the floor position.
      * @param circulatingSupply The circulating supply of tokens.
-     * @param anchorCapacity The capacity of the anchor liquidity position.
      * @param positions An array containing the existing liquidity positions (floor, anchor, discovery).
      * @return newFloorPrice The calculated new floor price.
      */
     function computeNewFloorPrice(
-        address _pool,
         uint256 toSkim,
         uint256 floorNewToken1Balance,
         uint256 circulatingSupply,
-        uint256 anchorCapacity,
         LiquidityPosition[3] memory positions
-    ) external view returns (uint256 newFloorPrice) {
+    ) external pure returns (uint256 newFloorPrice) {
         return LiquidityDeployer
         .computeNewFloorPrice(
-            _pool,
             toSkim,
             floorNewToken1Balance,
             circulatingSupply,
-            anchorCapacity,
             positions
         );
     }
