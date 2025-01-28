@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 import { IUniswapV3Factory } from "v3-core/interfaces/IUniswapV3Factory.sol";
 import { IUniswapV3Pool } from "v3-core/interfaces/IUniswapV3Pool.sol";
@@ -23,72 +24,7 @@ import {
     LiquidityStructureParameters
 } from "../types/Types.sol";
 
-/**
- * @title IVaultUpgrade
- * @notice Interface for initiating and finalizing vault upgrades.
- */
-interface IVaultUpgrade {
-    /**
-     * @notice Initiates the upgrade process for a vault.
-     * @param diamond The address of the diamond contract to be upgraded.
-     * @param _vaultUpgradeFinalize The address of the contract responsible for finalizing the upgrade.
-     */
-    function doUpgradeStart(address diamond, address _vaultUpgradeFinalize) external;
-
-    /**
-     * @notice Finalizes the upgrade process for a vault.
-     * @param diamond The address of the diamond contract that has been upgraded.
-     */
-    function doUpgradeFinalize(address diamond) external;
-}
-
-/**
- * @title IEtchVault
- * @notice Interface for pre-deploying a vault.
- */
-interface IEtchVault {
-    /**
-     * @notice Pre-deploys a vault using the provided resolver.
-     * @param _resolver The address of the resolver contract.
-     * @return vaultAddress The address of the pre-deployed vault.
-     * @return vaultUpgrade The address of the associated vault upgrade contract.
-     */
-    function preDeployVault(address _resolver) external returns (address vaultAddress, address vaultUpgrade);
-}
-
-/**
- * @title IExtFactory
- * @notice Interface for deploying auxiliary contracts related to a vault.
- */
-interface IExtFactory {
-    /**
-     * @notice Deploys all necessary auxiliary contracts for a vault.
-     * @param deployerAddress The address of the deployer initiating the process.
-     * @param vaultAddress The address of the vault for which auxiliary contracts are being deployed.
-     * @param token0 The address of the primary token associated with the vault.
-     * @return auxiliaryContract1 The address of the first auxiliary contract deployed.
-     * @return auxiliaryContract2 The address of the second auxiliary contract deployed.
-     */
-    function deployAll(
-        address deployerAddress,
-        address vaultAddress,
-        address token0
-    ) external returns (address auxiliaryContract1, address auxiliaryContract2);
-}
-
-/**
- * @title IDeployerFactory
- * @notice Interface for deploying a Deployer contract.
- */
-interface IDeployerFactory {
-    /**
-     * @notice Deploys a new Deployer contract.
-     * @param owner The address designated as the owner of the new Deployer contract.
-     * @param resolver The address of the resolver contract to be associated with the Deployer.
-     * @return deployer The address of the newly deployed Deployer contract.
-     */
-    function deployDeployer(address owner, address resolver) external returns (address deployer);
-}
+import {IVaultUpgrade, IEtchVault, IExtFactory, IDeployerFactory} from "../interfaces/IVaultUpgrades.sol";
 
 /**
  * @title IERC20
@@ -102,6 +38,7 @@ interface IERC20 {
      */
     function mint(address to, uint256 amount) external;
     function burn(address from, uint256 amount) external;
+    function totalSupply() external view returns (uint256);
 }
 
 /**
@@ -144,6 +81,8 @@ error OnlyOneVaultError();
  */
 error InvalidSymbol();
 
+error ZeroAddressError();
+
 /**
  * @title NomaFactory
  * @notice This contract facilitates the deployment and management of Noma Vaults, including associated tokens and liquidity pools.
@@ -155,7 +94,7 @@ contract NomaFactory {
     IAddressResolver resolver;
     Deployer deployer;
 
-    address deploymentFactory;
+    address deployerFactory;
     address extFactory;
     address authority;
     address uniswapV3Factory;
@@ -177,19 +116,26 @@ contract NomaFactory {
      * @notice Constructor to initialize the NomaFactory contract.
      * @param _uniswapV3Factory The address of the Uniswap V3 Factory contract.
      * @param _resolver The address of the Address Resolver contract.
-     * @param _deploymentFactory The address of the Deployment Factory contract.
+     * @param _deployerFactory The address of the Deployment Factory contract.
      * @param _extFactory The address of the External Factory contract.
      */
     constructor(
         address _uniswapV3Factory,
         address _resolver,
-        address _deploymentFactory,
+        address _deployerFactory,
         address _extFactory
     ) {
+        if (
+            _uniswapV3Factory == address(0) || 
+            _resolver == address(0)         || 
+            _deployerFactory == address(0)  || 
+            _extFactory == address(0)
+        ) revert ZeroAddressError();
+
         authority = msg.sender;
         uniswapV3Factory = _uniswapV3Factory;
         resolver = IAddressResolver(_resolver);
-        deploymentFactory = _deploymentFactory;
+        deployerFactory = _deployerFactory;
         extFactory = _extFactory;
         permissionlessDeployEnabled = false;
     }
@@ -206,10 +152,10 @@ contract NomaFactory {
     */
     function deployVault(
         VaultDeployParams memory _params
-    ) external checkDeployAuthority returns (address vaultAddress, address poolAddress, address nomaTokenAddress) {
+    ) external checkDeployAuthority returns (address, address, address) {
         _validateToken1(_params.token1);
 
-        MockNomaToken nomaToken = _deployNomaToken(
+        (,ERC1967Proxy proxy) = _deployNomaToken(
             _params._name,
             _params._symbol,
             _params.token1, 
@@ -218,7 +164,7 @@ contract NomaFactory {
         
         IUniswapV3Pool pool = _deployPool(
             _params._IDOPrice,
-            address(nomaToken), 
+            address(proxy), 
             _params.token1
         );
 
@@ -233,11 +179,11 @@ contract NomaFactory {
         .deployAll(
             address(this),
             vaultAddress,
-            address(nomaToken)
+            address(proxy)
         );
 
         deployer = Deployer(
-            IDeployerFactory(deploymentFactory)
+            IDeployerFactory(deployerFactory)
             .deployDeployer(
                 address(this), 
                 address(resolver)
@@ -267,7 +213,7 @@ contract NomaFactory {
             address(pool), 
             modelHelper(), 
             stakingContract,
-            address(nomaToken),
+            address(proxy),
             adaptiveSupply(),
             getLiquidityStructureParameters()
         );
@@ -276,15 +222,14 @@ contract NomaFactory {
             tokenName: _params._name,
             tokenSymbol: _params._symbol,
             tokenDecimals: _params._decimals,
-            token0: address(nomaToken),
+            token0: address(proxy),
             token1: _params.token1,
             deployer: msg.sender,
             vault: vaultAddress
         });
 
-        IERC20Metadata(address(nomaToken)).transfer(address(deployer), _params._totalSupply);
-
-        if (nomaToken.balanceOf(address(deployer)) != _params._totalSupply) revert SupplyTransferError();
+        IERC20Metadata(address(proxy)).transfer(address(deployer), _params._totalSupply);
+        if (IERC20Metadata(address(proxy)).balanceOf(address(deployer)) != _params._totalSupply) revert SupplyTransferError();
 
         _deployLiquidity(_params._IDOPrice, _params._totalSupply, getLiquidityStructureParameters());
 
@@ -305,7 +250,7 @@ contract NomaFactory {
         deployers.add(msg.sender);
         totalVaults += 1;
 
-        return (vaultAddress, address(pool), address(nomaToken));
+        return (vaultAddress, address(pool), address(proxy));
     }
 
     /**
@@ -323,7 +268,7 @@ contract NomaFactory {
         string memory _symbol,
         address _token1,
         uint256 _totalSupply
-    ) internal returns (MockNomaToken nomaToken) {
+    ) internal returns  (MockNomaToken, ERC1967Proxy) {
         bytes32 tokenHash = keccak256(abi.encodePacked(_name, _symbol));
 
         if (deployedTokenHashes[tokenHash]) revert TokenAlreadyExistsError();
@@ -332,16 +277,37 @@ contract NomaFactory {
         uint256 nonce = uint256(tokenHash);
 
         MockNomaToken _nomaToken;
+        ERC1967Proxy proxy ;
+
+        // Encode the initialize function call
+        bytes memory data = abi.encodeWithSelector(
+            _nomaToken.initialize.selector,
+            address(this),    // Deployer address
+            _totalSupply,     // Initial supply
+            _name,            // Token name
+            _symbol,          // Token symbol
+            address(resolver) // Resolver address
+        );
+
         do {
             _nomaToken = new MockNomaToken{salt: bytes32(nonce)}();
+            // Deploy the proxy contract
+            proxy = new ERC1967Proxy{salt: bytes32(nonce)}(
+                address(_nomaToken),
+                data
+            );
             nonce++;
-        } while (address(_nomaToken) >= _token1);
+        } while (address(proxy) >= _token1);
 
-        _nomaToken.initialize(authority, _totalSupply, _name, _symbol, address(resolver));
+        // _nomaToken.initialize(authority, _totalSupply, _name, _symbol, address(resolver));
 
-        if (address(_nomaToken) >= _token1) revert InvalidTokenAddressError();
+        if (address(proxy) >= _token1) revert InvalidTokenAddressError();
 
-        return _nomaToken;
+        uint256 totalSupplyFromContract = IERC20(address(proxy)).totalSupply();
+        require(totalSupplyFromContract == _totalSupply, "wrong parameters");
+
+        require(address(proxy) != address(0), "Token deploy failed");
+        return (_nomaToken, proxy);
     }
 
     /**
