@@ -5,6 +5,15 @@ if [ -f .env ]; then
   export $(cat .env | sed 's/#.*//g' | xargs)
 fi
 
+OUT="$(dirname "$0")/deploy_helper/out"
+
+if [ ! -d "$OUT" ]; then
+  echo "Directory does not exist. Creating it..."
+  mkdir -p "$OUT"
+else
+  echo "Directory already exists."
+fi
+
 # Define the output files
 DEPLOY_LOG=$(mktemp)
 RAW_TMP="$(dirname "$0")/deploy_helper/raw.tmp"
@@ -22,3 +31,4 @@ awk '
 
 # Step 3: Extract the addresses and update the deployment file
 sh "$(dirname "$0")/deploy_helper/extractFromRaw.sh"
+
