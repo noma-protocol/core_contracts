@@ -7,6 +7,10 @@ import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {LiquidityType} from "../types/Types.sol";
 
+error ZeroLiquidty();
+error NoTokensExchanged();
+error InvalidSwap();
+
 library Uniswap {
 
     function mint(
@@ -39,7 +43,7 @@ library Uniswap {
        IUniswapV3Pool(pool).mint(receiver, lowerTick, upperTick, liquidity, data);
     }
 
-    function burn(
+    function _burn(
         address pool,
         address receiver,
         int24 lowerTick,
@@ -47,8 +51,7 @@ library Uniswap {
         uint128 liquidity        
     ) internal {
 
-        (uint256 burn0, uint256 burn1) =
-            IUniswapV3Pool(pool).burn(lowerTick, upperTick, liquidity);
+        IUniswapV3Pool(pool).burn(lowerTick, upperTick, liquidity);
 
         IUniswapV3Pool(pool).collect(
             receiver, 
@@ -77,7 +80,7 @@ library Uniswap {
         (uint128 liquidity,,,,) = IUniswapV3Pool(pool).positions(positionId);
 
         if (liquidity > 0) {
-            burn(
+            _burn(
                 pool,
                 receiver,
                 lowerTick, 
@@ -85,16 +88,7 @@ library Uniswap {
                 liquidity
             );
         } else {
-            // revert(
-            //     string(
-            //         abi.encodePacked(
-            //                 "collect: liquidity is 0, liquidity: ", 
-            //                 Utils._uint2str(uint256(liquidity)
-            //             )
-            //         )
-            //     )                
-            // );
-            revert("collect: liquidity is 0");
+            revert ZeroLiquidty();
         }
     }
 
@@ -121,10 +115,10 @@ library Uniswap {
         ) {
             uint256 balanceAfterSwap = IERC20Metadata(zeroForOne ? token1 : token0).balanceOf(receiver);
             if (balanceBeforeSwap == balanceAfterSwap) {
-                revert("no tokens exchanged");
+                revert NoTokensExchanged();
             }
         } catch {
-            revert("Error swapping tokens");
+            revert InvalidSwap();
         }
     }
 
