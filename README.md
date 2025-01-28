@@ -12,7 +12,7 @@ foo@bar:~$ ./install_deps.sh
 
 ## Local testing
 
-1) Use anvil to fork the Arbitrum mainnet, replace the fork-url with your rpc node. Do not forget the mnemonic phrase.
+1) Use anvil to fork the Arbitrum mainnet blockchain. Replace the fork-url with your rpc node. Do not forget the mnemonic phrase.
 
 ```console
 foo@bar:~$ anvil --balance 10000000000 --fork-url https://arb-mainnet.g.alchemy.com/v2/DeadBeefDeadBeefDeadBeef --accounts 2 -m "example some key phrase generated randomly you wish to use  goes here" --chain-id=1337 --port 8545
@@ -43,7 +43,7 @@ Private Keys
  RPC_URL="http://localhost:8545"
 ```
 
-3) Deploy contracts with the following command:
+3) Deploy contracts locally on the forked blockchain with the following command:
 
 ```console
 foo@bar:~$ ./deploy.sh 
