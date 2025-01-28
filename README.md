@@ -12,7 +12,7 @@ To install all dependencies and build the contracts run the following commands:
 foo@bar:~/core_contracts$ ./install_deps.sh
 ```
 
-## Local testing
+## Testing
 
 1) Use anvil to fork the Arbitrum mainnet blockchain. Replace the fork-url with your rpc node. Do not forget the mnemonic phrase.
 
@@ -52,11 +52,16 @@ Private Keys
 foo@bar:~/core_contracts$ ./deploy.sh 
 ```
 
-## Testing
-
-Run tests with the following command:
+4) Run tests with the following command:
 
 ```console
 foo@bar:~/core_contracts$ forge test --rpc-url http://localhost:8545
 ``` 
 
+## Static Analysis - [Slither](https://github.com/crytic/slither)
+
+Please go to the link above for detail to install. To run the analysis:
+
+```console
+foo@bar:~/core_contracts$ slither src
+```
