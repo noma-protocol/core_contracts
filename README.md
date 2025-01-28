@@ -1,6 +1,6 @@
 ## Noma Protocol core contracts
 
-This is the Noma protocol core contracts repository. Noma is a next-generation DeFi protocol. Read more on our official [website](https://noma.money). 
+This is the Noma protocol core contracts repository. Noma is a next-generation DeFi protocol, read more on our official [website](https://noma.money). 
 
 Built with [Foundry](https://github.com/foundry-rs/foundry) ❤️
 
