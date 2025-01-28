@@ -2,7 +2,9 @@
 
 This is the Noma protocol core contracts repository. Noma is a next-generation DeFi protocol. Read more on our official [website](https://noma.money). 
 
-## Build
+Built with [Foundry](https://github.com/foundry-rs/foundry) ❤️
+
+## Building
 
 To install all dependencies and build the contracts run the following commands:
 
@@ -50,7 +52,9 @@ Private Keys
 foo@bar:~$ ./deploy.sh 
 ```
 
-4) Run tests with the following command:
+## Testing
+
+Run tests with the following command:
 
 ```console
 foo@bar:~$ forge test --rpc-url http://localhost:8545
