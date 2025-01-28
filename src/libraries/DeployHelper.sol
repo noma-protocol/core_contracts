@@ -13,8 +13,7 @@ import {Conversions} from "./Conversions.sol";
  
 import {
     LiquidityPosition, 
-    LiquidityType,
-    tickSpacing
+    LiquidityType
 } from "../types/Types.sol";
 
 

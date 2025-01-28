@@ -75,20 +75,16 @@ interface IDeployer {
 
     /**
      * @notice Computes the new floor price based on various parameters and current positions.
-     * @param pool The address of the Uniswap V3 pool.
      * @param toSkim The amount to be skimmed from the pool.
      * @param floorNewTokenBalance The new token balance for the floor position.
      * @param circulatingSupply The current circulating supply of the token.
-     * @param anchorCapacity The capacity of the anchor position.
      * @param positions An array containing current liquidity positions.
      * @return newFloorPrice The calculated new floor price.
      */
     function computeNewFloorPrice(
-        address pool,
         uint256 toSkim,
         uint256 floorNewTokenBalance,
         uint256 circulatingSupply,
-        uint256 anchorCapacity,
         LiquidityPosition[3] memory positions
     ) external view returns (uint256 newFloorPrice);
 }
