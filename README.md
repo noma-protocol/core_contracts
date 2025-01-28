@@ -18,7 +18,7 @@ foo@bar:~/core_contracts$ ./install_deps.sh
 
 ```console
 foo@bar:~/core_contracts$ anvil --balance 10000000000 --fork-url https://arb-mainnet.g.alchemy.com/v2/DeadBeefDeadBeefDeadBeef \
---accounts 2 -m "example some key phrase generated randomly you wish to use  goes here" --chain-id=1337 --port 8545
+--accounts 2 -m "example some mnemonic phrase generated randomly you wish to use  goes here" --chain-id=1337 --port 8545
 ```
 
 Example output:
