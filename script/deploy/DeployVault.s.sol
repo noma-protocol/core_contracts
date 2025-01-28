@@ -8,10 +8,8 @@ import { IDOHelper } from "../../test/IDO_Helper/IDOHelper.sol";
 
 contract DeployVault is Script {
     // Get environment variables.
-    address feeTo = vm.envAddress("FEE_TO");
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address deployer = vm.envAddress("DEPLOYER");
-    bytes32 salt = keccak256(bytes(vm.envString("SALT")));
 
     // Constants
     address WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
