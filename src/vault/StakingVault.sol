@@ -28,7 +28,7 @@ interface IStakingRewards {
 }
 
 interface IRewardsCalculator {
-    function calculateRewards(RewardParams memory params, uint256 timeElapsed) external pure returns (uint256);
+    function calculateRewards(RewardParams memory params, uint256 timeElapsed, address token0) external pure returns (uint256);
 }
 
 error NotInitialized();
@@ -50,7 +50,6 @@ contract StakingVault is BaseVault {
         }
 
         if (!_v.stakingEnabled) {
-            // revert StakingNotEnabled();
             return;
         }
 
@@ -88,7 +87,8 @@ contract StakingVault is BaseVault {
                 totalSupply,
                 10e8 // sensitivity for r TODO remove hardcoded
             ),
-            block.timestamp - _v.timeLastMinted
+            block.timestamp - _v.timeLastMinted,
+            IUniswapV3Pool(addresses.pool).token0()
         );
                 
         if (toMint > 0) {        
@@ -128,48 +128,36 @@ contract StakingVault is BaseVault {
             LiquidityType.Floor
         );
 
-        {
-            uint256 anchorCapacity = IModelHelper(addresses.modelHelper)
-            .getPositionCapacity(
-                addresses.pool, 
-                addresses.vault, 
-                positions[1],
-                LiquidityType.Anchor
+        (
+            uint256 circulatingSupply,,,
+        ) = LiquidityOps.getVaulData(addresses);
+
+        uint256 newFloorPrice = IDeployer(addresses.deployer)
+        .computeNewFloorPrice(
+            toMint,
+            floorToken1Balance,
+            circulatingSupply,
+            positions
+        );
+
+        uint256 currentFloorPrice = Conversions
+        .sqrtPriceX96ToPrice(
+            Conversions
+            .tickToSqrtPriceX96(
+                positions[0].upperTick
+            ), 
+        IERC20Metadata(address(IUniswapV3Pool(addresses.pool).token0())).decimals());
+        
+        // Bump floor if necessary
+        if (newFloorPrice > currentFloorPrice) {
+            _shiftPositions(
+                positions, 
+                addresses, 
+                newFloorPrice, 
+                toMint, 
+                floorToken1Balance
             );
-
-            (
-                uint256 circulatingSupply,,,
-            ) = LiquidityOps.getVaulData(addresses);
-
-            uint256 newFloorPrice = IDeployer(addresses.deployer)
-            .computeNewFloorPrice(
-                addresses.pool,
-                toMint,
-                floorToken1Balance,
-                circulatingSupply,
-                anchorCapacity,
-                positions
-            );
-
-            uint256 currentFloorPrice = Conversions
-            .sqrtPriceX96ToPrice(
-                Conversions
-                .tickToSqrtPriceX96(
-                    positions[0].upperTick
-                ), 
-            IERC20Metadata(address(IUniswapV3Pool(addresses.pool).token0())).decimals());
-            
-            // Bump floor if necessary
-            if (newFloorPrice > currentFloorPrice) {
-                _shiftPositions(
-                    positions, 
-                    addresses, 
-                    newFloorPrice, 
-                    toMint, 
-                    floorToken1Balance
-                );
-            }  
-        }        
+        }  
     }
 
     function collectLiquidity(
