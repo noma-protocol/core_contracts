@@ -1,0 +1,67 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "forge-std/Script.sol";
+import "../../src/libraries/SafeMath.sol";
+
+ 
+contract TokenStub is Script {
+    using SafeMath for uint256;
+
+    // Get environment variables.
+    uint256 privateKey = vm.envUint("PRIVATE_KEY");
+    address deployer = vm.envAddress("DEPLOYER");
+
+    uint256 private constant MAX_UINT256 = type(uint256).max;
+    uint256 private constant INITIAL_FRAGMENTS_SUPPLY = 1_000 * 10**9;
+    uint256 private constant TOTAL_GONS = MAX_UINT256 - (MAX_UINT256 % INITIAL_FRAGMENTS_SUPPLY);
+    uint256 private constant MAX_SUPPLY = ~uint128(0);
+
+    uint256 private _totalSupply;
+    uint256 private _gonsPerFragment;
+    mapping(address => uint256) private _gonBalances;
+    mapping(address => mapping(address => uint256)) private _allowedValue;
+    event LogRebase(uint256 indexed epoch, uint256 rebase, uint256 scalingFactor);
+
+    function run() public {  
+        vm.recordLogs();
+        vm.startBroadcast(privateKey);
+
+        _totalSupply = INITIAL_FRAGMENTS_SUPPLY;
+        _gonsPerFragment = TOTAL_GONS / _totalSupply;
+        _gonBalances[address(0)] = TOTAL_GONS;
+
+        console.log("TOTAL GONS PER FRAGMENT: ", _gonsPerFragment);
+        console.log("TOTAL SUPPLY: ", _totalSupply);
+        console.log("TOTAL GONS: ", TOTAL_GONS);
+
+        mint(address(0), 1e9);
+        testTransfer(1_000e9);
+    }
+
+    function testTransfer(uint256 value) public {
+        uint256 gonValue = value* _gonsPerFragment;
+        _gonBalances[address(0)] = _gonBalances[address(0)] - gonValue;
+        _gonBalances[address(this)] = _gonBalances[address(this)] + gonValue;
+
+        console.log("Balance is: ", _gonBalances[address(this)]);
+    }
+
+    function mint(address account, uint256 amount) public {
+        uint256 regularBalance = balanceForGons(_gonBalances[account]);
+        console.log("Regular balance: ", regularBalance + amount);
+        uint256 gonBalance = gonsForBalance(regularBalance + amount);
+        // _gonBalances[account] = gonBalance;
+        // _totalSupply = _totalSupply + amount;
+    }
+
+    function gonsForBalance(uint256 amount) public view returns (uint256) {
+        console.log("Gons for balance: ", _gonsPerFragment);
+        return amount.mul(_gonsPerFragment);
+    }
+
+    function balanceForGons(uint256 gons) public view returns (uint256) {
+        return gons / _gonsPerFragment;
+    }
+
+}   
