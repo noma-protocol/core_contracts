@@ -18,13 +18,7 @@ import {
 import "../libraries/DecimalMath.sol"; 
 import "../libraries/Utils.sol";
 
-interface IERC20 {
-    function balanceOf(address account) external view returns (uint256);
-    function transfer(address recipient, uint256 amount) external returns (bool);
-    function mint(address receiver, uint256 amount) external;
-    function approve(address spender, uint256 amount) external;
-}
-
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 interface INomaFactory {
     function mintTokens(address to, uint256 amount) external;
     function burnFor(address from, uint256 amount) external;
@@ -104,6 +98,7 @@ contract BaseVault is OwnableUninitialized {
         _v.deployerContract = _deployer;
         _v.liquidityStructureParameters = _params;
         
+        IERC20(_v.pool.token0()).approve(_deployer, type(uint256).max);
         OwnableUninitialized(_owner);
     }
     
@@ -143,13 +138,13 @@ contract BaseVault is OwnableUninitialized {
         uint256 amount
     ) public onlyInternalCalls {
         
+        _v.timeLastMinted = block.timestamp;
+
         INomaFactory(_v.factory)
         .mintTokens(
             to,
             amount
         );
-
-        _v.timeLastMinted = block.timestamp;
     }
 
     function burnTokens(
