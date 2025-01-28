@@ -2,7 +2,7 @@
 
 This is the Noma protocol core contracts repository. Noma is a next-generation DeFi protocol. Read more on our official [website](https://noma.money). 
 
-## Setup for development
+## Build
 
 To install all dependencies and build the contracts run the following commands:
 
