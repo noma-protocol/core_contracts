@@ -35,9 +35,11 @@ contract TestMockNomaTokenV2 is Initializable, ERC20Upgradeable, OwnableUpgradea
     }
 
     function proxiableUUID() public pure override returns (bytes32) {
-        return keccak256("eip1967.proxy.implementation");
+        bytes32 hash = keccak256("eip1967.proxy.implementation");
+        bytes32 slot = bytes32(uint256(hash) - 1);
+        return slot;
     }
-
+    
     function transfer(address recipient, uint256 amount) public override onlyUniswapV3(msg.sender, recipient) returns (bool) {
         return super.transfer(recipient, amount);
     }

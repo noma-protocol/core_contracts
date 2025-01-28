@@ -85,7 +85,7 @@ contract DeployToken is Test {
 
     function testProxiableUUID() public {
         // Check that the proxiableUUID returns the correct value
-        bytes32 uuid = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbd;
+        bytes32 uuid = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
         console.log("UUID %s", uint256(uuid));
 
