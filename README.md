@@ -35,7 +35,7 @@ Private Keys
 
 ```
 
-2) Setup an .env file with DEPLOYER as the first address (0) and the corresponding private key as well as the local RPC_URL. 
+2) Setup an .env file with DEPLOYER as the first address (0) and the corresponding private key, as well as the local RPC_URL. 
 
 ```
  DEPLOYER="0x8Fc4f07BCB9396722404bFfBE1A77cF73Af06E47"
