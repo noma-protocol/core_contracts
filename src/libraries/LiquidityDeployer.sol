@@ -263,7 +263,6 @@ library LiquidityDeployer {
 
     function reDeployFloor(
         address pool,
-        address deployer,
         uint256 amount1ToDeploy,
         LiquidityPosition[3] memory positions
     ) internal returns (LiquidityPosition memory newPosition) {
@@ -298,11 +297,9 @@ library LiquidityDeployer {
     }
 
     function computeNewFloorPrice(
-        address pool,
         uint256 toSkim,
         uint256 floorNewToken1Balance,
         uint256 circulatingSupply,
-        uint256 anchorCapacity,
         LiquidityPosition[3] memory positions
     ) internal pure returns (uint256) {
 

@@ -145,15 +145,12 @@ library LiquidityOps {
     ) internal returns (LiquidityPosition[3] memory newPositions) {
 
         address deployer = params.addresses.deployer;
-        address pool = params.addresses.pool;
 
         uint256 newFloorPrice = IDeployer(deployer)
                 .computeNewFloorPrice(
-                    pool,
                     params.toSkim,
                     params.floorToken1Balance,
                     params.circulatingSupply,
-                    params.anchorCapacity,
                     _positions
                 );
 
@@ -523,7 +520,6 @@ library LiquidityOps {
 
                 balanceToken0 = IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).balanceOf(address(this));
             }
-
         }
         
         newPosition = IDeployer(addresses.deployer)
