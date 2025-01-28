@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.0;
 
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -13,6 +13,12 @@ contract MockNomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, U
     IAddressResolver public resolver;
 
     error OnlyFactory();
+    error CannotInitializeLogicContract();
+
+    constructor() {
+        // Disable initializers to prevent the logic contract from being initialized
+        _disableInitializers();
+    }
 
     function initialize(
         address _deployer,
@@ -20,11 +26,12 @@ contract MockNomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, U
         string memory _name, 
         string memory _symbol,
         address _resolver
-    ) initializer public {
+    ) external initializer {
+        if (msg.sender == address(this)) revert CannotInitializeLogicContract();
         __ERC20_init(_name, _symbol);
         __Ownable_init(_deployer);
         __UUPSUpgradeable_init();
-        _mint(msg.sender, _totalSupply);
+        _mint(_deployer, _totalSupply);
         resolver = IAddressResolver(_resolver);
     }
 
@@ -63,7 +70,6 @@ contract MockNomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, U
     }    
 
     modifier onlyFactory() {
-        // require(msg.sender == nomaFactory(), "Only factory");
         if (msg.sender != nomaFactory()) revert OnlyFactory();
         _;
     }
