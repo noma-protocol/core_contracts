@@ -43,13 +43,13 @@ Private Keys
  RPC_URL="http://localhost:8545"
 ```
 
-Deploy contracts with the following command:
+3) Deploy contracts with the following command:
 
 ```console
 foo@bar:~$ ./deploy.sh 
 ```
 
-Run tests with the following command:
+4) Run tests with the following command:
 
 ```console
 foo@bar:~$ forge test --rpc-url http://localhost:8545
