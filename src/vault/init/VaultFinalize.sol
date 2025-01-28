@@ -26,7 +26,7 @@ contract VaultFinalize  {
         upgradePreviousStep = _upgradePreviousStep;
     }
 
-    function doUpgradeFinalize(address diamond) public  {
+    function doUpgradeFinalize(address diamond) public authorized {
  
         address[] memory newFacets = new address[](1);
         IDiamondCut.FacetCutAction[] memory actions = new IDiamondCut.FacetCutAction[](1);
@@ -45,14 +45,17 @@ contract VaultFinalize  {
             });
         }
 
-        // address lastOwner = IDiamond(diamond).owner();
-
         IDiamondCut(diamond).diamondCut(cuts, address(0), "");
         IDiamondInterface(diamond).transferOwnership(finalAuthority);
     }  
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner");
+        _;
+    }
+
+    modifier authorized() {
+        require(msg.sender == upgradePreviousStep, "Only UpgradePreviousStep");
         _;
     }
 

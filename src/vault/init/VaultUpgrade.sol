@@ -7,8 +7,7 @@ import {LendingVault} from "../LendingVault.sol";
 
 import {IDiamondCut} from "../../interfaces/IDiamondCut.sol";
 import {IFacet} from "../../interfaces/IFacet.sol";
-import {IDiamond} from "../../interfaces/IDiamond.sol";
-import "../../libraries/Utils.sol";
+import {Utils} from "../../libraries/Utils.sol";
 
 interface IVaultUpgrader {
     function doUpgradeStart(address diamond, address _vaultUpgradeFinalize) external;
@@ -120,8 +119,6 @@ contract VaultUpgradeStep1  {
             });
         }
 
-        address lastOwner = IDiamond(diamond).owner();
-
         IDiamondCut(diamond).diamondCut(cuts, address(0), "");
         IDiamondInterface(diamond).transferOwnership(upgradeNextStep);
         IVaultUpgrader(upgradeNextStep).doUpgradeStep2(diamond);
@@ -173,8 +170,6 @@ contract VaultUpgradeStep2  {
                 functionSelectors: functionSelectors[i]
             });
         }
-
-        address lastOwner = IDiamond(diamond).owner();
 
         IDiamondCut(diamond).diamondCut(cuts, address(0), "");
         IDiamondInterface(diamond).transferOwnership(upgradeNextStep);
