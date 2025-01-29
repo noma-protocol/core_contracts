@@ -41,6 +41,10 @@ struct VaultStorage {
     // Token information
     TokenInfo tokenInfo;
 
+    // Uniswap pool information
+    uint24 feeTier;
+    int24 tickSpacing;
+
     // Protocol addresses
     address deployerContract;
     address modelHelper;
