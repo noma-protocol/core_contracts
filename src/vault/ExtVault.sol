@@ -19,6 +19,12 @@ interface ILendingVault {
     function rollLoan(address who) external;
 }
 
+event Borrow(address indexed who, uint256 borrowAmount, uint256 duration);
+event Payback(address indexed who);
+event RollLoan(address indexed who);
+event Shift();
+event Slide();
+
 contract ExtVault {
 
     function borrow(
@@ -32,7 +38,10 @@ contract ExtVault {
             borrowAmount,
             duration
         );
+
+        emit Borrow(who, borrowAmount, duration);
     }
+
 
     function payback(
         address who
@@ -41,6 +50,8 @@ contract ExtVault {
         .paybackLoan(
             who
         );
+
+        emit Payback(who);
     }
 
     function roll(
@@ -50,6 +61,8 @@ contract ExtVault {
         .rollLoan(
             who
         );
+
+        emit RollLoan(who);
     }
 
     function shift() public {
@@ -63,6 +76,8 @@ contract ExtVault {
         );
 
         IStakingVault(address(this)).mintAndDistributeRewards(addresses);
+        
+        emit Shift();
     }    
 
     function slide() public  {
@@ -74,6 +89,8 @@ contract ExtVault {
             addresses,
             positions
         );
+
+        emit Slide();
     }
 
     function getFunctionSelectors() external pure  returns (bytes4[] memory) {
