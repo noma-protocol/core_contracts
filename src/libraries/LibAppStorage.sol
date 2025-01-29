@@ -18,22 +18,33 @@ import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
 struct VaultStorage {
     // Vault state
     address factory;
+    address manager;
+    IAddressResolver resolver;
 
+    // Loans
+    address[] loanAddresses;
+    uint256 totalLoans;
+    uint256 collateralAmount;
+    uint256 loanFee;    
+    mapping(address => LoanPosition) loanPositions;
+    mapping(address => uint256) totalLoansPerUser;
+
+    // Protocol configuration
     ProtocolParameters protocolParameters;
+    bool initialized;
+    bool stakingEnabled; 
+
+    // Protocol addresses
+    address deployerContract;
+    address modelHelper;
+    address stakingContract;
+    address proxyAddress;
+    address adaptiveSupplyController;
 
     // Liquidity positions
     LiquidityPosition  floorPosition;
     LiquidityPosition  anchorPosition;
     LiquidityPosition  discoveryPosition;
-
-    // Loans
-    mapping(address => LoanPosition) loanPositions;
-    mapping(address => uint256) totalLoansPerUser;
-
-    address[] loanAddresses;
-    uint256 totalLoans;
-    uint256 collateralAmount;
-    uint256 loanFee;
     
     // Staking rewards
     uint256 totalMinted;
@@ -45,30 +56,16 @@ struct VaultStorage {
     // Uniswap pool information
     uint24 feeTier;
     int24 tickSpacing;
-
-    // Protocol addresses
-    address deployerContract;
-    address modelHelper;
-    address stakingContract;
-    address proxyAddress;
-    address adaptiveSupplyController;
-    
     IUniswapV3Pool pool;
-    IAddressResolver resolver;
 
     // Uniswap Fees
     uint256 feesAccumulatorToken0;
     uint256 feesAccumulatorToken1;
-
-    // System parameters
-    bool initialized;
-    bool stakingEnabled; 
-    // uint256 lastLiquidityRatio;
 }
 
 
 /**
- * @notice Library for accessing token-related storage.
+ * @notice Library for accessing storage.
  */
 library LibAppStorage {
     /**
