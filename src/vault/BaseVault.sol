@@ -12,7 +12,7 @@ import {
     LiquidityType,
     VaultInfo,
     ProtocolAddresses,
-    LiquidityStructureParameters
+    ProtocolParameters
 } from "../types/Types.sol";
 
 import "../libraries/DecimalMath.sol"; 
@@ -79,7 +79,7 @@ contract BaseVault is OwnableUninitialized {
         address _pool, 
         address _stakingContract,
         address _proxyAddress,
-        LiquidityStructureParameters memory _params
+        ProtocolParameters memory _params
     ) public onlyFactory {
         LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
 
@@ -94,10 +94,11 @@ contract BaseVault is OwnableUninitialized {
         _v.tokenInfo.token1 = _v.pool.token1();
         _v.initialized = false;
         _v.stakingEnabled = false;
+        _v.loanFee = _params.loanFee;
         _v.stakingContract = _stakingContract;
         _v.proxyAddress = _proxyAddress;
         _v.deployerContract = _deployer;
-        _v.liquidityStructureParameters = _params;
+        _v.protocolParameters = _params;
         
         IERC20(_v.pool.token0()).approve(_deployer, type(uint256).max);
         OwnableUninitialized(_owner);
@@ -238,7 +239,7 @@ contract BaseVault is OwnableUninitialized {
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](9);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
-        selectors[1] = bytes4(keccak256(bytes("initialize(address,address,address,address,address,address,(uint8,uint8,uint8,uint16[2],uint256,uint256,int24,int24,int24,uint256,uint256,uint256))")));
+        selectors[1] = bytes4(keccak256(bytes("initialize(address,address,address,address,address,address,(uint8,uint8,uint8,uint16[2],uint256,uint256,int24,int24,int24,uint256,uint256,uint256,uint256))")));
         selectors[2] = bytes4(keccak256(bytes("initializeLiquidity((int24,int24,uint128,uint256,int24)[3])")));
         selectors[3] = bytes4(keccak256(bytes("uniswapV3MintCallback(uint256,uint256,bytes)")));
         selectors[4] = bytes4(keccak256(bytes("getUnderlyingBalances(uint8)")));

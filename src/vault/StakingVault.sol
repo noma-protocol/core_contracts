@@ -327,7 +327,7 @@ contract StakingVault is BaseVault {
         int24 discoveryLowerTick = Utils.nearestUsableTick(
             Utils.addBipsToTick(
                 anchorUpperTick,
-                IVault(address(this)).getLiquidityStructureParameters().discoveryBips,
+                IVault(address(this)).getProtocolParameters().discoveryBips,
                 decimals,
                 tickSpacing
             ),
@@ -340,7 +340,7 @@ contract StakingVault is BaseVault {
                 lowerTick: discoveryLowerTick,
                 upperTick: Utils.nearestUsableTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96) * 
-                    int8(IVault(address(this)).getLiquidityStructureParameters().idoPriceMultiplier),
+                    int8(IVault(address(this)).getProtocolParameters().idoPriceMultiplier),
                     tickSpacing
                 ),
                 amount1ToDeploy: discoveryToken1Balance,

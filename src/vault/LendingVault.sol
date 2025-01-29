@@ -13,7 +13,7 @@ import {
     LiquidityPosition, 
     LiquidityType,
     LoanPosition,
-    LiquidityStructureParameters
+    ProtocolParameters
 } from "../types/Types.sol";
 
 interface IERC20 {
@@ -36,6 +36,7 @@ interface INomaFactory {
 
 error NotInitialized();
 error InsufficientLoanAmount();
+error InvalidDuration();
 error InsufficientFloorBalance();
 error NoActiveLoan();
 error LoanExpired();
@@ -53,15 +54,16 @@ contract LendingVault is BaseVault {
         return (DecimalMath.divideDecimal(borrowAmount, intrinsicMinimumValue), intrinsicMinimumValue);
     }
 
-    function calculateLoanFees(uint256 borrowAmount, uint256 duration) public pure returns (uint256 fees) {
-        uint256 percentage = 27; // 0.027% 
+    function _calculateLoanFees(uint256 borrowAmount, uint256 duration) internal view returns (uint256 fees) {
+        uint256 percentage = _v.loanFee; // e.g. 27 --> 0.027% 
         uint256 scaledPercentage = percentage * 10**12; 
         fees = (borrowAmount * scaledPercentage * (duration / SECONDS_IN_DAY)) / (100 * 10**18);
     }    
 
-    function borrowFromFloor(address who, uint256 borrowAmount, uint256 duration) public onlyVault {
-        if (borrowAmount == 0) revert InsufficientLoanAmount(); 
-        
+    function borrowFromFloor(address who, uint256 borrowAmount, uint256 duration) public onlyInternalCalls {
+        if (borrowAmount == 0) revert InsufficientLoanAmount();
+        if (duration < 30 days || duration > 365 days) revert InvalidDuration();
+
         (uint256 collateralAmount,) = _getTotalCollateral(borrowAmount);
         if (collateralAmount == 0) revert InsufficientCollateral();
 
@@ -71,7 +73,7 @@ contract LendingVault is BaseVault {
         if (floorToken1Balance < borrowAmount) revert InsufficientFloorBalance();
 
         IERC20(_v.pool.token0()).transferFrom(who, address(this), collateralAmount);  
-        uint256 loanFees = calculateLoanFees(borrowAmount, duration);
+        uint256 loanFees = _calculateLoanFees(borrowAmount, duration);
 
         _v.collateralAmount += collateralAmount;
         
@@ -101,7 +103,7 @@ contract LendingVault is BaseVault {
         .enforceSolvencyInvariant(address(this));           
     }
 
-    function paybackLoan(address who) public onlyVault {
+    function paybackLoan(address who) public onlyInternalCalls {
         LoanPosition storage loan = _v.loanPositions[who];
 
         if (loan.borrowAmount == 0) revert NoActiveLoan();
@@ -113,7 +115,7 @@ contract LendingVault is BaseVault {
         _removeLoanAddress(who);
     }
 
-    function rollLoan(address who) public onlyVault {
+    function rollLoan(address who) public onlyInternalCalls {
         LoanPosition storage loan = _v.loanPositions[who];
 
         if (loan.borrowAmount == 0) revert NoActiveLoan();
@@ -127,7 +129,7 @@ contract LendingVault is BaseVault {
         if (newCollateralValue <= loan.borrowAmount) revert CantRollLoan();
 
         uint256 newBorrowAmount = newCollateralValue - loan.borrowAmount;
-        uint256 newFees = calculateLoanFees(newBorrowAmount, loan.expiry - block.timestamp);
+        uint256 newFees = _calculateLoanFees(newBorrowAmount, loan.expiry - block.timestamp);
 
         (,,, uint256 floorToken1Balance) = IModelHelper(modelHelper())
         .getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
@@ -147,7 +149,7 @@ contract LendingVault is BaseVault {
         // enforce insolvency invariant
     }
 
-    function defaultLoans() public onlyVault {
+    function defaultLoans() public onlyInternalCalls {
         for (uint256 i = 0; i < _v.loanAddresses.length; i++) {
             address who = _v.loanAddresses[i];
             LoanPosition storage loan = _v.loanPositions[who];
@@ -228,9 +230,9 @@ contract LendingVault is BaseVault {
         return INomaFactory(_v.factory).teamMultiSig();
     }
 
-    function getLiquidityStructureParameters() public view returns 
-    (LiquidityStructureParameters memory ) {
-        return _v.liquidityStructureParameters;
+    function getProtocolParameters() public view returns 
+    (ProtocolParameters memory ) {
+        return _v.protocolParameters;
     }
 
     function getTimeSinceLastMint() public view returns (uint256) {
@@ -263,7 +265,7 @@ contract LendingVault is BaseVault {
         selectors[4] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256,int24)[3])")));
         selectors[5] = bytes4(keccak256(bytes("getPositions()")));
         selectors[6] = bytes4(keccak256(bytes("teamMultiSig()")));
-        selectors[7] = bytes4(keccak256(bytes("getLiquidityStructureParameters()")));  
+        selectors[7] = bytes4(keccak256(bytes("getProtocolParameters()")));  
         selectors[8] = bytes4(keccak256(bytes("getTimeSinceLastMint()")));
         selectors[9] = bytes4(keccak256(bytes("getCollateralAmount()")));
         selectors[10] = bytes4(keccak256(bytes("mintTokens(address,uint256)")));
