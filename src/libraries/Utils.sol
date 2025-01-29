@@ -2,10 +2,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {
-    tickSpacing
-} from "../types/Types.sol";
-
 import {Conversions} from "./Conversions.sol";
 
 library Utils {
@@ -17,11 +13,6 @@ library Utils {
     error NegativeValue();
     error InvalidChars();
     error InvalidTickSpacing();
-
-    function calculateLoanFees(uint256 amount) public pure returns (uint256) {
-        uint256 fee = (amount * 3) / 100;
-        return fee;
-    }
 
     function addBips(uint256 _price, int256 bips) public pure returns (uint256) {
         if (bips >= 0) {
@@ -38,7 +29,7 @@ library Utils {
     }
 
     // Function to add bips to a tick value
-    function addBipsToTick(int24 currentTick, int24 bips, uint8 _decimals) public pure returns (int24) {
+    function addBipsToTick(int24 currentTick, int24 bips, uint8 _decimals, int24 _tickSpacing) public pure returns (int24) {
 
         uint256 tickToPrice = Conversions
         .sqrtPriceX96ToPrice(
@@ -50,7 +41,7 @@ library Utils {
         int24 newTickValue = Conversions
         .priceToTick(
             int256(newPrice), 
-            tickSpacing,
+            _tickSpacing,
             _decimals
         );
 
@@ -194,17 +185,17 @@ library Utils {
     } 
 
     // TICK CALCULATION FUNCTIONS
-    function nearestUsableTick(int24 tick) public pure returns (int24) {
+    function nearestUsableTick(int24 tick, int24 tickSpacing) public pure returns (int24) {
         require(tickSpacing > 0, "Invalid tick spacing");
         require(tick >= MIN_TICK && tick <= MAX_TICK, "Out of range");
 
         int24 remainder = tick % tickSpacing;
-        int24 rounded = _roundTick(tick, remainder);
+        int24 rounded = _roundTick(tick, remainder, tickSpacing);
 
-        return _clampTick(rounded);
+        return _clampTick(rounded, tickSpacing);
     }
 
-    function _roundTick(int24 tick, int24 remainder) internal pure returns (int24) {
+    function _roundTick(int24 tick, int24 remainder, int24 tickSpacing) internal pure returns (int24) {
         int24 rounded = tick - remainder;
 
         if (remainder * 2 >= tickSpacing) {
@@ -216,7 +207,7 @@ library Utils {
         return rounded;
     }
 
-    function _clampTick(int24 rounded) internal pure returns (int24) {
+    function _clampTick(int24 rounded, int24 tickSpacing) internal pure returns (int24) {
         if (rounded < MIN_TICK) {
             return rounded + tickSpacing;
         } else if (rounded > MAX_TICK) {
