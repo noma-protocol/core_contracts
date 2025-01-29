@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
-import {SafeMathInt} from "../../libraries/SafeMathInt.sol";
+import {MathInt} from "../../libraries/MathInt.sol";
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 
 interface IERC20 { 
@@ -15,7 +15,7 @@ interface IVault {
 
 contract AdaptiveSupply {
     using FixedPointMathLib for uint256;
-    using SafeMathInt for int256;
+    using MathInt for int256;
 
     // Custom errors
     error TimeElapsedZero();
@@ -26,13 +26,7 @@ contract AdaptiveSupply {
     error InvalidDenominator();
     error InvalidSqrtTimeElapsed();
 
-    function calculateVolatilityAdjustment(uint256 volatility) internal pure returns (uint256) {
-        uint256 kv = 1e18;
-        int256 volExp = -int256(kv.mulWadDown(volatility));
-        return uint256(volExp.expWad());
-    }
-
-    function calculateMintAmount(
+    function computeMintAmount(
         uint256 deltaSupply,
         uint256 timeElapsed,
         uint256 spotPrice,
@@ -42,15 +36,15 @@ contract AdaptiveSupply {
         if (deltaSupply == 0) revert DeltaSupplyZero();
         if (imv == 0) revert IMVZero();
 
-        uint256 scaleFactor = calculateScaleFactor();
-        uint256 sigmoid = calculateSigmoid(deltaSupply, timeElapsed);
+        uint256 scaleFactor = computeScaleFactor();
+        uint256 sigmoid = computeSigmoid(deltaSupply, timeElapsed);
 
-        // Calculate ratio = spotPrice / imv
+        // compute ratio = spotPrice / imv
         uint256 ratio = spotPrice.divWadDown(imv);
         if (ratio < 1e18) revert SpotPriceLowerThanIMV();
 
         // Combine ratio and time for adjustment
-        uint256 timeAdjustment = calculateTimeAdjustment(ratio, timeElapsed);
+        uint256 timeAdjustment = computeTimeAdjustment(ratio, timeElapsed);
 
         uint256 sqrtTime = timeElapsed.sqrt();
         if (sqrtTime == 0) revert InvalidSqrtTimeElapsed();
@@ -60,7 +54,7 @@ contract AdaptiveSupply {
         mintAmount = mintAmount / scaleFactor;
     }
 
-    function calculateScaleFactor() internal view returns (uint256) {
+    function computeScaleFactor() internal view returns (uint256) {
         uint256 tokenDecimals = IERC20(
             IUniswapV3Pool(
                 IVault(msg.sender).pool()
@@ -70,7 +64,7 @@ contract AdaptiveSupply {
         return 10**(18 - tokenDecimals);
     }
 
-    function calculateSigmoid(uint256 deltaSupply, uint256 timeElapsed) internal pure returns (uint256) {
+    function computeSigmoid(uint256 deltaSupply, uint256 timeElapsed) internal pure returns (uint256) {
         uint256 denominator = deltaSupply + timeElapsed;
         if (denominator == 0) revert InvalidDenominator();
         uint256 r = deltaSupply.divWadDown(denominator);
@@ -95,7 +89,7 @@ contract AdaptiveSupply {
         return uint256(1e18).divWadDown(1e18 + exponent.expWad());
     }
 
-    function calculateTimeAdjustment(uint256 ratio, uint256 timeElapsed) internal pure returns (uint256) {
+    function computeTimeAdjustment(uint256 ratio, uint256 timeElapsed) internal pure returns (uint256) {
         // Combine ratio and timeElapsed to create an adjustment factor
         uint256 ratioFactor = ratio.divWadDown(1e18); // Normalize ratio to a factor
         uint256 timeFactor = timeElapsed.sqrt();

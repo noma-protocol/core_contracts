@@ -38,7 +38,7 @@ interface IVault {
 }
 
 interface IAdaptiveSupply {
-    function calculateMintAmount(
+    function computeMintAmount(
         uint256 deltaSupply,
         uint256 timeElapsed,
         uint256 spotPrice,
@@ -485,7 +485,7 @@ library LiquidityOps {
                     // Mint unbacked supply
                     (uint256 mintAmount) = IAdaptiveSupply(
                         addresses.adaptiveSupplyController
-                    ).calculateMintAmount(
+                    ).computeMintAmount(
                         totalSupply,
                         IVault(address(this)).getTimeSinceLastMint() > 0 ? 
                         IVault(address(this)).getTimeSinceLastMint() : 
