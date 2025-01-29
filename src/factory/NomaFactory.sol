@@ -18,8 +18,6 @@ import { MockNomaToken } from "../token/MockNomaToken.sol";
 import { Deployer } from "../Deployer.sol";
 
 import {
-    feeTier, 
-    tickSpacing, 
     VaultDeployParams,
     LiquidityStructureParameters
 } from "../types/Types.sol";
@@ -71,7 +69,20 @@ error TokenAlreadyExistsError();
  */
 error InvalidSymbol();
 
+/**
+ * @dev Thrown when an address is zero.
+ */
 error ZeroAddressError();
+
+/**
+ * @dev Thrown when the tick spacing is invalid for the given fee tier.
+ */
+error InvalidTickSpacing();
+
+/**
+ * @dev Thrown when the fee tier is invalid.
+ */
+error InvalidFeeTier();
 
 /**
  * @title NomaFactory
@@ -144,6 +155,8 @@ contract NomaFactory {
         VaultDeployParams memory _params
     ) external checkDeployAuthority returns (address, address, address) {
         _validateToken1(_params.token1);
+        int24 tickSpacing = _validateFeeTier(_params.feeTier);
+        require(tickSpacing == 60, "invalid fee tier");
 
         (,ERC1967Proxy proxy) = _deployNomaToken(
             _params._name,
@@ -155,7 +168,9 @@ contract NomaFactory {
         IUniswapV3Pool pool = _deployPool(
             _params._IDOPrice,
             address(proxy), 
-            _params.token1
+            _params.token1,
+            _params.feeTier,
+            tickSpacing
         );
 
         (address vaultAddress, address vaultUpgrade) = IEtchVault(
@@ -165,7 +180,7 @@ contract NomaFactory {
             )
         ).preDeployVault(address(resolver));
 
-        (, address stakingContract) = IExtFactory(extFactory)
+        (address sNoma, address stakingContract) = IExtFactory(extFactory)
         .deployAll(
             address(this),
             vaultAddress,
@@ -221,15 +236,21 @@ contract NomaFactory {
         IERC20Metadata(address(proxy)).transfer(address(deployer), _params._totalSupply);
         if (IERC20Metadata(address(proxy)).balanceOf(address(deployer)) != _params._totalSupply) revert SupplyTransferError();
 
-        _deployLiquidity(_params._IDOPrice, _params._totalSupply, getLiquidityStructureParameters());
+        _deployLiquidity(_params._IDOPrice, _params._totalSupply, tickSpacing, getLiquidityStructureParameters());
 
-        bytes32 name = Utils.stringToBytes32("AdaptiveSupply");
-        bytes32[] memory names = new bytes32[](1);
-        names[0] = name;
+        bytes32[] memory names = new bytes32[](4);
+        names[0] = Utils.stringToBytes32("AdaptiveSupply");
+        names[1] = Utils.stringToBytes32("ModelHelper");
+        names[2] = Utils.stringToBytes32("Staking");
+        names[3] = Utils.stringToBytes32("sNoma");
 
-        address _adaptiveSupply = adaptiveSupply();
-        address[] memory destinations  = new address[](1);
-        destinations[0] = _adaptiveSupply;
+        address[] memory destinations  = new address[](4);
+
+        destinations[0] = adaptiveSupply();
+        destinations[1] = modelHelper();
+        destinations[2] = stakingContract;
+        destinations[3] = sNoma;
+
 
         resolver.configureDeployerACL(vaultAddress);  
         resolver.importVaultAddress(vaultAddress, names, destinations);
@@ -303,13 +324,17 @@ contract NomaFactory {
     * @param _initPrice The initial price of the pool.
     * @param token0 The address of the first token.
     * @param token1 The address of the second token.
+    * @param feeTier The fee tier of the pool.
+    * @param tickSpacing The tick spacing of the pool.
     * @return pool The address of the deployed Uniswap V3 pool.
     * @dev This internal function checks if the pool already exists; if not, it creates a new pool and initializes it with the provided price.
     */
     function _deployPool(
         uint256 _initPrice,
         address token0,
-        address token1
+        address token1,
+        uint24 feeTier,
+        int24 tickSpacing
     ) internal returns (IUniswapV3Pool pool) {
         IUniswapV3Factory factory = IUniswapV3Factory(uniswapV3Factory);
         IUniswapV3Pool _pool = IUniswapV3Pool(
@@ -337,7 +362,30 @@ contract NomaFactory {
 
         return _pool;
     }
- 
+
+    /**
+    * @notice Deploys liquidity for the vault based on the provided parameters.
+    * @param _IDOPrice The initial DEX offering price.
+    * @param _totalSupply The total supply of the token.
+    * @param _liquidityParams The parameters defining the liquidity structure.
+    * @dev This internal function deploys floor, anchor, and discovery liquidity using the deployer contract.
+    */
+    function _deployLiquidity(
+        uint256 _IDOPrice,
+        uint256 _totalSupply,
+        int24 _tickSpacing,
+        LiquidityStructureParameters memory _liquidityParams
+    ) internal {
+        deployer.deployFloor(_IDOPrice, _totalSupply * _liquidityParams.floorPercentage / 100, _tickSpacing);  
+        deployer.deployAnchor(
+            _liquidityParams.floorBips[0], 
+            _liquidityParams.floorBips[1], 
+            _totalSupply * _liquidityParams.anchorPercentage / 100
+        );
+        deployer.deployDiscovery(_IDOPrice * _liquidityParams.idoPriceMultiplier);
+    }
+
+
     /**
     * @notice Initializes the vault with the provided parameters.
     * @param _vault The address of the vault to initialize.
@@ -369,33 +417,12 @@ contract NomaFactory {
             _owner,
             _deployer,
             _pool,
-            _modelHelper,
+            // _modelHelper,
             _stakingContract,
             _token0,
-            _adaptiveSupply,
+            // _adaptiveSupply,
             _params
         );
-    }
-
-    /**
-    * @notice Deploys liquidity for the vault based on the provided parameters.
-    * @param _IDOPrice The initial DEX offering price.
-    * @param _totalSupply The total supply of the token.
-    * @param _liquidityParams The parameters defining the liquidity structure.
-    * @dev This internal function deploys floor, anchor, and discovery liquidity using the deployer contract.
-    */
-    function _deployLiquidity(
-        uint256 _IDOPrice,
-        uint256 _totalSupply,
-        LiquidityStructureParameters memory _liquidityParams
-    ) internal {
-        deployer.deployFloor(_IDOPrice, _totalSupply * _liquidityParams.floorPercentage / 100);  
-        deployer.deployAnchor(
-            _liquidityParams.floorBips[0], 
-            _liquidityParams.floorBips[1], 
-            _totalSupply * _liquidityParams.anchorPercentage / 100
-        );
-        deployer.deployDiscovery(_IDOPrice * _liquidityParams.idoPriceMultiplier);
     }
 
     /**
@@ -457,6 +484,18 @@ contract NomaFactory {
             result := mload(add(symbol, 32))
         }
         resolver.requireAndGetAddress(result, "not a reserve token");
+    }
+
+    function _validateFeeTier(uint24 _feeTier) internal pure returns (int24) {
+        return _getTickSpacing(_feeTier);
+    }
+
+    function _getTickSpacing(uint24 _feeTier) internal pure returns (int24) {
+        if (_feeTier == 100) return 1;
+        if (_feeTier == 500) return 10;
+        if (_feeTier == 3000) return 60;
+        if (_feeTier == 10000) return 200;
+        revert InvalidFeeTier();
     }
 
     /**

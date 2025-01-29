@@ -59,17 +59,17 @@ contract StakingVault is BaseVault {
             _v.discoveryPosition
         ];
 
-        uint256 excessReservesToken1 = IModelHelper(_v.modelHelper)
+        uint256 excessReservesToken1 = IModelHelper(modelHelper())
         .getExcessReserveBalance(
             address(_v.pool),
-            addresses.vault,
+            address(this),
             false
         );
 
-        uint256 intrinsicMinimumValue = IModelHelper(_v.modelHelper)
-        .getIntrinsicMinimumValue(addresses.vault);
+        uint256 intrinsicMinimumValue = IModelHelper(modelHelper())
+        .getIntrinsicMinimumValue(address(this));
 
-        uint256 circulatingSupply = IModelHelper(_v.modelHelper).getCirculatingSupply(addresses.pool, addresses.vault);
+        uint256 circulatingSupply = IModelHelper(modelHelper()).getCirculatingSupply(addresses.pool, address(this));
         uint256 totalSupply = IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).totalSupply();
 
         (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(addresses.pool).slot0();
@@ -93,7 +93,7 @@ contract StakingVault is BaseVault {
                 
         if (toMint > 0) {        
             IERC20Metadata(_v.tokenInfo.token0).approve(_v.stakingContract, toMint);
-            mintTokens(_v.stakingContract, toMint);
+            IVault(address(this)).mintTokens(_v.stakingContract, toMint);
             // Update total minted (NOMA)
             _v.totalMinted += toMint;
 
@@ -130,7 +130,7 @@ contract StakingVault is BaseVault {
 
         (
             uint256 circulatingSupply,,,
-        ) = LiquidityOps.getVaulData(addresses);
+        ) = LiquidityOps.getVaultData(addresses);
 
         uint256 newFloorPrice = IDeployer(addresses.deployer)
         .computeNewFloorPrice(
@@ -200,7 +200,7 @@ contract StakingVault is BaseVault {
 
         ( , uint256 anchorToken1Balance, 
             uint256 discoveryToken1Balance,
-        ) = LiquidityOps.getVaulData(addresses);
+        ) = LiquidityOps.getVaultData(addresses);
 
         // Collect all liquidity
         collectLiquidity(positions, addresses);
@@ -220,7 +220,7 @@ contract StakingVault is BaseVault {
             sqrtRatioX96
         );
 
-        IModelHelper(_v.modelHelper)
+        IModelHelper(modelHelper())
             .enforceSolvencyInvariant(address(this));   
     }
 
@@ -249,6 +249,7 @@ contract StakingVault is BaseVault {
 
         positions[1] = _deployAnchorPosition(
             positions[0].upperTick,
+            positions[0].tickSpacing,
             addresses,
             anchorToken1Balance,
             discoveryToken1Balance,
@@ -258,12 +259,13 @@ contract StakingVault is BaseVault {
 
         positions[2] = _deployDiscoveryPosition(
             positions[1].upperTick,
+            positions[1].tickSpacing,
             addresses,
             discoveryToken1Balance,
             sqrtRatioX96
         );
 
-        IVault(addresses.vault).updatePositions(positions);  
+        IVault(address(this)).updatePositions(positions);  
     }
 
     function _shiftFloorPosition(
@@ -281,7 +283,7 @@ contract StakingVault is BaseVault {
 
         return IDeployer(addresses.deployer).shiftFloor(
             addresses.pool,
-            addresses.vault,
+            address(this),
             price,
             newFloorPrice,
             floorToken1Balance + toMint,
@@ -292,6 +294,7 @@ contract StakingVault is BaseVault {
 
     function _deployAnchorPosition(
         int24 upperTick,
+        int24 tickSpacing,
         ProtocolAddresses memory addresses,
         uint256 anchorToken1Balance,
         uint256 discoveryToken1Balance,
@@ -303,7 +306,8 @@ contract StakingVault is BaseVault {
             LiquidityInternalPars({
                 lowerTick: upperTick,
                 upperTick: Utils.nearestUsableTick(
-                    TickMath.getTickAtSqrtRatio(sqrtRatioX96)
+                    TickMath.getTickAtSqrtRatio(sqrtRatioX96),
+                    tickSpacing
                 ),
                 amount1ToDeploy: (anchorToken1Balance + discoveryToken1Balance) - toMint,
                 liquidityType: LiquidityType.Anchor
@@ -314,6 +318,7 @@ contract StakingVault is BaseVault {
 
     function _deployDiscoveryPosition(
         int24 anchorUpperTick,
+        int24 tickSpacing,
         ProtocolAddresses memory addresses,
         uint256 discoveryToken1Balance,
         uint160 sqrtRatioX96
@@ -323,8 +328,10 @@ contract StakingVault is BaseVault {
             Utils.addBipsToTick(
                 anchorUpperTick,
                 IVault(address(this)).getLiquidityStructureParameters().discoveryBips,
-                decimals
-            )
+                decimals,
+                tickSpacing
+            ),
+            tickSpacing
         );
 
         return LiquidityOps.reDeploy(
@@ -333,7 +340,8 @@ contract StakingVault is BaseVault {
                 lowerTick: discoveryLowerTick,
                 upperTick: Utils.nearestUsableTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96) * 
-                    int8(IVault(address(this)).getLiquidityStructureParameters().idoPriceMultiplier)
+                    int8(IVault(address(this)).getLiquidityStructureParameters().idoPriceMultiplier),
+                    tickSpacing
                 ),
                 amount1ToDeploy: discoveryToken1Balance,
                 liquidityType: LiquidityType.Discovery

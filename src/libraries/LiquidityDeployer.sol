@@ -17,8 +17,7 @@ import {
     LiquidityPosition, 
     LiquidityType, 
     DeployLiquidityParameters, 
-    AmountsToMint,
-    tickSpacing
+    AmountsToMint
 } from "../types/Types.sol";
 
 library LiquidityDeployer {
@@ -41,23 +40,21 @@ library LiquidityDeployer {
             LiquidityType liquidityType
         )
     {
-        uint8 decimals = IERC20Metadata(address(IUniswapV3Pool(pool).token0())).decimals();
-
         (int24 lowerTick, int24 upperTick) = Conversions
         .computeRangeTicks(
             Conversions.sqrtPriceX96ToPrice(
                 Conversions.tickToSqrtPriceX96(floorPosition.upperTick),
-                decimals
+                IERC20Metadata(address(IUniswapV3Pool(pool).token0())).decimals()
             ),
             Utils.addBips(
                 Conversions.sqrtPriceX96ToPrice(
                     Conversions.tickToSqrtPriceX96(floorPosition.upperTick),
-                    decimals
+                    IERC20Metadata(address(IUniswapV3Pool(pool).token0())).decimals()
                 ),
                 int256(deployParams.bips)
             ),
             deployParams.tickSpacing,
-            decimals
+            IERC20Metadata(address(IUniswapV3Pool(pool).token0())).decimals()
         );
 
         if (upperTick <= lowerTick) {
@@ -69,6 +66,7 @@ library LiquidityDeployer {
             receiver,
             lowerTick,
             upperTick,
+            floorPosition.tickSpacing,
             LiquidityType.Anchor,
             AmountsToMint({
                 amount0: amount0,
@@ -122,6 +120,7 @@ library LiquidityDeployer {
             receiver,
             lowerTick,
             upperTick,
+            anchorPosition.tickSpacing,
             LiquidityType.Discovery,
             AmountsToMint({amount0: balanceToken0, amount1: 0})
         );
@@ -153,7 +152,7 @@ library LiquidityDeployer {
             (int24 lowerTick, int24 upperTick) = 
             Conversions.computeSingleTick(
                 newFloorPrice,
-                tickSpacing,
+                floorPosition.tickSpacing,
                 decimals
             );
 
@@ -181,6 +180,7 @@ library LiquidityDeployer {
                 newPosition.liquidity = newLiquidity;
                 newPosition.upperTick = upperTick;
                 newPosition.lowerTick = lowerTick;
+                newPosition.tickSpacing = floorPosition.tickSpacing;
 
             } else {
                 revert(
@@ -205,6 +205,7 @@ library LiquidityDeployer {
         address receiver,
         int24 lowerTick,
         int24 upperTick,
+        int24 tickSpacing,
         LiquidityType liquidityType,
         AmountsToMint memory amounts
     ) internal returns (LiquidityPosition memory newPosition) {
@@ -224,7 +225,7 @@ library LiquidityDeployer {
                 revert(
                     string(
                         abi.encodePacked(
-                            "_deployPosition: liquidity is 0 : ", 
+                            "_deployPosition(1): liquidity is 0 : ", 
                             Utils._uint2str(uint256(amounts.amount0))
                         )
                     )
@@ -246,7 +247,7 @@ library LiquidityDeployer {
             revert(
                 string(
                     abi.encodePacked(
-                        "_deployPosition: liquidity is 0 : ", 
+                        "_deployPosition(2): liquidity is 0 : ", 
                         Utils._uint2str(uint256(liquidity))
                     )
                 )
@@ -257,7 +258,8 @@ library LiquidityDeployer {
             lowerTick: lowerTick, 
             upperTick: upperTick, 
             liquidity: liquidity, 
-            price: 0
+            price: 0,
+            tickSpacing: tickSpacing
         });    
     }
 
@@ -277,6 +279,7 @@ library LiquidityDeployer {
             address(this), 
             positions[0].lowerTick,
             positions[0].upperTick,
+            positions[0].tickSpacing,
             LiquidityType.Floor, 
             AmountsToMint({
                 amount0: 0,

@@ -77,7 +77,8 @@ library DeployHelper {
             lowerTick: lowerTick, 
             upperTick: upperTick, 
             liquidity: liquidity, 
-            price: _floorPrice
+            price: _floorPrice,
+            tickSpacing: tickSpacing
         });
 
         return (

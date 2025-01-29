@@ -8,7 +8,6 @@ import {LiquidityDeployer} from "./libraries/LiquidityDeployer.sol";
 import {DeployHelper} from "./libraries/DeployHelper.sol";
 import {
     AmountsToMint, 
-    tickSpacing, 
     LiquidityPosition, 
     LiquidityType, 
     DeployLiquidityParameters
@@ -100,7 +99,7 @@ contract Deployer is Ownable {
         resolver = _resolver;
     }
 
-    /// @notice Initializes the contract state for a new deployment.
+    /// @notice Initializes the contract state
     /// @dev This function is protected by a lock modifier to prevent reentrancy.
     /// @param _factory Address of the factory.
     /// @param _vault Address of the vault.
@@ -165,7 +164,7 @@ contract Deployer is Ownable {
     /// @notice Deploys a floor liquidity position.
     /// @param _floorPrice The target floor price.
     /// @param _amount0 The amount of token0 to allocate.
-    function deployFloor(uint256 _floorPrice, uint256 _amount0) public lock onlyFactory {
+    function deployFloor(uint256 _floorPrice, uint256 _amount0, int24 tickSpacing) public lock onlyFactory {
         (LiquidityPosition memory newPosition, ) = DeployHelper.deployFloor(
             pool, 
             vault, 
@@ -191,7 +190,7 @@ contract Deployer is Ownable {
             DeployLiquidityParameters({
                 bips: _bipsWidth,
                 bipsBelowSpot: _bipsBelowSpot,
-                tickSpacing: tickSpacing,
+                tickSpacing: floorPosition.tickSpacing,
                 lowerTick: 0,
                 upperTick: 0
             })
@@ -213,7 +212,7 @@ contract Deployer is Ownable {
             address(pool), 
             vault,
             _upperDiscoveryPrice, 
-            tickSpacing,
+            floorPosition.tickSpacing,
             anchorPosition
         );
 
@@ -250,6 +249,7 @@ contract Deployer is Ownable {
             receiver,
             lowerTick,
             upperTick,
+            floorPosition.tickSpacing,
             liquidityType,
             amounts
         );
