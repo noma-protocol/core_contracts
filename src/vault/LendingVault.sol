@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {BaseVault} from "./BaseVault.sol";
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
-
 import {DecimalMath} from "../libraries/DecimalMath.sol";
 import {Uniswap} from "../libraries/Uniswap.sol";
 import {LiquidityDeployer} from "../libraries/LiquidityDeployer.sol";
-
 import {IVault} from "../interfaces/IVault.sol";
 
 import {
@@ -50,7 +49,7 @@ contract LendingVault is BaseVault {
     uint256 public constant SECONDS_IN_DAY = 86400;
 
     function _getTotalCollateral(uint256 borrowAmount) internal view returns (uint256, uint256) {
-        uint256 intrinsicMinimumValue = IModelHelper(_v.modelHelper).getIntrinsicMinimumValue(address(this));
+        uint256 intrinsicMinimumValue = IModelHelper(modelHelper()).getIntrinsicMinimumValue(address(this));
         return (DecimalMath.divideDecimal(borrowAmount, intrinsicMinimumValue), intrinsicMinimumValue);
     }
 
@@ -66,7 +65,7 @@ contract LendingVault is BaseVault {
         (uint256 collateralAmount,) = _getTotalCollateral(borrowAmount);
         if (collateralAmount == 0) revert InsufficientCollateral();
 
-        (,,, uint256 floorToken1Balance) = IModelHelper(_v.modelHelper)
+        (,,, uint256 floorToken1Balance) = IModelHelper(modelHelper())
         .getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
 
         if (floorToken1Balance < borrowAmount) revert InsufficientFloorBalance();
@@ -98,7 +97,7 @@ contract LendingVault is BaseVault {
 
         IVault(address(this)).updatePositions([_v.floorPosition, _v.anchorPosition, _v.discoveryPosition]);
         
-        IModelHelper(_v.modelHelper)
+        IModelHelper(modelHelper())
         .enforceSolvencyInvariant(address(this));           
     }
 
@@ -122,7 +121,7 @@ contract LendingVault is BaseVault {
 
         uint256 newCollateralValue = DecimalMath.multiplyDecimal(
             loan.collateralAmount, 
-            IModelHelper(_v.modelHelper).getIntrinsicMinimumValue(address(this))
+            IModelHelper(modelHelper()).getIntrinsicMinimumValue(address(this))
         );
 
         if (newCollateralValue <= loan.borrowAmount) revert CantRollLoan();
@@ -130,7 +129,7 @@ contract LendingVault is BaseVault {
         uint256 newBorrowAmount = newCollateralValue - loan.borrowAmount;
         uint256 newFees = calculateLoanFees(newBorrowAmount, loan.expiry - block.timestamp);
 
-        (,,, uint256 floorToken1Balance) = IModelHelper(_v.modelHelper)
+        (,,, uint256 floorToken1Balance) = IModelHelper(modelHelper())
         .getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
 
         LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
@@ -190,6 +189,32 @@ contract LendingVault is BaseVault {
         _v.discoveryPosition = _positions[2];
     }
 
+    function mintTokens(
+        address to,
+        uint256 amount
+    ) public onlyInternalCalls {
+        
+        _v.timeLastMinted = block.timestamp;
+
+        INomaFactory(_v.factory)
+        .mintTokens(
+            to,
+            amount
+        );
+    }
+
+    function burnTokens(
+        uint256 amount
+    ) public onlyInternalCalls {
+
+        IERC20(_v.pool.token0()).approve(address(_v.factory), amount);
+        INomaFactory(_v.factory)
+        .burnFor(
+            address(this),
+            amount
+        );
+    }
+
     function getPositions() public view
     returns (LiquidityPosition[3] memory positions) {
         positions = [
@@ -203,18 +228,25 @@ contract LendingVault is BaseVault {
         return INomaFactory(_v.factory).teamMultiSig();
     }
 
-    function setFees(
-        uint256 _feesAccumulatedToken0, 
-        uint256 _feesAccumulatedToken1
-    ) public onlyInternalCalls {
-
-        _v.feesAccumulatorToken0 += _feesAccumulatedToken0;
-        _v.feesAccumulatorToken1 += _feesAccumulatedToken1;
-    }
-
     function getLiquidityStructureParameters() public view returns 
     (LiquidityStructureParameters memory ) {
         return _v.liquidityStructureParameters;
+    }
+
+    function getTimeSinceLastMint() public view returns (uint256) {
+        return block.timestamp - _v.timeLastMinted;
+    }
+
+    function getCollateralAmount() public view returns (uint256) {
+        return _v.collateralAmount;
+    }
+
+    function pool() public view returns (IUniswapV3Pool) {
+        return _v.pool;
+    }
+
+    function getAccumulatedFees() public view returns (uint256, uint256) {
+        return (_v.feesAccumulatorToken0, _v.feesAccumulatorToken1);
     }
 
     modifier onlyVault() {
@@ -223,16 +255,20 @@ contract LendingVault is BaseVault {
     }
 
     function getFunctionSelectors() external pure override returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](9);
+        bytes4[] memory selectors = new bytes4[](13);
         selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,uint256)")));    
         selectors[1] = bytes4(keccak256(bytes("paybackLoan(address)")));
         selectors[2] = bytes4(keccak256(bytes("rollLoan(address)")));
         selectors[3] = bytes4(keccak256(bytes("defaultLoans()")));
-        selectors[4] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256)[3])")));
+        selectors[4] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256,int24)[3])")));
         selectors[5] = bytes4(keccak256(bytes("getPositions()")));
         selectors[6] = bytes4(keccak256(bytes("teamMultiSig()")));
         selectors[7] = bytes4(keccak256(bytes("getLiquidityStructureParameters()")));  
-        selectors[8] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));
+        selectors[8] = bytes4(keccak256(bytes("getTimeSinceLastMint()")));
+        selectors[9] = bytes4(keccak256(bytes("getCollateralAmount()")));
+        selectors[10] = bytes4(keccak256(bytes("mintTokens(address,uint256)")));
+        selectors[11] = bytes4(keccak256(bytes("burnTokens(uint256)")));
+        selectors[12] = bytes4(keccak256(bytes("pool()")));
         return selectors;
     }
 }
