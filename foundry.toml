@@ -5,6 +5,7 @@ libs = ["lib"]
 fs_permissions = [{ access = "read", path = "./"}]
 auto_detect_remappings = false
 skip_dependencies = true
+solc_version="0.8.23"
 
 remappings = [
     "ds-test/=lib/forge-std/lib/ds-test/src/",
