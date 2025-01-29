@@ -40,7 +40,7 @@ error StakingNotEnabled();
 
 contract StakingVault is BaseVault {
 
-    function mintAndDistributeRewards(ProtocolAddresses memory addresses) public {
+    function mintAndDistributeRewards(ProtocolAddresses memory addresses) public onlyInternalCalls {
         if (msg.sender != address(this)) {
             revert Unauthorized();
         }
@@ -103,15 +103,7 @@ contract StakingVault is BaseVault {
             // Send tokens to Floor
             _sendToken1ToFloor(positions, addresses, toMint);
         } else {
-            revert(
-                string(
-                    abi.encodePacked(
-                        "mintAndDistributeRewards: toMint is 0 : ", 
-                        Utils._uint2str(uint256(toMint))
-                    )
-                )
-            );
-            // revert NoStakingRewards();
+            revert NoStakingRewards();
         }
     }
 
@@ -365,6 +357,13 @@ contract StakingVault is BaseVault {
 
     function stakingEnabled() external view returns (bool) {
         return _v.stakingEnabled;
+    }
+
+    modifier onlyManager() {
+        if (msg.sender != _v.manager) {
+            revert Unauthorized();
+        }
+        _;
     }
 
     function getFunctionSelectors() external pure  override returns (bytes4[] memory) {
