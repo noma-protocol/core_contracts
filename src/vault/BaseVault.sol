@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
-import {OwnableUninitialized} from "../abstract/OwnableUninitialized.sol";
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
 import {VaultStorage} from "../libraries/LibAppStorage.sol";
 import {LibDiamond} from "../libraries/LibDiamond.sol";
@@ -42,7 +41,7 @@ error OnlyInternalCalls();
 error CallbackCaller();
 error ResolverNotSet();
 
-contract BaseVault is OwnableUninitialized {
+contract BaseVault {
     VaultStorage internal _v;
 
     event FloorUpdated(uint256 floorPrice, uint256 floorCapacity);
@@ -99,11 +98,13 @@ contract BaseVault is OwnableUninitialized {
         _v.proxyAddress = _proxyAddress;
         _v.deployerContract = _deployer;
         _v.protocolParameters = _params;
+        _v.manager = _owner;
         
         IERC20(_v.pool.token0()).approve(_deployer, type(uint256).max);
-        OwnableUninitialized(_owner);
     }
     
+    // *** MUTATIVE FUNCTIONS *** //
+
     function initializeLiquidity(
         LiquidityPosition[3] memory positions
     ) public onlyDeployer {
@@ -129,6 +130,8 @@ contract BaseVault is OwnableUninitialized {
         _v.feesAccumulatorToken0 += _feesAccumulatedToken0;
         _v.feesAccumulatorToken1 += _feesAccumulatedToken1;
     }
+
+    // *** VIEW FUNCTIONS *** //
 
     function getUnderlyingBalances(
         LiquidityType liquidityType
@@ -235,6 +238,8 @@ contract BaseVault is OwnableUninitialized {
         if (msg.sender != factory) revert OnlyFactory();
         _;
     }
+
+    // *** FUNCTION SELECTORS *** //
 
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](9);
