@@ -9,7 +9,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 abstract contract ERC20 is IERC20 {
     /// @dev Interface identifier for ERC20Token using ERC1820.
-    /// TODO: Document the actual hash value.
+    
+    /// The keccak256 hash of ERC20Token is aea199e31a596269b42cdafd93407f14436db6e4cad65417994c2eb37381e05a
     bytes32 private constant ERC20TOKEN_ERC1820_INTERFACE_ID = keccak256("ERC20Token");
 
     /// @dev Maps addresses to their respective token balances.
