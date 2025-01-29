@@ -23,7 +23,7 @@ import {
     ShiftParameters,
     ProtocolAddresses,
     PreShiftParameters,
-    LiquidityStructureParameters,
+    ProtocolParameters,
     LiquidityInternalPars
 } from "../types/Types.sol";
 
@@ -32,7 +32,7 @@ interface IVault {
     function setFees(uint256 _feesAccumulatedToken0, uint256 _feesAccumulatedToken1) external;
     function mintTokens(address to, uint256 amount) external;
     function burnTokens(uint256 amount) external;
-    function getLiquidityStructureParameters() external view returns (LiquidityStructureParameters memory _params);
+    function getProtocolParameters() external view returns (ProtocolParameters memory _params);
     function getTimeSinceLastMint() external view returns (uint256);
     function teamMultiSig() external view returns (address);
 }
@@ -81,7 +81,7 @@ library LiquidityOps {
             uint256 discoveryToken0Balance
         ) = getVaultData(addresses);
 
-        if (currentLiquidityRatio <= IVault(address(this)).getLiquidityStructureParameters().shiftRatio) {
+        if (currentLiquidityRatio <= IVault(address(this)).getProtocolParameters().shiftRatio) {
             
             // Shift --> ETH after skim at floor = 
             // ETH before skim at anchor - (liquidity ratio * ETH before skim at anchor)
@@ -267,7 +267,7 @@ library LiquidityOps {
 
         if (
             IModelHelper(addresses.modelHelper).getLiquidityRatio(addresses.pool, addresses.vault) >= 
-            IVault(address(this)).getLiquidityStructureParameters().slideRatio
+            IVault(address(this)).getProtocolParameters().slideRatio
         ) {
             
             (
@@ -363,7 +363,7 @@ library LiquidityOps {
                 upperTick: Utils.addBipsToTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
                     IVault(address(this))
-                    .getLiquidityStructureParameters().shiftAnchorUpperBips,
+                    .getProtocolParameters().shiftAnchorUpperBips,
                     decimals,
                     params.positions[0].tickSpacing
                 ),
@@ -386,7 +386,7 @@ library LiquidityOps {
                 upperTick: Utils.addBipsToTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
                     IVault(address(this))
-                    .getLiquidityStructureParameters().discoveryBips,
+                    .getProtocolParameters().discoveryBips,
                     decimals,
                     params.positions[0].tickSpacing
                 ),
@@ -412,7 +412,7 @@ library LiquidityOps {
                 lowerTick: positions[0].upperTick,
                 upperTick: Utils.addBipsToTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                    IVault(address(this)).getLiquidityStructureParameters()
+                    IVault(address(this)).getProtocolParameters()
                     .slideAnchorUpperBips,
                     IERC20Metadata(address(IUniswapV3Pool(addresses.pool).token0())).decimals(),
                     positions[0].tickSpacing
@@ -435,7 +435,7 @@ library LiquidityOps {
                 lowerTick: newPositions[1].upperTick + positions[0].tickSpacing,
                 upperTick: Utils.addBipsToTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                    IVault(address(this)).getLiquidityStructureParameters()
+                    IVault(address(this)).getProtocolParameters()
                     .discoveryBips,
                     IERC20Metadata(address(IUniswapV3Pool(addresses.pool).token0())).decimals(),
                     positions[0].tickSpacing
@@ -480,7 +480,7 @@ library LiquidityOps {
             
             (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(addresses.pool).slot0();
 
-            if (balanceToken0 < circulatingSupply / IVault(address(this)).getLiquidityStructureParameters().lowBalanceThresholdFactor) {
+            if (balanceToken0 < circulatingSupply / IVault(address(this)).getProtocolParameters().lowBalanceThresholdFactor) {
                 if (isShift) {
                     // Mint unbacked supply
                     (uint256 mintAmount) = IAdaptiveSupply(
@@ -499,7 +499,7 @@ library LiquidityOps {
 
                     if (mintAmount == 0 || mintAmount > totalSupply) {
                         // Fallback to minting a % of circulating supply
-                        mintAmount = circulatingSupply / IVault(address(this)).getLiquidityStructureParameters().lowBalanceThresholdFactor;
+                        mintAmount = circulatingSupply / IVault(address(this)).getProtocolParameters().lowBalanceThresholdFactor;
                     }
 
                     IVault(address(this))
@@ -513,14 +513,14 @@ library LiquidityOps {
                     if (teamMultisig != address(0)) {
                         IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).transfer(
                             teamMultisig, 
-                            mintAmount - (mintAmount * (IVault(address(this)).getLiquidityStructureParameters().inflationFee / 1e18))
+                            mintAmount - (mintAmount * (IVault(address(this)).getProtocolParameters().inflationFee / 1e18))
                         );
                     }
 
                 }
             }
         
-            if (balanceToken0 >= circulatingSupply / IVault(address(this)).getLiquidityStructureParameters().highBalanceThresholdFactor) {
+            if (balanceToken0 >= circulatingSupply / IVault(address(this)).getProtocolParameters().highBalanceThresholdFactor) {
                     if (!isShift) {
     
                         IVault(address(this))
@@ -531,7 +531,7 @@ library LiquidityOps {
                         IVault(address(this))
                         .mintTokens(
                             address(this),
-                            circulatingSupply / IVault(address(this)).getLiquidityStructureParameters().highBalanceThresholdFactor
+                            circulatingSupply / IVault(address(this)).getProtocolParameters().highBalanceThresholdFactor
                         );   
                 }                
             }
@@ -544,7 +544,7 @@ library LiquidityOps {
                 IVault(address(this))
                 .mintTokens(
                     address(this),
-                    circulatingSupply / IVault(address(this)).getLiquidityStructureParameters().lowBalanceThresholdFactor
+                    circulatingSupply / IVault(address(this)).getProtocolParameters().lowBalanceThresholdFactor
                 );
 
                 balanceToken0 = IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).balanceOf(address(this));

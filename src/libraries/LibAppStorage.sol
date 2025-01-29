@@ -8,7 +8,7 @@ import {
     TokenInfo, 
     LiquidityPosition, 
     LoanPosition, 
-    LiquidityStructureParameters
+    ProtocolParameters
 }  from "../types/Types.sol";
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
 
@@ -19,7 +19,7 @@ struct VaultStorage {
     // Vault state
     address factory;
 
-    LiquidityStructureParameters liquidityStructureParameters;
+    ProtocolParameters protocolParameters;
 
     // Liquidity positions
     LiquidityPosition  floorPosition;
@@ -33,7 +33,8 @@ struct VaultStorage {
     address[] loanAddresses;
     uint256 totalLoans;
     uint256 collateralAmount;
-
+    uint256 loanFee;
+    
     // Staking rewards
     uint256 totalMinted;
     uint256 timeLastMinted;

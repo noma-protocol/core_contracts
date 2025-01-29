@@ -19,7 +19,7 @@ import { Deployer } from "../Deployer.sol";
 
 import {
     VaultDeployParams,
-    LiquidityStructureParameters
+    ProtocolParameters
 } from "../types/Types.sol";
 
 import {IVaultUpgrade, IEtchVault, IExtFactory, IDeployerFactory} from "../interfaces/IVaultUpgrades.sol";
@@ -105,7 +105,7 @@ contract NomaFactory {
     
     bool permissionlessDeployEnabled;    
 
-    LiquidityStructureParameters liquidityStructureParameters;
+    ProtocolParameters protocolParameters;
 
     EnumerableSet.AddressSet deployers; 
 
@@ -220,7 +220,7 @@ contract NomaFactory {
             stakingContract,
             address(proxy),
             adaptiveSupply(),
-            getLiquidityStructureParameters()
+            getProtocolParameters()
         );
 
         VaultDescription memory vaultDesc = VaultDescription({
@@ -236,7 +236,7 @@ contract NomaFactory {
         IERC20Metadata(address(proxy)).transfer(address(deployer), _params._totalSupply);
         if (IERC20Metadata(address(proxy)).balanceOf(address(deployer)) != _params._totalSupply) revert SupplyTransferError();
 
-        _deployLiquidity(_params._IDOPrice, _params._totalSupply, tickSpacing, getLiquidityStructureParameters());
+        _deployLiquidity(_params._IDOPrice, _params._totalSupply, tickSpacing, getProtocolParameters());
 
         bytes32[] memory names = new bytes32[](4);
         names[0] = Utils.stringToBytes32("AdaptiveSupply");
@@ -374,7 +374,7 @@ contract NomaFactory {
         uint256 _IDOPrice,
         uint256 _totalSupply,
         int24 _tickSpacing,
-        LiquidityStructureParameters memory _liquidityParams
+        ProtocolParameters memory _liquidityParams
     ) internal {
         deployer.deployFloor(_IDOPrice, _totalSupply * _liquidityParams.floorPercentage / 100, _tickSpacing);  
         deployer.deployAnchor(
@@ -408,7 +408,7 @@ contract NomaFactory {
         address _stakingContract,
         address _token0,
         address _adaptiveSupply,
-        LiquidityStructureParameters memory _params
+        ProtocolParameters memory _params
     ) internal {
         BaseVault vault = BaseVault(_vault);
 
@@ -450,10 +450,10 @@ contract NomaFactory {
     * @param _params The new liquidity structure parameters.
     * @dev This function can only be called by the authority.
     */
-    function setLiquidityStructureParameters(
-        LiquidityStructureParameters memory _params
+    function setProtocolParameters(
+        ProtocolParameters memory _params
     ) public isAuthority {
-        liquidityStructureParameters = _params;
+        protocolParameters = _params;
     }
 
     /**
@@ -502,9 +502,9 @@ contract NomaFactory {
     * @notice Retrieves the current liquidity structure parameters.
     * @return The current liquidity structure parameters.
     */
-    function getLiquidityStructureParameters() public view returns 
-    (LiquidityStructureParameters memory) {
-        return liquidityStructureParameters;
+    function getProtocolParameters() public view returns 
+    (ProtocolParameters memory) {
+        return protocolParameters;
     }
 
     /**

@@ -6,7 +6,7 @@ import {
     VaultInfo,
     LiquidityPosition,
     ProtocolAddresses,
-    LiquidityStructureParameters
+    ProtocolParameters
 } from "../types/Types.sol";
 
 /**
@@ -100,9 +100,9 @@ interface IVault {
 
     /**
      * @notice Retrieves the liquidity structure parameters of the vault.
-     * @return A `LiquidityStructureParameters` object containing the vault's liquidity parameters.
+     * @return A `ProtocolParameters` object containing the vault's liquidity parameters.
      */
-    function getLiquidityStructureParameters() external view returns (LiquidityStructureParameters memory);
+    function getProtocolParameters() external view returns (ProtocolParameters memory);
 
     /**
      * @notice Retrieves the address of the staking contract associated with the vault.
