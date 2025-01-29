@@ -9,13 +9,22 @@ interface IERC20 {
     function decimals() external view returns (uint8);
 }
 
-interface IVault{
+interface IVault {
     function pool() external view returns (IUniswapV3Pool);
 }
 
 contract AdaptiveSupply {
     using FixedPointMathLib for uint256;
     using SafeMathInt for int256;
+
+    // Custom errors
+    error TimeElapsedZero();
+    error DeltaSupplyZero();
+    error IMVZero();
+    error SpotPriceLowerThanIMV();
+    error InvalidTokenDecimals();
+    error InvalidDenominator();
+    error InvalidSqrtTimeElapsed();
 
     function calculateVolatilityAdjustment(uint256 volatility) internal pure returns (uint256) {
         uint256 kv = 1e18;
@@ -29,22 +38,22 @@ contract AdaptiveSupply {
         uint256 spotPrice,
         uint256 imv
     ) public view returns (uint256 mintAmount) {
-        require(timeElapsed > 0, "Time elapsed must be greater than zero");
-        require(deltaSupply > 0, "Delta supply must be greater than zero");
-        require(imv > 0, "IMV must be greater than zero");
+        if (timeElapsed == 0) revert TimeElapsedZero();
+        if (deltaSupply == 0) revert DeltaSupplyZero();
+        if (imv == 0) revert IMVZero();
 
         uint256 scaleFactor = calculateScaleFactor();
         uint256 sigmoid = calculateSigmoid(deltaSupply, timeElapsed);
 
         // Calculate ratio = spotPrice / imv
         uint256 ratio = spotPrice.divWadDown(imv);
-        require(ratio >= 1e18, "Spot price must not be lower than IMV");
+        if (ratio < 1e18) revert SpotPriceLowerThanIMV();
 
         // Combine ratio and time for adjustment
         uint256 timeAdjustment = calculateTimeAdjustment(ratio, timeElapsed);
 
         uint256 sqrtTime = timeElapsed.sqrt();
-        require(sqrtTime > 0, "Invalid sqrt(timeElapsed)");
+        if (sqrtTime == 0) revert InvalidSqrtTimeElapsed();
         uint256 tBase = deltaSupply.divWadDown(sqrtTime);
 
         mintAmount = tBase.mulWadDown(sigmoid).mulWadDown(timeAdjustment);
@@ -57,13 +66,13 @@ contract AdaptiveSupply {
                 IVault(msg.sender).pool()
             ).token1()
         ).decimals();
-        require(tokenDecimals >= 6 && tokenDecimals <= 18, "Invalid token decimals");
+        if (tokenDecimals < 6 || tokenDecimals > 18) revert InvalidTokenDecimals();
         return 10**(18 - tokenDecimals);
     }
 
     function calculateSigmoid(uint256 deltaSupply, uint256 timeElapsed) internal pure returns (uint256) {
         uint256 denominator = deltaSupply + timeElapsed;
-        require(denominator > 0, "Invalid denominator");
+        if (denominator == 0) revert InvalidDenominator();
         uint256 r = deltaSupply.divWadDown(denominator);
 
         uint256 maxR = 0.99e18;
@@ -92,5 +101,4 @@ contract AdaptiveSupply {
         uint256 timeFactor = timeElapsed.sqrt();
         return ratioFactor.mulWadDown(timeFactor);
     }
-
 }

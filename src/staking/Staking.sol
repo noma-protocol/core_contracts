@@ -11,16 +11,16 @@ contract Staking {
     using SafeERC20 for IsNomaToken;
 
     struct Epoch {
-        uint256 number; // since inception
-        uint256 end; // timestamp
+        uint256 number;     // since inception
+        uint256 end;        // timestamp
         uint256 distribute; // amount
     }
 
     struct Claim {
         uint256 deposit; // if forfeiting
-        uint256 gons; // staked balance
-        uint256 expiry; // end of warmup period
-        bool lock; // prevents malicious delays for claim
+        uint256 gons;    // staked balance
+        uint256 expiry;  // end of warmup period
+        bool lock;       // prevents malicious delays for claim
     }
 
     IERC20 public NOMA;
@@ -43,6 +43,10 @@ contract Staking {
     error NotEnoughBalance();
     error InvalidReward();
     error OnlyVault();
+
+    event Staked(address indexed user, uint256 amount);
+    event Unstaked(address indexed user, uint256 amount);
+    event NotifiedReward(uint256 reward);
 
     constructor(    
         address _noma,
@@ -79,6 +83,7 @@ contract Staking {
         NOMA.safeTransferFrom(_to, address(this), _amount);
         sNOMA.mint(_to, _amount);
 
+        emit Staked(_to, _amount);
     }
 
     function unstake(
@@ -105,6 +110,7 @@ contract Staking {
         sNOMA.burnFor(_from, balance);
         NOMA.safeTransfer(_from, balance);
 
+        emit Unstaked(_from, balance);
     }  
 
     function notifyRewardAmount(uint256 _reward) public onlyVault {
@@ -120,7 +126,6 @@ contract Staking {
         
         // Save current epoch with the reward distributed
         if (totalEpochs > 1) {
-            // require(_reward > 0, "epoch > 1, invalid reward");
             if (_reward == 0) {
                 revert InvalidReward();
             }
@@ -143,6 +148,8 @@ contract Staking {
         } 
         
         totalEpochs++;
+    
+        emit NotifiedReward(_reward);
     }
 
     modifier onlyVault() {
