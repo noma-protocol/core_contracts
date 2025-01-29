@@ -111,4 +111,8 @@ interface IVault {
     function getStakingContract() external view returns (address);
 
     function stakingEnabled() external view returns (bool);
+
+    function mintTokens(address to, uint256 amount) external;
+
+    function burnTokens(uint256 amount) external;
 }
