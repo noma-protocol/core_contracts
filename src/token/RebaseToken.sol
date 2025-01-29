@@ -60,7 +60,7 @@ contract RebaseToken is ERC20Permit {
         transfer(stakingContract, _totalSupply);
     }
 
-    function mint(address to, uint256 amount) external {
+    function mint(address to, uint256 amount) public onlyStakingContract {
         require(amount > 0, "Amount must be greater than 0");
 
         uint256 gonAmount = amount.mul(_gonsPerFragment);
