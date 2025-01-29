@@ -4,10 +4,6 @@ pragma solidity ^0.8.23;
 import {RewardParams} from "../../types/Types.sol";
 import {Math} from "openzeppelin/contracts/utils/math/Math.sol";
 
-interface IERC20 { 
-    function decimals() external view returns (uint8);
-}
-
 contract RewardsCalculator {
 
     function calculateRewards(
@@ -25,4 +21,5 @@ contract RewardsCalculator {
         uint256 tMint = totalSupplyScaled / Math.sqrt(timeElapsed);
         return tMint;
     }
+
 }
