@@ -52,40 +52,6 @@ library Utils {
 
         return newTickValue;
     }
-
-    function intToString(int256 _value) public pure returns (string memory) {
-        // Handle zero case explicitly
-        if (_value == 0) {
-            return "0";
-        }
-        
-        // Temporary buffer to store the reversed string
-        bytes memory buffer = new bytes(100);
-        uint256 length = 0;
-
-        // Handle negative values
-        bool isNegative = _value < 0;
-        uint256 value = isNegative ? uint256(-_value) : uint256(_value);
-
-        // Construct the string in reverse
-        while (value != 0) {
-            buffer[length++] = bytes1(uint8(48 + value % 10));
-            value /= 10;
-        }
-
-        // Add '-' for negative numbers
-        if (isNegative) {
-            buffer[length++] = '-';
-        }
-
-        // Reverse the string to get the correct representation
-        bytes memory strBytes = new bytes(length);
-        for (uint256 i = 0; i < length; ++i) {
-            strBytes[i] = buffer[length - 1 - i];
-        }
-
-        return string(strBytes);
-    }
     
     function _uint2str(uint256 _i) internal pure returns (string memory _uintAsString) {
         if (_i == 0) return "0";
@@ -105,26 +71,6 @@ library Utils {
             _i /= 10;
         }
         return string(bstr);
-    }
-
-    function strToUint(string memory s) public pure returns (uint256) {
-       bytes memory b = bytes(s);
-        uint256 result = 0;
-        for (uint256 i = 0; i < b.length; i++) {
-            if (b[i] >= 0x30 && b[i] <= 0x39) { // 0x30 is '0' and 0x39 is '9'
-                result = result * 10 + (uint8(b[i]) - 0x30);
-            } else {
-                revert InvalidChars();
-            }
-        }
-        return result;
-    }
-
-    function int24ToUint256(int24 _value) public pure returns (uint256) {
-        if (_value < 0) {
-            revert NegativeValue();
-        }
-        return uint256(uint24(_value));
     }
 
     function toHexChar(uint8 byteValue) internal pure returns (bytes memory) {
@@ -148,20 +94,6 @@ library Utils {
         }
         return string(hexString);
     }
-    
-    function bytesToString(bytes memory byteData) internal pure returns (string memory) {
-        bytes memory stringBytes = new bytes(byteData.length);
-
-        for (uint256 i=0; i<byteData.length; i++) {
-            stringBytes[i] = byteData[i];
-        }
-
-        return string(stringBytes);
-    }
-
-    function compareStrings(string memory a, string memory b) internal pure returns (bool) {
-        return (keccak256(abi.encodePacked((a))) == keccak256(abi.encodePacked((b))));
-    }
 
     function stringToBytes32(string memory source) public pure returns (bytes32 result) {
         bytes memory tempEmptyStringTest = bytes(source);
@@ -179,10 +111,6 @@ library Utils {
             return result;
         }
     }
-
-    function abs(int256 x) pure private returns (uint256) {
-        return uint256(x >= 0 ? x : -x);
-    } 
 
     // TICK CALCULATION FUNCTIONS
     function nearestUsableTick(int24 tick, int24 tickSpacing) public pure returns (int24) {

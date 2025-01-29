@@ -11,7 +11,7 @@ import {Conversions} from "../libraries/Conversions.sol";
 import {DecimalMath} from "../libraries/DecimalMath.sol";
 
 import {Underlying} from "../libraries/Underlying.sol";
-import { IVault } from "../interfaces/IVault.sol";
+import {IVault} from "../interfaces/IVault.sol";
 
 import {
     LiquidityPosition,
@@ -19,7 +19,6 @@ import {
     TokenInfo,
     VaultInfo
 } from "../types/Types.sol";
-
 
 error NoLiquidity();
 error InsolvencyInvariant();

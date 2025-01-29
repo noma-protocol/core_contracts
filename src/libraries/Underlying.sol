@@ -85,8 +85,6 @@ library Underlying {
             uint256 amount1Current
         )
     {
-        // require(position.liquidity > 0, "0 liquidity position");
-
         (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
 
         (
@@ -113,29 +111,6 @@ library Underlying {
 
             lowerTick = position.lowerTick;
             upperTick = position.upperTick;
-
-            // compute current fees earned, 3000 = Manager fee
-            // uint256 fee0 = computeFeesEarned(
-            //     pool, 
-            //     position, 
-            //     true, 
-            //     feeGrowthInside0Last, 
-            //     tick, 
-            //     liquidity
-            // ) + uint256(tokensOwed0);
-
-            // fee0 = fee0 - (fee0 * (250 + 3000)) / 10000;
-
-            // uint256 fee1 = computeFeesEarned(
-            //     pool, 
-            //     position, 
-            //     false, 
-            //     feeGrowthInside1Last, 
-            //     tick, 
-            //     liquidity
-            // ) + uint256(tokensOwed1);
-
-            // fee1 = fee1 - (fee1 * (250 + 3000)) / 10000;
         }  
     }    
 }

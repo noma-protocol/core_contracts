@@ -45,7 +45,6 @@ contract BaseVault {
     VaultStorage internal _v;
 
     event FloorUpdated(uint256 floorPrice, uint256 floorCapacity);
-    error MyError();
 
     /**
      * @notice Uniswap V3 callback function, called back on pool.mint
