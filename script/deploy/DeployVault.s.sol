@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Script.sol";
 import { NomaFactory } from  "../../src/factory/NomaFactory.sol";
-import { VaultDeployParams, VaultDescription, LiquidityStructureParameters } from "../../src/types/Types.sol";
+import { VaultDeployParams, VaultDescription, ProtocolParameters } from "../../src/types/Types.sol";
 import { IDOHelper } from "../../test/IDO_Helper/IDOHelper.sol";
 
 contract DeployVault is Script {
@@ -14,7 +14,7 @@ contract DeployVault is Script {
     // Constants
     address WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
     address private nomaFactoryAddress = 0xe819370DE33df08F8080E99818f6a3653F742812;
-    address private modelHelper = 0x0E90A3D616F9Fe2405325C3a7FB064837817F45F;
+    address private modelHelper = 0x6D47E56d5CD83d396AC92F1f66e7D095925B4D0C;
 
     IDOHelper private idoManager;
 
@@ -31,7 +31,8 @@ contract DeployVault is Script {
             100e18,
             10,
             1e18,
-            WETH
+            WETH,
+            3000
         );
 
         (address vault, address pool, address proxy) = 

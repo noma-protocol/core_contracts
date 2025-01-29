@@ -10,7 +10,7 @@ import { Resolver } from "../../src/Resolver.sol";
 import { ModelHelper } from "../../src/model/Helper.sol";
 import { Deployer } from "../../src/Deployer.sol";
 import { NomaFactory } from "../../src/factory/NomaFactory.sol";
-import { VaultDeployParams, VaultDescription, LiquidityStructureParameters } from "../../src/types/Types.sol";
+import { VaultDeployParams, VaultDescription, ProtocolParameters } from "../../src/types/Types.sol";
 import { 
     VaultUpgrade, 
     VaultUpgradeStep1, 
@@ -114,23 +114,24 @@ contract DeployFactory is Script {
             ContractInfo("NomaFactory", address(nomaFactory))
         );
 
-        LiquidityStructureParameters memory _params =
-        LiquidityStructureParameters(
-            10, // Floor percentage of total supply
-            5, // Anchor percentage of total supply
-            3, // IDO price multiplier
+        ProtocolParameters memory _params =
+        ProtocolParameters(
+            10,         // Floor percentage of total supply
+            5,          // Anchor percentage of total supply
+            3,          // IDO price multiplier
             [200, 500], // Floor bips
-            90e16, // Shift liquidity ratio
-            120e16, // Slide liquidity ratio,
-            25000, // Discovery deploy bips,
-            10, // shiftAnchorUpperBips
-            300, // slideAnchorUpperBips
-            100, // lowBalanceThresholdFactor
-            100, // highBalanceThresholdFactor
-            5e15 // inflationFee
+            90e16,      // Shift liquidity ratio
+            120e16,     // Slide liquidity ratio
+            25000,      // Discovery deploy bips
+            10,         // shiftAnchorUpperBips
+            300,        // slideAnchorUpperBips
+            100,        // lowBalanceThresholdFactor
+            100,        // highBalanceThresholdFactor
+            5e15,       // inflationFee
+            27          // loanFee
         );
 
-        nomaFactory.setLiquidityStructureParameters(_params);
+        nomaFactory.setProtocolParameters(_params);
 
         resolver.initFactory(address(nomaFactory));
         etchVault = new EtchVault(address(nomaFactory), address(resolver));
