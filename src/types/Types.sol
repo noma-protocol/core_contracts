@@ -210,7 +210,7 @@ struct RewardParams {
 /// @param shiftRatio Ratio used for liquidity shifting.
 /// @param slideRatio Ratio used for liquidity sliding.
 /// @param discoveryBips Basis points for the discovery range.
-struct LiquidityStructureParameters {
+struct ProtocolParameters {
     uint8 floorPercentage;
     uint8 anchorPercentage;
     uint8 idoPriceMultiplier;
@@ -223,6 +223,7 @@ struct LiquidityStructureParameters {
     uint256 lowBalanceThresholdFactor;
     uint256 highBalanceThresholdFactor;
     uint256 inflationFee;
+    uint256 loanFee;
 }
 
 /// @notice Parameters for structuring liquidity.
