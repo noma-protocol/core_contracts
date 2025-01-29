@@ -4,12 +4,6 @@ pragma solidity ^0.8.0;
 /// @title Liquidity Management Structs and Constants
 /// @notice This contract defines various structs and constants used in liquidity management operations.
 
-/// @dev Fee tier used in the protocol, specified in basis points (bps).
-uint24 constant feeTier = 3000;
-
-/// @dev Tick spacing used for Uniswap pools.
-int24 constant tickSpacing = 60;
-
 /// @notice Represents a liquidity position within specified tick ranges.
 /// @param lowerTick The lower tick of the position.
 /// @param upperTick The upper tick of the position.
@@ -20,6 +14,7 @@ struct LiquidityPosition {
     int24 upperTick;
     uint128 liquidity;
     uint256 price;
+    int24 tickSpacing;
 }
 
 /// @notice Enum representing the types of liquidity.
@@ -28,20 +23,6 @@ enum LiquidityType {
     Floor,
     Anchor,
     Discovery
-}
-
-/// @notice Parameters for deploying liquidity positions.
-/// @param bips Basis points for the liquidity.
-/// @param bipsBelowSpot Basis points below the spot price.
-/// @param tickSpacing Tick spacing for the position.
-/// @param lowerTick The lower tick of the position.
-/// @param upperTick The upper tick of the position.
-struct DeployLiquidityParameters {
-    uint256 bips;
-    uint256 bipsBelowSpot;
-    int24 tickSpacing;
-    int24 lowerTick;
-    int24 upperTick;
 }
 
 /// @notice Struct for representing token amounts to mint.
@@ -60,14 +41,6 @@ struct TokenInfo {
     address token1;
 }
 
-/// @notice Results of a shift operation.
-/// @param currentLiquidityRatio The current liquidity ratio.
-/// @param newFloorPrice The new floor price after the shift.
-struct ShiftOpResult {
-    uint256 currentLiquidityRatio;
-    uint256 newFloorPrice;
-}
-
 /// @notice Addresses used by the protocol.
 /// @param pool Address of the liquidity pool.
 /// @param vault Address of the vault contract.
@@ -80,65 +53,6 @@ struct ProtocolAddresses {
     address deployer;
     address modelHelper;
     address adaptiveSupplyController;
-}
-
-/// @notice Parameters for structuring liquidity.
-/// @param floorPercentage Percentage allocated to floor liquidity.
-/// @param anchorPercentage Percentage allocated to anchor liquidity.
-/// @param idoPriceMultiplier Multiplier for the IDO price.
-/// @param floorBips Basis points for the floor range.
-/// @param shiftRatio Ratio used for liquidity shifting.
-/// @param slideRatio Ratio used for liquidity sliding.
-/// @param discoveryBips Basis points for the discovery range.
-struct LiquidityStructureParameters {
-    uint8 floorPercentage;
-    uint8 anchorPercentage;
-    uint8 idoPriceMultiplier;
-    uint16[2] floorBips;
-    uint256 shiftRatio;
-    uint256 slideRatio;
-    int24 discoveryBips;
-    int24 shiftAnchorUpperBips;
-    int24 slideAnchorUpperBips;
-    uint256 lowBalanceThresholdFactor;
-    uint256 highBalanceThresholdFactor;
-    uint256 inflationFee;
-}
-
-/// @notice Parameters for a shift operation.
-/// @param pool Address of the liquidity pool.
-/// @param deployer Address of the deployer.
-/// @param toSkim Amount to skim from liquidity.
-/// @param newFloorPrice The new floor price.
-/// @param modelHelper Address of the model helper.
-/// @param adaptiveSupplyController Address of the adaptive supply controller.
-/// @param floorToken1Balance Token1 balance allocated to the floor.
-/// @param anchorToken1Balance Token1 balance allocated to the anchor.
-/// @param discoveryToken1Balance Token1 balance allocated to discovery.
-/// @param discoveryToken0Balance Token0 balance allocated to discovery.
-/// @param positions Liquidity positions involved in the operation.
-struct ShiftParameters {
-    address pool;
-    address deployer;
-    uint256 toSkim;
-    uint256 newFloorPrice;
-    address modelHelper;
-    address adaptiveSupplyController;
-    uint256 floorToken1Balance;
-    uint256 anchorToken1Balance;
-    uint256 discoveryToken1Balance; 
-    uint256 discoveryToken0Balance;   
-    LiquidityPosition[3] positions;
-}
-
-/// @notice Vault data used in the protocol.
-/// @param anchorToken1Balance Token1 balance allocated to the anchor.
-/// @param discoveryToken1Balance Token1 balance allocated to discovery.
-/// @param circulatingSupply Total circulating supply of the vault's tokens.
-struct VaultData {
-    uint256 anchorToken1Balance;
-    uint256 discoveryToken1Balance;
-    uint256 circulatingSupply;
 }
 
 /// @notice General information about the vault.
@@ -177,22 +91,21 @@ struct VaultDeployParams {
     uint16 _percentageForSale;
     uint256 _IDOPrice;
     address token1;
+    uint24 feeTier;
 }
 
-/// @notice Parameters for initializing a vault.
-/// @param _deployer Address of the deployer.
-/// @param _pool Address of the liquidity pool.
-/// @param _modelHelper Address of the model helper.
-/// @param _stakingContract Address of the staking contract.
-/// @param _proxyAddress Address of the proxy contract.
-/// @param _escrowContract Address of the escrow contract.
-struct VaultInitParams {
-    address _deployer;
-    address _pool;
-    address _modelHelper;
-    address _stakingContract;
-    address _proxyAddress;
-    address _escrowContract;
+/// @notice Parameters for deploying liquidity positions.
+/// @param bips Basis points for the liquidity.
+/// @param bipsBelowSpot Basis points below the spot price.
+/// @param tickSpacing Tick spacing for the position.
+/// @param lowerTick The lower tick of the position.
+/// @param upperTick The upper tick of the position.
+struct DeployLiquidityParameters {
+    uint256 bips;
+    uint256 bipsBelowSpot;
+    int24 tickSpacing;
+    int24 lowerTick;
+    int24 upperTick;
 }
 
 /// @notice Description of a vault.
@@ -233,6 +146,33 @@ struct PreShiftParameters {
     uint256 discoveryToken0Balance;
 }
 
+/// @notice Parameters for a shift operation.
+/// @param pool Address of the liquidity pool.
+/// @param deployer Address of the deployer.
+/// @param toSkim Amount to skim from liquidity.
+/// @param newFloorPrice The new floor price.
+/// @param modelHelper Address of the model helper.
+/// @param adaptiveSupplyController Address of the adaptive supply controller.
+/// @param floorToken1Balance Token1 balance allocated to the floor.
+/// @param anchorToken1Balance Token1 balance allocated to the anchor.
+/// @param discoveryToken1Balance Token1 balance allocated to discovery.
+/// @param discoveryToken0Balance Token0 balance allocated to discovery.
+/// @param positions Liquidity positions involved in the operation.
+struct ShiftParameters {
+    address pool;
+    address deployer;
+    uint256 toSkim;
+    uint256 newFloorPrice;
+    address modelHelper;
+    address adaptiveSupplyController;
+    uint256 floorToken1Balance;
+    uint256 anchorToken1Balance;
+    uint256 discoveryToken1Balance; 
+    uint256 discoveryToken0Balance;   
+    LiquidityPosition[3] positions;
+}
+
+
 /// @notice Represents a loan position.
 /// @param borrowAmount Amount borrowed.
 /// @param collateralAmount Collateral amount provided.
@@ -262,6 +202,37 @@ struct RewardParams {
     uint256 kr;          // Sensitivity for r adjustment (e.g., 10e18)
 }
 
+/// @notice Parameters for structuring liquidity.
+/// @param floorPercentage Percentage allocated to floor liquidity.
+/// @param anchorPercentage Percentage allocated to anchor liquidity.
+/// @param idoPriceMultiplier Multiplier for the IDO price.
+/// @param floorBips Basis points for the floor range.
+/// @param shiftRatio Ratio used for liquidity shifting.
+/// @param slideRatio Ratio used for liquidity sliding.
+/// @param discoveryBips Basis points for the discovery range.
+struct LiquidityStructureParameters {
+    uint8 floorPercentage;
+    uint8 anchorPercentage;
+    uint8 idoPriceMultiplier;
+    uint16[2] floorBips;
+    uint256 shiftRatio;
+    uint256 slideRatio;
+    int24 discoveryBips;
+    int24 shiftAnchorUpperBips;
+    int24 slideAnchorUpperBips;
+    uint256 lowBalanceThresholdFactor;
+    uint256 highBalanceThresholdFactor;
+    uint256 inflationFee;
+}
+
+/// @notice Parameters for structuring liquidity.
+/// @param floorPercentage Percentage allocated to floor liquidity.
+/// @param anchorPercentage Percentage allocated to anchor liquidity.
+/// @param idoPriceMultiplier Multiplier for the IDO price.
+/// @param floorBips Basis points for the floor range.
+/// @param shiftRatio Ratio used for liquidity shifting.
+/// @param slideRatio Ratio used for liquidity sliding.
+/// @param discoveryBips Basis points for the discovery range.
 struct LiquidityInternalPars {
     int24 lowerTick;
     int24 upperTick;
