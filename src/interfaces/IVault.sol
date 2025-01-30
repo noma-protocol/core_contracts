@@ -57,9 +57,10 @@ interface IVault {
     /**
      * @notice Allows a borrower to roll their loan.
      * @param who The address of the borrower rolling their loan.
+        * @param newDuration The new duration of the loan.
      * @dev Rolls the loan to a new term with updated parameters.
      */
-    function roll(address who) external;
+    function roll(address who, uint256 newDuration) external;
 
     /**
      * @notice Updates the vault's liquidity positions.

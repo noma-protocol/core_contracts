@@ -153,8 +153,8 @@ contract LendingVault is BaseVault {
         if (block.timestamp > loan.expiry) revert LoanExpired();
 
         // Ensure the new duration is valid
-        if (newDuration == 0) revert InvalidDuration("Duration cannot be zero");
-        if (newDuration > loan.duration) revert InvalidDuration("New duration cannot exceed original duration");
+        if (newDuration == 0) revert InvalidDuration();
+        if (newDuration > loan.duration) revert InvalidDuration();
 
         // Recalculate the collateral value
         uint256 newCollateralValue = DecimalMath.multiplyDecimal(
@@ -371,7 +371,7 @@ contract LendingVault is BaseVault {
         bytes4[] memory selectors = new bytes4[](13);
         selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,uint256)")));    
         selectors[1] = bytes4(keccak256(bytes("paybackLoan(address)")));
-        selectors[2] = bytes4(keccak256(bytes("rollLoan(address)")));
+        selectors[2] = bytes4(keccak256(bytes("rollLoan(address,uint256)")));
         selectors[3] = bytes4(keccak256(bytes("defaultLoans()")));
         selectors[4] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256,int24)[3])")));
         selectors[5] = bytes4(keccak256(bytes("getPositions()")));

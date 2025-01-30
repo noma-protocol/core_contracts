@@ -16,7 +16,7 @@ interface IStakingVault {
 interface ILendingVault {
     function borrowFromFloor(address who, uint256 borrowAmount, uint256 duration) external;
     function paybackLoan(address who) external;
-    function rollLoan(address who) external;
+    function rollLoan(address who, uint256 newDuration) external;
 }
 
 // Events
@@ -28,8 +28,8 @@ event Slide();
 
 /**
  * @title ExtVault
- * @notice A contract for extending the functionality of a vault, including borrowing, paying back loans, and managing liquidity positions.
- * @dev This contract interacts with the `LendingVault` and `StakingVault` to provide additional functionality.
+ * @notice A contract for vault external functions.
+ * @dev n/a.
  */
 contract ExtVault {
 
@@ -74,11 +74,13 @@ contract ExtVault {
      * @param who The address of the borrower.
      */
     function roll(
-        address who
+        address who,
+        uint256 newDuration
     ) external {
         ILendingVault(address(this))
         .rollLoan(
-            who
+            who,
+            newDuration
         );
 
         emit RollLoan(who);
@@ -130,7 +132,7 @@ contract ExtVault {
         selectors[1] = bytes4(keccak256(bytes("slide()")));  
         selectors[2] = bytes4(keccak256(bytes("borrow(address,uint256,uint256)")));  
         selectors[3] = bytes4(keccak256(bytes("payback(address)")));
-        selectors[4] = bytes4(keccak256(bytes("roll(address)")));              
+        selectors[4] = bytes4(keccak256(bytes("roll(address,uint256)")));              
         return selectors;
     }
 }
