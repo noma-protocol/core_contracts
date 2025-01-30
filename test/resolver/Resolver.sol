@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "../../src/abstract/OwnableUninitialized.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import {IAddressResolver} from "../../src/interfaces/IAddressResolver.sol";
 
-contract TestResolver is OwnableUninitialized {
+contract TestResolver is Ownable {
     IAddressResolver resolver;
 
     mapping(bytes32 => address) private addressCache;
@@ -19,16 +19,14 @@ contract TestResolver is OwnableUninitialized {
     error AddressNotFound(string reason);
     error OnlyFactoryOrManagerAllowed();
 
-    constructor(address _deployer) {
-        _manager = _deployer;
-    }
+    constructor(address _deployer)  Ownable(_deployer) {}
 
-    function initFactory(address _factory) external onlyManager {
+    function initFactory(address _factory) external onlyOwner {
         if (_factory == address(0)) revert InvalidAddress();
         repository["NomaFactory"] = _factory;
     }
 
-    function importAddresses(bytes32[] calldata names, address[] calldata destinations) external onlyManager {
+    function importAddresses(bytes32[] calldata names, address[] calldata destinations) external onlyOwner {
         if (names.length != destinations.length) revert InputLengthsMismatch();
 
         for (uint256 i = 0; i < names.length; i++) {
@@ -87,7 +85,7 @@ contract TestResolver is OwnableUninitialized {
     }
 
     modifier onlyFactoryOrManager() {
-        if (msg.sender != repository["NomaFactory"] && msg.sender != _manager) {
+        if (msg.sender != repository["NomaFactory"] && msg.sender != owner()) {
             revert OnlyFactoryOrManagerAllowed();
         }
         _;

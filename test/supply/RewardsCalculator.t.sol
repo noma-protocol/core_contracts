@@ -2,14 +2,14 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
-import {RewardParams} from "../../src/types/Types.sol";
+
 import {TestMockNomaToken} from "../token/TestMockNomaToken.sol";
-import {ERC1967Proxy} from "openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {SafeMathInt} from "../../src/libraries/SafeMathInt.sol";
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {RewardParams} from "../../src/types/Types.sol";
 import {Math} from "openzeppelin/contracts/utils/math/Math.sol";
+import {ERC1967Proxy} from "openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {MathInt} from "../../src/libraries/MathInt.sol";
+import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 
 interface IERC20 { 
     function decimals() external view returns (uint8);
@@ -21,7 +21,7 @@ interface IVault {
 
 contract RewardsCalculatorTest {
     using FixedPointMathLib for uint256;
-    using SafeMathInt for int256;
+    using MathInt for int256;
 
     function calculateRewards(
         RewardParams memory params,

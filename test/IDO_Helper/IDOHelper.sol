@@ -9,12 +9,9 @@ import {Conversions} from "../../src/libraries/Conversions.sol";
 import { BaseVault } from "../../src/vault/BaseVault.sol";
 
 import {
-    feeTier, 
-    tickSpacing, 
     LiquidityPosition, 
     LiquidityType, 
-    TokenInfo,
-    VaultInitParams
+    TokenInfo
 } from "../../src/types/Types.sol";
 
 import {Uniswap} from "../../src/libraries/Uniswap.sol";
@@ -27,6 +24,8 @@ contract IDOHelper {
     BaseVault public vault;
     address public modelHelper;
     TokenInfo private  tokenInfo;
+
+    int24 tickSpacing = 60;
 
     constructor(
         address _pool, 

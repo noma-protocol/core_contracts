@@ -178,7 +178,7 @@ contract LendingVaultTest is Test {
 
     function testLargePurchaseTriggerShift() public {
         IDOManager managerContract = IDOManager(idoManager);
-        BaseVault vault = managerContract.vault();
+        LendingVault vault = LendingVault(address(managerContract.vault()));
         address pool = address(vault.pool());
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
@@ -246,7 +246,7 @@ contract LendingVaultTest is Test {
     
     function solvency() public view {
         IDOManager managerContract = IDOManager(idoManager);
-        BaseVault vault = managerContract.vault();
+        LendingVault vault = LendingVault(address(managerContract.vault()));
         address pool = address(vault.pool());
 
         uint256 circulatingSupply = modelHelper.getCirculatingSupply(pool, address(vault));

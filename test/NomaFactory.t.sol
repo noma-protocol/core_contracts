@@ -19,7 +19,7 @@ import { VaultFinalize } from "../src/vault/init/VaultFinalize.sol";
 import { 
     VaultDeployParams, 
     VaultDescription, 
-    LiquidityStructureParameters 
+    ProtocolParameters 
 } from "../src/types/Types.sol";
 
 import "../src/libraries/Utils.sol";
@@ -121,24 +121,25 @@ contract NomaFactoryTest is Test {
         vm.prank(deployer);
         configureResolver();
 
-        LiquidityStructureParameters memory _params =
-        LiquidityStructureParameters(
-            10, // Floor percentage of total supply
-            5, // Anchor percentage of total supply
-            3, // IDO price multiplier
+        ProtocolParameters memory _params =
+        ProtocolParameters(
+            10,         // Floor percentage of total supply
+            5,          // Anchor percentage of total supply
+            3,          // IDO price multiplier
             [200, 500], // Floor bips
-            90e16, // Shift liquidity ratio
-            120e16, // Slide liquidity ratio
-            25000, // Discovery bips
-            10, // shiftAnchorUpperBips
-            300, // slideAnchorUpperBips
-            100, // lowBalanceThresholdFactor
-            100, // highBalanceThresholdFactor
-            5e15 // inflationFee
+            90e16,      // Shift liquidity ratio
+            120e16,     // Slide liquidity ratio
+            25000,      // Discovery deploy bips
+            10,         // shiftAnchorUpperBips
+            300,        // slideAnchorUpperBips
+            100,        // lowBalanceThresholdFactor
+            100,        // highBalanceThresholdFactor
+            5e15,       // inflationFee
+            27          // loanFee
         );
 
         vm.prank(deployer);
-        nomaFactory.setLiquidityStructureParameters(_params);
+        nomaFactory.setProtocolParameters(_params);
     }
 
     function testCreateVaultShouldRevert() public {
@@ -150,7 +151,8 @@ contract NomaFactoryTest is Test {
                 100e18,       // Total supply
                 10,           // Percentage for sale
                 1e18,         // IDO Price
-                WETH          // Token1 address
+                WETH,         // Token1 address
+                3000          // Uniswap V3 Fee tier
             );
 
         // 1. Expect revert using custom error signature
@@ -177,7 +179,8 @@ contract NomaFactoryTest is Test {
                 100e18,       // Total supply
                 10,           // Percentage for sale
                 1e18,         // IDO Price
-                WETH          // Token1 address
+                WETH,         // Token1 address
+                3000          // Uniswap V3 Fee tier
             );
 
         // 1. Call the function
@@ -202,7 +205,8 @@ contract NomaFactoryTest is Test {
                 100e18,       // Total supply
                 10,           // Percentage for sale
                 1e18,         // IDO Price
-                WETH          // Token1 address
+                WETH,         // Token1 address
+                3000          // Uniswap V3 Fee tier
             );
 
         // 1. Call the function
@@ -220,7 +224,8 @@ contract NomaFactoryTest is Test {
                 100e18,       // Total supply
                 10,           // Percentage for sale
                 1e18,         // IDO Price
-                WETH          // Token1 address
+                WETH,         // Token1 address
+                3000          // Uniswap V3 Fee tier
             );
 
         vm.expectRevert(abi.encodeWithSignature("TokenAlreadyExistsError()"));
@@ -232,26 +237,27 @@ contract NomaFactoryTest is Test {
     }
 
     function testLiquidityStructureMatches() public {
-        LiquidityStructureParameters memory _params =
-        LiquidityStructureParameters(
-            10, // Floor percentage of total supply
-            5, // Anchor percentage of total supply
-            3, // IDO price multiplier
+        ProtocolParameters memory _params =
+        ProtocolParameters(
+            10,         // Floor percentage of total supply
+            5,          // Anchor percentage of total supply
+            3,          // IDO price multiplier
             [200, 500], // Floor bips
-            90e16, // Shift liquidity ratio
-            120e16, // Slide liquidity ratio
-            25000, // Discovery bips
-            10, // shiftAnchorUpperBips
-            300, // slideAnchorUpperBips
-            100, // lowBalanceThresholdFactor
-            100, // highBalanceThresholdFactor
-            0.005e18 // inflationFee
+            90e16,      // Shift liquidity ratio
+            120e16,     // Slide liquidity ratio
+            25000,      // Discovery deploy bips
+            10,         // shiftAnchorUpperBips
+            300,        // slideAnchorUpperBips
+            100,        // lowBalanceThresholdFactor
+            100,        // highBalanceThresholdFactor
+            5e15,       // inflationFee
+            27          // loanFee
         );
 
         vm.prank(deployer);
-        nomaFactory.setLiquidityStructureParameters(_params);
+        nomaFactory.setProtocolParameters(_params);
 
-        LiquidityStructureParameters memory _params2 = nomaFactory.getLiquidityStructureParameters();
+        ProtocolParameters memory _params2 = nomaFactory.getProtocolParameters();
 
         assertEq(_params.floorPercentage, _params2.floorPercentage);
         assertEq(_params.anchorPercentage, _params2.anchorPercentage);
@@ -278,7 +284,8 @@ contract NomaFactoryTest is Test {
                 100e18,       // Total supply
                 10,           // Percentage for sale
                 1e18,         // IDO Price
-                WETH          // Token1 address
+                WETH,         // Token1 address
+                3000          // Uniswap V3 Fee tier
             );
 
         vm.expectRevert(abi.encodeWithSignature("NotAuthorityError()"));
@@ -303,7 +310,8 @@ contract NomaFactoryTest is Test {
                 100e18,       // Total supply
                 10,           // Percentage for sale
                 1e18,         // IDO Price
-                WETH          // Token1 address
+                WETH,         // Token1 address
+                3000          // Uniswap V3 Fee tier
             );
 
         vm.prank(deployer);
@@ -328,7 +336,8 @@ contract NomaFactoryTest is Test {
                 100e18,       // Total supply
                 10,           // Percentage for sale
                 1e18,         // IDO Price
-                WETH          // Token1 address
+                WETH,         // Token1 address
+                3000          // Uniswap V3 Fee tier
             );
 
         vm.prank(deployer);
@@ -360,7 +369,8 @@ contract NomaFactoryTest is Test {
                 100e18,       // Total supply
                 10,           // Percentage for sale
                 1e18,         // IDO Price
-                WETH          // Token1 address
+                WETH,         // Token1 address
+                3000          // Uniswap V3 Fee tier
             );
 
         // 1. Call the function
@@ -398,7 +408,8 @@ contract NomaFactoryTest is Test {
             100e18,             // Total supply
             10,                 // Percentage for sale
             1e18,               // IDO Price
-            WETH                // Token1 address
+            WETH,               // Token1 address
+            3000                // Uniswap V3 Fee tier
         );
 
         // Vault 2 parameters
@@ -409,7 +420,8 @@ contract NomaFactoryTest is Test {
             200e18,             // Total supply
             15,                 // Percentage for sale
             2e18,               // IDO Price
-            WETH                // Token1 address
+            WETH,               // Token1 address
+            3000                // Uniswap V3 Fee tier
         );
 
         // Set permissionless deploy to allow multiple vaults
@@ -445,63 +457,6 @@ contract NomaFactoryTest is Test {
         assertEq(deployersList.length, 1);
         assertEq(deployersList[0], deployer);
     }
-
-    // function testOnlyOneVaultPerDeployer() public {
-    //     expectedAddressesInResolver.push(
-    //         ContractInfo("WETH", WETH)
-    //     );
-
-    //     configureResolver();    
-
-    //     VaultDeployParams memory vaultDeployParams = 
-    //         VaultDeployParams(
-    //             "Noma Token", // Name
-    //             "NOMA",       // Symbol
-    //             18,           // Decimals
-    //             100e18,       // Total supply
-    //             10,           // Percentage for sale
-    //             1e18,         // IDO Price
-    //             WETH          // Token1 address
-    //         );
-
-    //     vm.prank(deployer);
-    //     nomaFactory.setPermissionlessDeploy(true);
-
-    //     // 1. Call the function
-    //     vm.prank(deployer);
-    //     nomaFactory.deployVault(vaultDeployParams);
-
-    //     // Check deployers
-    //     address[] memory deployersList = nomaFactory.getDeployers();
-
-    //     // Get Vaults
-    //     address[] memory vaults = nomaFactory.getVaults(deployer);
-
-    //     // Check vaults
-    //     VaultDescription memory vaultDesc = nomaFactory.getVaultDescription(vaults[0]);  
-
-    //     assertEq(deployersList.length, 1);
-    //     assertEq(vaultDesc.deployer, deployersList[0]);
-    //     assertEq(deployersList[0], deployer);
-    //     assertEq(vaultDesc.token1, WETH);
-
-    //     vaultDeployParams = 
-    //         VaultDeployParams(
-    //             "Test Token", // Name
-    //             "TEST",       // Symbol
-    //             18,           // Decimals
-    //             100e18,       // Total supply
-    //             10,           // Percentage for sale
-    //             1e18,         // IDO Price
-    //             WETH          // Token1 address
-    //         );
-
-    //     // 1. Call the function
-    //     vm.expectRevert(abi.encodeWithSignature("OnlyOneVaultError()"));
-
-    //     vm.prank(deployer);
-    //     nomaFactory.deployVault(vaultDeployParams);
-    // }
 
     function configureResolver() internal {
         bytes32[] memory names = new bytes32[](expectedAddressesInResolver.length);

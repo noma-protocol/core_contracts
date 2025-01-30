@@ -22,7 +22,7 @@ contract AdaptiveMintTest {
      * @param timeElapsed The time elapsed (in seconds) since the last mint event.
      * @return mintAmount The calculated mint amount.
      */
-    function calculateMintAmount(
+    function computeMintAmount(
         uint256 deltaSupply,
         uint256 volatility,
         uint256 timeElapsed

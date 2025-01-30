@@ -4,11 +4,12 @@ pragma solidity ^0.8.0;
 import { IModelHelper } from "../../src/interfaces/IModelHelper.sol";
 import { IDeployer } from "../../src/interfaces/IDeployer.sol";
 import { LiquidityOps } from "../../src/libraries/LiquidityOps.sol";
+import { VaultStorage } from "../../src/libraries/LibAppStorage.sol";
 
 import {
     LiquidityPosition, 
     ProtocolAddresses,
-    LiquidityStructureParameters
+    ProtocolParameters
 } from "../../src/types/Types.sol";
 
 interface IStakingVault {
@@ -18,10 +19,11 @@ interface IStakingVault {
 interface IVault {
     function getPositions() external view returns (LiquidityPosition[3] memory positions);
     function getProtocolAddresses() external view returns (ProtocolAddresses memory addresses);
-    function liquidityStructureParameters() external view returns (LiquidityStructureParameters memory _params);
+    function protocolParameters() external view returns (ProtocolParameters memory _params);
 }
 
 contract ExtVaultUpgraded {
+    VaultStorage internal _v;
 
     error DisabledFunction();
 
