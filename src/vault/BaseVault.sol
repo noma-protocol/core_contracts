@@ -154,7 +154,7 @@ contract BaseVault {
     function setFees(
         uint256 _feesAccumulatedToken0, 
         uint256 _feesAccumulatedToken1
-    ) public  onlyInternalCalls {
+    ) public onlyInternalCalls {
         _v.feesAccumulatorToken0 += _feesAccumulatedToken0;
         _v.feesAccumulatorToken1 += _feesAccumulatedToken1;
     }
@@ -315,16 +315,15 @@ contract BaseVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](9);
+        bytes4[] memory selectors = new bytes4[](8);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
         selectors[1] = bytes4(keccak256(bytes("initialize(address,address,address,address,address,address,(uint8,uint8,uint8,uint16[2],uint256,uint256,int24,int24,int24,uint256,uint256,uint256,uint256))")));
         selectors[2] = bytes4(keccak256(bytes("initializeLiquidity((int24,int24,uint128,uint256,int24)[3])")));
         selectors[3] = bytes4(keccak256(bytes("uniswapV3MintCallback(uint256,uint256,bytes)")));
         selectors[4] = bytes4(keccak256(bytes("getUnderlyingBalances(uint8)")));
-        selectors[5] = bytes4(keccak256(bytes("getAccumulatedFees()")));
-        selectors[6] = bytes4(keccak256(bytes("getExcessReserveToken1()")));
-        selectors[7] = bytes4(keccak256(bytes("getProtocolAddresses()")));
-        selectors[8] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));
+        selectors[5] = bytes4(keccak256(bytes("getExcessReserveToken1()")));
+        selectors[6] = bytes4(keccak256(bytes("getProtocolAddresses()")));
+        selectors[7] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));
         return selectors;
     }
 }

@@ -368,7 +368,7 @@ contract LendingVault is BaseVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure override returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](13);
+        bytes4[] memory selectors = new bytes4[](14);
         selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,uint256)")));    
         selectors[1] = bytes4(keccak256(bytes("paybackLoan(address)")));
         selectors[2] = bytes4(keccak256(bytes("rollLoan(address,uint256)")));
@@ -382,6 +382,7 @@ contract LendingVault is BaseVault {
         selectors[10] = bytes4(keccak256(bytes("mintTokens(address,uint256)")));
         selectors[11] = bytes4(keccak256(bytes("burnTokens(uint256)")));
         selectors[12] = bytes4(keccak256(bytes("pool()")));
+        selectors[13] = bytes4(keccak256(bytes("getAccumulatedFees()")));
         return selectors;
     }
 }
