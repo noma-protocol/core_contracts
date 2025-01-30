@@ -148,6 +148,7 @@ contract LendingVaultTest is Test {
     function testRollLoan() public {
         uint256 borrowAmount = 5 ether;
         uint256 duration = 30 days;
+        uint256 newDuration = 90 days;
 
         vm.prank(deployer);
         token0.approve(vaultAddress, MAX_INT);
@@ -167,7 +168,9 @@ contract LendingVaultTest is Test {
         token1.approve(vaultAddress, MAX_INT);
 
         vm.prank(deployer);
-        vault.roll(deployer);
+
+        vm.expectRevert(abi.encodeWithSignature("InvalidDuration()"));
+        vault.roll(deployer, newDuration);
 
         // check if the loan amount is deducted from the user's balance
         // assertEq(balanceBeforePaybackToken1 - token1.balanceOf(deployer), borrowAmount);
@@ -175,6 +178,38 @@ contract LendingVaultTest is Test {
         assertLt(balanceBeforePaybackToken0, token0.balanceOf(deployer));
 
     }    
+
+    function testRollLoanShouldFail() public {
+        uint256 borrowAmount = 5 ether;
+        uint256 duration = 30 days;
+        uint256 newDuration = 10 days;
+
+        vm.prank(deployer);
+        token0.approve(vaultAddress, MAX_INT);
+
+        // Borrow first
+        vm.prank(deployer);
+        vault.borrow(deployer, borrowAmount, duration);
+        
+        uint256 balanceBeforePaybackToken1 = token1.balanceOf(deployer);
+        uint256 balanceBeforePaybackToken0 = token0.balanceOf(deployer);
+
+        // trigger shift
+        testLargePurchaseTriggerShift();
+
+        // Pay back part of the loan
+        vm.prank(deployer);
+        token1.approve(vaultAddress, MAX_INT);
+
+        vm.prank(deployer);
+        vault.roll(deployer, newDuration);
+
+        // check if the loan amount is deducted from the user's balance
+        // assertEq(balanceBeforePaybackToken1 - token1.balanceOf(deployer), borrowAmount);
+        // // check if the borrowed amount is reduced by the payback amount
+        assertLt(balanceBeforePaybackToken0, token0.balanceOf(deployer));
+
+    }
 
     function testLargePurchaseTriggerShift() public {
         IDOManager managerContract = IDOManager(idoManager);
