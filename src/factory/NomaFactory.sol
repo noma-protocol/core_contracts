@@ -417,10 +417,8 @@ contract NomaFactory {
             _owner,
             _deployer,
             _pool,
-            // _modelHelper,
             _stakingContract,
             _token0,
-            // _adaptiveSupply,
             _params
         );
     }
