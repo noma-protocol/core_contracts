@@ -9,6 +9,10 @@ import {IDiamondCut} from "../../interfaces/IDiamondCut.sol";
 import {IFacet} from "../../interfaces/IFacet.sol";
 import {Utils} from "../../libraries/Utils.sol";
 
+/**
+ * @title IVaultUpgrader
+ * @notice Interface for the VaultUpgrader contract.
+ */
 interface IVaultUpgrader {
     function doUpgradeStart(address diamond, address _vaultUpgradeFinalize) external;
     function doUpgradeStep1(address diamond) external;
@@ -16,29 +20,53 @@ interface IVaultUpgrader {
     function doUpgradeFinalize(address diamond) external;
 }
 
+/**
+ * @title IDiamondInterface
+ * @notice Interface for the Diamond proxy contract.
+ */
 interface IDiamondInterface {
     function initialize() external;
     function transferOwnership(address) external;
 }
 
+/**
+ * @title VaultUpgrade
+ * @notice A contract for starting the upgrade process of a Diamond proxy vault.
+ * @dev This contract is responsible for adding the BaseVault facet and initiating the upgrade process.
+ */
 contract VaultUpgrade {
-    address private owner;
-    address private someContract;
-    address private factory;
-    address private upgradeStep1;
-    address private upgradeFinalize;
+    address private owner; // The address of the contract owner.
+    address private someContract; // The address of the someContract.
+    address private factory; // The address of the factory contract.
+    address private upgradeStep1; // The address of the first upgrade step contract.
+    address private upgradeFinalize; // The address of the final upgrade step contract.
 
+    /**
+     * @notice Constructor to initialize the VaultUpgrade contract.
+     * @param _owner The address of the contract owner.
+     * @param _factory The address of the factory contract.
+     */
     constructor(address _owner, address _factory) {
         owner = _owner;
         factory = _factory;
     }
 
+    /**
+     * @notice Initializes the contract with the someContract and the first upgrade step contract.
+     * @param _someContract The address of the someContract.
+     * @param _upgradeStep1 The address of the first upgrade step contract.
+     */
     function init(address _someContract, address _upgradeStep1) onlyOwner public {
         require(_upgradeStep1 != address(0), "Invalid address");
         someContract = _someContract;
         upgradeStep1 = _upgradeStep1;
     }
 
+    /**
+     * @notice Starts the upgrade process by adding the BaseVault facet and initiating the next upgrade step.
+     * @param diamond The address of the Diamond proxy contract.
+     * @param _vaultUpgradeFinalize The address of the final upgrade step contract.
+     */
     function doUpgradeStart(address diamond, address _vaultUpgradeFinalize) public onlyFactory {
         require(_vaultUpgradeFinalize != address(0), "Invalid upgrade address");
 
@@ -64,19 +92,24 @@ contract VaultUpgrade {
         IVaultUpgrader(upgradeStep1).doUpgradeStep1(diamond);
     }     
 
+    /**
+     * @notice Modifier to restrict access to the contract owner.
+     */
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner");
         _;
     }
 
+    /**
+     * @notice Modifier to restrict access to the factory contract.
+     */
     modifier onlyFactory() {
-        // require(msg.sender == someContract, "Only factory");
         if (msg.sender != factory) {
             revert(
                 string(
                     abi.encodePacked(
                         "onlyFactory : ", 
-                        Utils.addressToString(someContract)
+                        Utils.addressToString(someContract) // TODO check this
                     )
                 )
             );
@@ -85,21 +118,39 @@ contract VaultUpgrade {
     }
 }
 
+/**
+ * @title VaultUpgradeStep1
+ * @notice A contract for the first step of the upgrade process of a Diamond proxy vault.
+ * @dev This contract is responsible for adding the StakingVault facet and initiating the next upgrade step.
+ */
 contract VaultUpgradeStep1  {
-    address private owner;
-    address private upgradePreviousStep;
-    address private upgradeNextStep;
+    address private owner; // The address of the contract owner.
+    address private upgradePreviousStep; // The address of the previous upgrade step contract.
+    address private upgradeNextStep; // The address of the next upgrade step contract.
 
+    /**
+     * @notice Constructor to initialize the VaultUpgradeStep1 contract.
+     * @param _owner The address of the contract owner.
+     */
     constructor(address _owner) {
         owner = _owner;
     }
 
+    /**
+     * @notice Initializes the contract with the next upgrade step contract and the previous upgrade step contract.
+     * @param _upgradeNextStep The address of the next upgrade step contract.
+     * @param _upgradePreviousStep The address of the previous upgrade step contract.
+     */
     function init(address _upgradeNextStep, address _upgradePreviousStep) onlyOwner public {
         require(_upgradePreviousStep != address(0), "Invalid address");
         upgradePreviousStep = _upgradePreviousStep;
         upgradeNextStep = _upgradeNextStep;
     }
 
+    /**
+     * @notice Executes the first step of the upgrade process by adding the StakingVault facet and initiating the next upgrade step.
+     * @param diamond The address of the Diamond proxy contract.
+     */
     function doUpgradeStep1(address diamond) public authorized {
  
         address[] memory newFacets = new address[](1);
@@ -124,34 +175,56 @@ contract VaultUpgradeStep1  {
         IVaultUpgrader(upgradeNextStep).doUpgradeStep2(diamond);
     }  
 
+    /**
+     * @notice Modifier to restrict access to the contract owner.
+     */
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner");
         _;
     }
 
+    /**
+     * @notice Modifier to restrict access to the previous upgrade step contract.
+     */
     modifier authorized() {
         require(msg.sender == upgradePreviousStep, "Only UpgradePreviousStep");
         _;
     }
-
 }
 
+/**
+ * @title VaultUpgradeStep2
+ * @notice A contract for the second step of the upgrade process of a Diamond proxy vault.
+ * @dev This contract is responsible for adding the LendingVault facet and initiating the final upgrade step.
+ */
 contract VaultUpgradeStep2  {
-    address private owner;
-    address private upgradePreviousStep;
-    address private upgradeNextStep;
+    address private owner; // The address of the contract owner.
+    address private upgradePreviousStep; // The address of the previous upgrade step contract.
+    address private upgradeNextStep; // The address of the next upgrade step contract.
     
+    /**
+     * @notice Constructor to initialize the VaultUpgradeStep2 contract.
+     * @param _owner The address of the contract owner.
+     */
     constructor(address _owner) {
         owner = _owner;
     }
 
+    /**
+     * @notice Initializes the contract with the next upgrade step contract and the previous upgrade step contract.
+     * @param _upgradeNextStep The address of the next upgrade step contract.
+     * @param _upgradePreviousStep The address of the previous upgrade step contract.
+     */
     function init(address _upgradeNextStep, address _upgradePreviousStep) onlyOwner public {
         require(_upgradePreviousStep != address(0), "Invalid address");
         upgradePreviousStep = _upgradePreviousStep;
         upgradeNextStep = _upgradeNextStep;
-        
     }
 
+    /**
+     * @notice Executes the second step of the upgrade process by adding the LendingVault facet and initiating the final upgrade step.
+     * @param diamond The address of the Diamond proxy contract.
+     */
     function doUpgradeStep2(address diamond) public authorized  {
  
         address[] memory newFacets = new address[](1);
@@ -176,15 +249,19 @@ contract VaultUpgradeStep2  {
         IVaultUpgrader(upgradeNextStep).doUpgradeFinalize(diamond);
     }  
 
+    /**
+     * @notice Modifier to restrict access to the contract owner.
+     */
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner");
         _;
     }
 
+    /**
+     * @notice Modifier to restrict access to the previous upgrade step contract.
+     */
     modifier authorized() {
         require(msg.sender == upgradePreviousStep, "Only UpgradePreviousStep");
         _;
     }
-
 }
-

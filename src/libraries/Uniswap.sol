@@ -1,5 +1,3 @@
-
-
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
@@ -7,12 +5,27 @@ import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {LiquidityType} from "../types/Types.sol";
 
+// Custom errors
 error ZeroLiquidty();
 error NoTokensExchanged();
 error InvalidSwap();
 
+/**
+ * @title Uniswap
+ * @notice A library for interacting with Uniswap V3 pools, including minting, burning, collecting, and swapping liquidity positions.
+ */
 library Uniswap {
 
+    /**
+     * @notice Mints a new liquidity position in a Uniswap V3 pool.
+     * @param pool The address of the Uniswap V3 pool.
+     * @param receiver The address that will receive the liquidity position.
+     * @param lowerTick The lower tick of the position.
+     * @param upperTick The upper tick of the position.
+     * @param liquidity The amount of liquidity to mint.
+     * @param liquidityType The type of liquidity position (Floor, Anchor, Discovery).
+     * @param isShift Whether the operation is part of a shift (true) or not (false).
+     */
     function mint(
         address pool,
         address receiver,
@@ -43,6 +56,14 @@ library Uniswap {
        IUniswapV3Pool(pool).mint(receiver, lowerTick, upperTick, liquidity, data);
     }
 
+    /**
+     * @notice Burns a liquidity position and collects the fees.
+     * @param pool The address of the Uniswap V3 pool.
+     * @param receiver The address that will receive the collected fees.
+     * @param lowerTick The lower tick of the position.
+     * @param upperTick The upper tick of the position.
+     * @param liquidity The amount of liquidity to burn.
+     */
     function _burn(
         address pool,
         address receiver,
@@ -62,6 +83,13 @@ library Uniswap {
         );
     }
 
+    /**
+     * @notice Collects fees from a liquidity position and burns it if it has liquidity.
+     * @param pool The address of the Uniswap V3 pool.
+     * @param receiver The address that will receive the collected fees.
+     * @param lowerTick The lower tick of the position.
+     * @param upperTick The upper tick of the position.
+     */
     function collect(
         address pool,
         address receiver,
@@ -92,6 +120,17 @@ library Uniswap {
         }
     }
 
+    /**
+     * @notice Executes a swap in a Uniswap V3 pool.
+     * @param pool The address of the Uniswap V3 pool.
+     * @param receiver The address that will receive the swapped tokens.
+     * @param token0 The address of token0 in the pool.
+     * @param token1 The address of token1 in the pool.
+     * @param basePrice The base price for the swap.
+     * @param amountToSwap The amount of tokens to swap.
+     * @param zeroForOne Whether the swap is token0 for token1 (true) or token1 for token0 (false).
+     * @param isLimitOrder Whether the swap is a limit order (true) or not (false).
+     */
     function swap(
         address pool,
         address receiver,
@@ -121,6 +160,4 @@ library Uniswap {
             revert InvalidSwap();
         }
     }
-
-
 }

@@ -24,16 +24,13 @@ interface IERC20 {
     function mint(address receiver, uint256 amount) external;
 }
 
-interface IStakingRewards {
-    function notifyRewardAmount(uint256 reward) external;
-}
-
 interface INomaFactory {
     function mintTokens(address to, uint256 amount) external;
     function burnFor(address from, uint256 amount) external;
     function teamMultiSig() external view returns (address);
 }
 
+// Custom errors
 error NotInitialized();
 error InsufficientLoanAmount();
 error InvalidDuration();
@@ -45,21 +42,43 @@ error CantRollLoan();
 error NoLiquidity();
 error OnlyVault();
 
+/**
+ * @title LendingVault
+ * @notice A contract for managing lending and borrowing functionality within a vault.
+ * @dev This contract extends the `BaseVault` contract and provides functionality for borrowing, repaying loans, and managing collateral.
+ */
 contract LendingVault is BaseVault {
-    
-    uint256 public constant SECONDS_IN_DAY = 86400;
 
+    /**
+     * @notice Calculates the total collateral required for a given borrow amount.
+     * @param borrowAmount The amount of tokens to borrow.
+     * @return collateralAmount The amount of collateral required.
+     * @return intrinsicMinimumValue The intrinsic minimum value of the collateral.
+     */
     function _getTotalCollateral(uint256 borrowAmount) internal view returns (uint256, uint256) {
         uint256 intrinsicMinimumValue = IModelHelper(modelHelper()).getIntrinsicMinimumValue(address(this));
         return (DecimalMath.divideDecimal(borrowAmount, intrinsicMinimumValue), intrinsicMinimumValue);
     }
 
+    /**
+     * @notice Calculates the loan fees for a given borrow amount and duration.
+     * @param borrowAmount The amount of tokens to borrow.
+     * @param duration The duration of the loan.
+     * @return fees The calculated loan fees.
+     */
     function _calculateLoanFees(uint256 borrowAmount, uint256 duration) internal view returns (uint256 fees) {
+        uint256 SECONDS_IN_DAY = 86400;
         uint256 percentage = _v.loanFee; // e.g. 27 --> 0.027% 
         uint256 scaledPercentage = percentage * 10**12; 
-        fees = (borrowAmount * scaledPercentage * (duration / SECONDS_IN_DAY)) / (100 * 10**18);
+        fees = (borrowAmount * scaledPercentage * (duration / SECONDS_IN_DAY)) / (100 * 10**18); // TODO Check this
     }    
 
+    /**
+     * @notice Allows a user to borrow tokens from the vault's floor liquidity.
+     * @param who The address of the borrower.
+     * @param borrowAmount The amount of tokens to borrow.
+     * @param duration The duration of the loan.
+     */
     function borrowFromFloor(address who, uint256 borrowAmount, uint256 duration) public onlyInternalCalls {
         if (borrowAmount == 0) revert InsufficientLoanAmount();
         if (duration < 30 days || duration > 365 days) revert InvalidDuration();
@@ -103,6 +122,10 @@ contract LendingVault is BaseVault {
         .enforceSolvencyInvariant(address(this));           
     }
 
+    /**
+     * @notice Allows a user to pay back a loan.
+     * @param who The address of the borrower.
+     */
     function paybackLoan(address who) public onlyInternalCalls {
         LoanPosition storage loan = _v.loanPositions[who];
 
@@ -115,6 +138,10 @@ contract LendingVault is BaseVault {
         _removeLoanAddress(who);
     }
 
+    /**
+     * @notice Allows a user to roll over a loan.
+     * @param who The address of the borrower.
+     */
     function rollLoan(address who) public onlyInternalCalls {
         LoanPosition storage loan = _v.loanPositions[who];
 
@@ -149,6 +176,9 @@ contract LendingVault is BaseVault {
         // enforce insolvency invariant
     }
 
+    /**
+     * @notice Defaults all expired loans and seizes the collateral.
+     */
     function defaultLoans() public onlyInternalCalls {
         for (uint256 i = 0; i < _v.loanAddresses.length; i++) {
             address who = _v.loanAddresses[i];
@@ -161,6 +191,10 @@ contract LendingVault is BaseVault {
         }
     }
 
+    /**
+     * @notice Seizes the collateral of a borrower.
+     * @param who The address of the borrower.
+     */
     function _seizeCollateral(address who) internal {
         LoanPosition storage loan = _v.loanPositions[who];
         uint256 collateralAmount = loan.collateralAmount;
@@ -168,6 +202,10 @@ contract LendingVault is BaseVault {
         _v.collateralAmount -= collateralAmount;
     }
 
+    /**
+     * @notice Removes a borrower's address from the list of loan addresses.
+     * @param who The address of the borrower.
+     */
     function _removeLoanAddress(address who) internal {
         for (uint256 i = 0; i < _v.loanAddresses.length; i++) {
             if (_v.loanAddresses[i] == who) {
@@ -178,6 +216,10 @@ contract LendingVault is BaseVault {
         }
     }
 
+    /**
+     * @notice Updates the liquidity positions in the vault.
+     * @param _positions The new liquidity positions.
+     */
     function updatePositions(LiquidityPosition[3] memory _positions) public onlyInternalCalls {
         if (!_v.initialized) revert NotInitialized();             
         if (_positions[0].liquidity == 0 || _positions[1].liquidity == 0 || _positions[2].liquidity == 0) revert NoLiquidity();
@@ -185,12 +227,21 @@ contract LendingVault is BaseVault {
         _updatePositions(_positions);
     }
     
+    /**
+     * @notice Internal function to update the liquidity positions.
+     * @param _positions The new liquidity positions.
+     */
     function _updatePositions(LiquidityPosition[3] memory _positions) internal {   
         _v.floorPosition = _positions[0];
         _v.anchorPosition = _positions[1];
         _v.discoveryPosition = _positions[2];
     }
 
+    /**
+     * @notice Mints new tokens and distributes them to the specified address.
+     * @param to The address to receive the minted tokens.
+     * @param amount The amount of tokens to mint.
+     */
     function mintTokens(
         address to,
         uint256 amount
@@ -205,6 +256,10 @@ contract LendingVault is BaseVault {
         );
     }
 
+    /**
+     * @notice Burns tokens from the vault.
+     * @param amount The amount of tokens to burn.
+     */
     function burnTokens(
         uint256 amount
     ) public onlyInternalCalls {
@@ -217,6 +272,10 @@ contract LendingVault is BaseVault {
         );
     }
 
+    /**
+     * @notice Retrieves the current liquidity positions.
+     * @return positions The current liquidity positions.
+     */
     function getPositions() public view
     returns (LiquidityPosition[3] memory positions) {
         positions = [
@@ -226,36 +285,67 @@ contract LendingVault is BaseVault {
         ];
     }
 
+    /**
+     * @notice Retrieves the address of the team multisig.
+     * @return The address of the team multisig.
+     */
     function teamMultiSig() public view returns (address) {
         return INomaFactory(_v.factory).teamMultiSig();
     }
 
+    /**
+     * @notice Retrieves the protocol parameters.
+     * @return The protocol parameters.
+     */
     function getProtocolParameters() public view returns 
     (ProtocolParameters memory ) {
         return _v.protocolParameters;
     }
 
+    /**
+     * @notice Retrieves the time since the last mint operation.
+     * @return The time since the last mint operation.
+     */
     function getTimeSinceLastMint() public view returns (uint256) {
         return block.timestamp - _v.timeLastMinted;
     }
 
+    /**
+     * @notice Retrieves the total collateral amount.
+     * @return The total collateral amount.
+     */
     function getCollateralAmount() public view returns (uint256) {
         return _v.collateralAmount;
     }
 
+    /**
+     * @notice Retrieves the Uniswap V3 pool contract.
+     * @return The Uniswap V3 pool contract.
+     */
     function pool() public view returns (IUniswapV3Pool) {
         return _v.pool;
     }
 
+    /**
+     * @notice Retrieves the accumulated fees.
+     * @return The accumulated fees for token0 and token1.
+     */
     function getAccumulatedFees() public view returns (uint256, uint256) {
         return (_v.feesAccumulatorToken0, _v.feesAccumulatorToken1);
     }
 
+    /**
+     * @notice Modifier to restrict access to the vault contract.
+     */
     modifier onlyVault() {
         if (msg.sender != address(this)) revert OnlyVault();
         _;
     }
 
+    /**
+     * @notice Retrieves the function selectors for this contract.
+     * @return selectors An array of function selectors.
+     */
     function getFunctionSelectors() external pure override returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](13);
         selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,uint256)")));    

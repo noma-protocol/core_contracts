@@ -6,26 +6,40 @@ import { ExtVault } from "../ExtVault.sol";
 import { IDiamondCut } from "../../interfaces/IDiamondCut.sol";
 import { IFacet } from "../../interfaces/IFacet.sol";
 
-interface IDiamondInterface {
-    function initialize() external;
-    function transferOwnership(address) external;
-}
-
+/**
+ * @title VaultFinalize
+ * @notice A contract for finalizing the upgrade of a Diamond proxy vault.
+ * @dev This contract is responsible for adding new facets to the Diamond proxy and transferring ownership to the final authority.
+ */
 contract VaultFinalize  {
-    address private owner;
-    address private finalAuthority;
-    address private upgradePreviousStep;
+    // State variables
+    address private owner; // The address of the contract owner.
+    address private finalAuthority; // The address of the final authority.
+    address private upgradePreviousStep; // The address of the previous upgrade step contract.
     
+    /**
+     * @notice Constructor to initialize the VaultFinalize contract.
+     * @param _owner The address of the contract owner.
+     */
     constructor(address _owner) {
         owner = _owner;
     }
 
+    /**
+     * @notice Initializes the contract with the final authority and the previous upgrade step contract.
+     * @param _someContract The address of the final authority.
+     * @param _upgradePreviousStep The address of the previous upgrade step contract.
+     */
     function init(address _someContract, address _upgradePreviousStep) onlyOwner public {
         require(_upgradePreviousStep != address(0), "Invalid address");
         finalAuthority = _someContract;
         upgradePreviousStep = _upgradePreviousStep;
     }
 
+    /**
+     * @notice Finalizes the upgrade of the Diamond proxy by adding new facets and transferring ownership.
+     * @param diamond The address of the Diamond proxy contract.
+     */
     function doUpgradeFinalize(address diamond) public authorized {
  
         address[] memory newFacets = new address[](1);
@@ -49,14 +63,19 @@ contract VaultFinalize  {
         IDiamondInterface(diamond).transferOwnership(finalAuthority);
     }  
 
+    /**
+     * @notice Modifier to restrict access to the contract owner.
+     */
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner");
         _;
     }
 
+    /**
+     * @notice Modifier to restrict access to the previous upgrade step contract.
+     */
     modifier authorized() {
         require(msg.sender == upgradePreviousStep, "Only UpgradePreviousStep");
         _;
     }
-
 }

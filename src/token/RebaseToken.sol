@@ -4,48 +4,42 @@ pragma solidity ^0.8.23;
 import {SafeMath} from "../libraries/SafeMath.sol";
 import {ERC20, ERC20Permit} from "../abstract/ERC20Permit.sol";
 
+/**
+ * @title RebaseToken
+ * @notice A token contract that supports rebasing and staking functionality.
+ * @dev This contract uses a "gons" system to handle rebasing, where the total supply can be adjusted without changing individual balances.
+ */
 contract RebaseToken is ERC20Permit {
-    // PLEASE READ BEFORE CHANGING ANY ACCOUNTING OR MATH
-    // Anytime there is division, there is a risk of numerical instability from rounding errors. In
-    // order to minimize this risk, we adhere to the following guidelines:
-    // 1) The conversion rate adopted is the number of gons that equals 1 fragment.
-    //    The inverse rate must not be used--TOTAL_GONS is always the numerator and _totalSupply is
-    //    always the denominator. (i.e. If you want to convert gons to fragments instead of
-    //    multiplying by the inverse rate, you should divide by the normal rate)
-    // 2) Gon balances converted into Fragments are always rounded down (truncated).
-    //
-    // We make the following guarantees:
-    // - If address 'A' transfers x Fragments to address 'B'. A's resulting external balance will
-    //   be decreased by precisely x Fragments, and B's external balance will be precisely
-    //   increased by x Fragments.
-    //
-    // We do not guarantee that the sum of all balances equals the result of calling totalSupply().
-    // This is because, for any conversion function 'f()' that has non-zero rounding error,
-    // f(x0) + f(x1) + ... + f(xn) is not always equal to f(x0 + x1 + ... xn).
     using SafeMath for uint256;
-    
-    event LogRebase(uint256 totalSupply);
-    event Mint(address indexed to, uint256 amount);
 
-    uint256 private constant DECIMALS = 18;
-    uint256 private constant MAX_UINT256 = ~uint256(0);
-    uint256 private constant INITIAL_FRAGMENTS_SUPPLY = 3.025 * 10**6 * 10**DECIMALS;
+    // Events
+    event LogRebase(uint256 totalSupply); // Emitted when a rebase occurs.
+    event Mint(address indexed to, uint256 amount); // Emitted when tokens are minted.
+
+    // Constants
+    uint256 private constant DECIMALS = 18; // Number of decimals for the token.
+    uint256 private constant MAX_UINT256 = ~uint256(0); // Maximum value for a uint256.
+    uint256 private constant INITIAL_FRAGMENTS_SUPPLY = 3.025 * 10**6 * 10**DECIMALS; // Initial supply of fragments.
 
     // TOTAL_GONS is a multiple of INITIAL_FRAGMENTS_SUPPLY so that _gonsPerFragment is an integer.
-    // Use the highest value that fits in a uint256 for max granularity.
     uint256 private constant TOTAL_GONS = MAX_UINT256 - (MAX_UINT256 % INITIAL_FRAGMENTS_SUPPLY);
 
     // MAX_SUPPLY = maximum integer < (sqrt(4*TOTAL_GONS + 1) - 1) / 2
     uint256 private constant MAX_SUPPLY = ~uint128(0);  // (2^128) - 1
 
-    uint256 private _gonsPerFragment;
-    mapping(address => uint256) private _gonBalances;
+    // State variables
+    uint256 private _gonsPerFragment; // Conversion rate between gons and fragments.
+    mapping(address => uint256) private _gonBalances; // Balances in gons for each address.
 
-    address public stakingContract;
-    
-    // This is denominated in Fragments, because the gons-fragments conversion might change before it's fully paid.
+    address public stakingContract; // Address of the staking contract.
+
+    // Mapping of allowances in fragments.
     mapping (address => mapping (address => uint256)) private _allowedFragments;
 
+    /**
+     * @notice Constructor to initialize the RebaseToken contract.
+     * @param _authority The address that will receive the initial supply of tokens.
+     */
     constructor(address _authority) ERC20("Staked Noma", "sNOMA", 18) ERC20Permit("Staked Noma") {
         _totalSupply = INITIAL_FRAGMENTS_SUPPLY;
         _gonBalances[_authority] = TOTAL_GONS;
@@ -54,12 +48,21 @@ contract RebaseToken is ERC20Permit {
         emit Transfer(address(0x0), _authority, _totalSupply);
     }
 
+    /**
+     * @notice Initializes the staking contract address.
+     * @param _stakingContract The address of the staking contract.
+     */
     function initialize(address _stakingContract) external  {
         require(stakingContract == address(0), "Already initialized");
         stakingContract = _stakingContract;
         transfer(stakingContract, _totalSupply);
     }
 
+    /**
+     * @notice Mints new tokens to the specified address.
+     * @param to The address to receive the minted tokens.
+     * @param amount The amount of tokens to mint.
+     */
     function mint(address to, uint256 amount) public onlyStakingContract {
         require(amount > 0, "Amount must be greater than 0");
 
@@ -78,9 +81,9 @@ contract RebaseToken is ERC20Permit {
     }
 
     /**
-    * @dev Notifies Fragments contract about a new rebase cycle.
-    * @param supplyDelta The number of new fragment tokens to add into circulation via expansion.
-    */
+     * @notice Notifies the contract about a new rebase cycle.
+     * @param supplyDelta The number of new fragment tokens to add into circulation via expansion.
+     */
     function rebase(uint256 supplyDelta) public onlyStakingContract {
         if (supplyDelta == 0) {
             emit LogRebase(_totalSupply);
@@ -94,26 +97,15 @@ contract RebaseToken is ERC20Permit {
 
         _gonsPerFragment = TOTAL_GONS.div(_totalSupply);
 
-        // From this point forward, _gonsPerFragment is taken as the source of truth.
-        // We recalculate a new _totalSupply to be in agreement with the _gonsPerFragment
-        // conversion rate.
-        // This means our applied supplyDelta can deviate from the requested supplyDelta,
-        // but this deviation is guaranteed to be < (_totalSupply^2)/(TOTAL_GONS - _totalSupply).
-        
-        // In the case of _totalSupply <= MAX_UINT128 (our current supply cap), this
-        // deviation is guaranteed to be < 1, so we can omit this step. If the supply cap is
-        // ever increased, it must be re-included.
-        // _totalSupply = TOTAL_GONS.div(_gonsPerFragment)
-
         emit LogRebase(_totalSupply);
     }
 
     /**
-    * @dev Burns a specific amount of tokens from the target address and decrements allowance.
-    * @param from The address which you want to burn tokens from.
-    * @param value The amount of token to be burned.
-    * @return A boolean that indicates if the operation was successful.
-    */
+     * @notice Burns a specific amount of tokens from the target address and decrements allowance.
+     * @param from The address from which to burn tokens.
+     * @param value The amount of tokens to burn.
+     * @return A boolean indicating if the operation was successful.
+     */
     function burnFor(address from, uint256 value) public onlyStakingContract returns (bool) {
         require(from != address(0), "ERC20: burn from the zero address");
         require(value <= balanceOf(from), "ERC20: burn amount exceeds balance");
@@ -131,7 +123,8 @@ contract RebaseToken is ERC20Permit {
     }
 
     /**
-     * @return The total number of fragments.
+     * @notice Returns the total number of fragments.
+     * @return The total supply of tokens.
      */
     function totalSupply()
         public
@@ -143,6 +136,7 @@ contract RebaseToken is ERC20Permit {
     }
 
     /**
+     * @notice Returns the balance of the specified address.
      * @param who The address to query.
      * @return The balance of the specified address.
      */
@@ -156,7 +150,7 @@ contract RebaseToken is ERC20Permit {
     }
 
     /**
-     * @dev Transfer tokens to a specified address.
+     * @notice Transfers tokens to a specified address.
      * @param to The address to transfer to.
      * @param value The amount to be transferred.
      * @return True on success, false otherwise.
@@ -174,7 +168,7 @@ contract RebaseToken is ERC20Permit {
     }
 
     /**
-     * @dev Function to check the amount of tokens that an owner has allowed to a spender.
+     * @notice Returns the amount of tokens that an owner has allowed to a spender.
      * @param owner_ The address which owns the funds.
      * @param spender The address which will spend the funds.
      * @return The number of tokens still available for the spender.
@@ -189,10 +183,11 @@ contract RebaseToken is ERC20Permit {
     }
 
     /**
-     * @dev Transfer tokens from one address to another.
-     * @param from The address you want to send tokens from.
-     * @param to The address you want to transfer to.
+     * @notice Transfers tokens from one address to another.
+     * @param from The address to send tokens from.
+     * @param to The address to transfer to.
      * @param value The amount of tokens to be transferred.
+     * @return True on success, false otherwise.
      */
     function transferFrom(address from, address to, uint256 value)
         public
@@ -210,15 +205,10 @@ contract RebaseToken is ERC20Permit {
     }
 
     /**
-     * @dev Approve the passed address to spend the specified amount of tokens on behalf of
-     * msg.sender. This method is included for ERC20 compatibility.
-     * increaseAllowance and decreaseAllowance should be used instead.
-     * Changing an allowance with this method brings the risk that someone may transfer both
-     * the old and the new allowance - if they are both greater than zero - if a transfer
-     * transaction is mined before the later approve() call is mined.
-     *
+     * @notice Approves the passed address to spend the specified amount of tokens on behalf of msg.sender.
      * @param spender The address which will spend the funds.
      * @param value The amount of tokens to be spent.
+     * @return True on success, false otherwise.
      */
     function approve(address spender, uint256 value)
         public
@@ -231,11 +221,10 @@ contract RebaseToken is ERC20Permit {
     }
 
     /**
-     * @dev Increase the amount of tokens that an owner has allowed to a spender.
-     * This method should be used instead of approve() to avoid the double approval vulnerability
-     * described above.
+     * @notice Increases the allowance of a spender.
      * @param spender The address which will spend the funds.
      * @param addedValue The amount of tokens to increase the allowance by.
+     * @return True on success, false otherwise.
      */
     function increaseAllowance(address spender, uint256 addedValue)
         public
@@ -249,10 +238,10 @@ contract RebaseToken is ERC20Permit {
     }
 
     /**
-     * @dev Decrease the amount of tokens that an owner has allowed to a spender.
-     *
+     * @notice Decreases the allowance of a spender.
      * @param spender The address which will spend the funds.
      * @param subtractedValue The amount of tokens to decrease the allowance by.
+     * @return True on success, false otherwise.
      */
     function decreaseAllowance(address spender, uint256 subtractedValue)
         public 
@@ -269,18 +258,35 @@ contract RebaseToken is ERC20Permit {
         return true;
     }
     
+    /**
+     * @notice Converts a fragment amount to gons.
+     * @param amount The amount of fragments to convert.
+     * @return The equivalent amount in gons.
+     */
     function gonsForBalance(uint256 amount) public view returns (uint256) {
         return amount.mul(_gonsPerFragment);
     }
 
+    /**
+     * @notice Converts a gons amount to fragments.
+     * @param gons The amount of gons to convert.
+     * @return The equivalent amount in fragments.
+     */
     function balanceForGons(uint256 gons) public view returns (uint256) {
         return gons.div(_gonsPerFragment);
     }
 
+    /**
+     * @notice Returns the circulating supply of tokens.
+     * @return The circulating supply of tokens.
+     */
     function circulatingSupply() public view returns (uint256) {
         return balanceOf(address(this)) - balanceOf(address(0));
     }
 
+    /**
+     * @notice Modifier to restrict access to the staking contract.
+     */
     modifier onlyStakingContract() {
         require(msg.sender == stakingContract, "Only staking contract can call this function");
         _;

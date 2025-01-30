@@ -1,5 +1,3 @@
-
-
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
@@ -27,6 +25,10 @@ import {
     LiquidityInternalPars
 } from "../types/Types.sol";
 
+/**
+ * @title IVault
+ * @notice Interface for the Vault contract.
+ */
 interface IVault {
     function updatePositions(LiquidityPosition[3] memory newPositions) external;
     function setFees(uint256 _feesAccumulatedToken0, uint256 _feesAccumulatedToken1) external;
@@ -37,6 +39,10 @@ interface IVault {
     function teamMultiSig() external view returns (address);
 }
 
+/**
+ * @title IAdaptiveSupply
+ * @notice Interface for the AdaptiveSupply contract.
+ */
 interface IAdaptiveSupply {
     function computeMintAmount(
         uint256 deltaSupply,
@@ -46,17 +52,28 @@ interface IAdaptiveSupply {
     ) external pure returns (uint256 mintAmount);
 }
 
-error InvalidTick();
-error AboveThreshold();
-error BelowThreshold();
-error PositionsLength();
-error NoLiquidity();
-error MintAmount();
-error BalanceToken0();
-error OnlyNotEmptyPositions();
-
+/**
+ * @title LiquidityOps
+ * @notice Library for managing liquidity positions in a Uniswap V3 pool.
+ */
 library LiquidityOps {
     
+    error InvalidTick();
+    error AboveThreshold();
+    error BelowThreshold();
+    error PositionsLength();
+    error NoLiquidity();
+    error MintAmount();
+    error BalanceToken0();
+    error OnlyNotEmptyPositions();
+
+    /**
+     * @notice Shifts liquidity positions based on the current liquidity ratio.
+     * @param addresses Protocol addresses.
+     * @param positions Current liquidity positions.
+     * @return currentLiquidityRatio The current liquidity ratio.
+     * @return newPositions The new liquidity positions after shifting.
+     */
     function shift(
         ProtocolAddresses memory addresses,
         LiquidityPosition[3] memory positions
@@ -102,7 +119,6 @@ library LiquidityOps {
                     LiquidityType.Floor
                 );
 
-
                 uint256 anchorCapacity = IModelHelper(addresses.modelHelper)
                 .getPositionCapacity(
                     addresses.pool, 
@@ -138,6 +154,12 @@ library LiquidityOps {
         }
     }
 
+    /**
+     * @notice Prepares the positions for shifting.
+     * @param params Pre-shift parameters.
+     * @param _positions Current liquidity positions.
+     * @return newPositions The new liquidity positions after pre-shift.
+     */
     function preShiftPositions(
         PreShiftParameters memory params,
         LiquidityPosition[3] memory _positions
@@ -170,10 +192,14 @@ library LiquidityOps {
                 positions: _positions
             })
         );
-
-
     }
 
+    /**
+     * @notice Shifts the liquidity positions.
+     * @param addresses Protocol addresses.
+     * @param params Shift parameters.
+     * @return newPositions The new liquidity positions after shifting.
+     */
     function shiftPositions(
         ProtocolAddresses memory addresses,
         ShiftParameters memory params
@@ -249,9 +275,14 @@ library LiquidityOps {
         } else {
             revert("shiftPositions: no liquidity in Floor");
         }
-
     }
     
+    /**
+     * @notice Slides liquidity positions based on the current liquidity ratio.
+     * @param addresses Protocol addresses.
+     * @param positions Current liquidity positions.
+     * @return newPositions The new liquidity positions after sliding.
+     */
     function slide(
         ProtocolAddresses memory addresses,
         LiquidityPosition[3] memory positions
@@ -321,9 +352,14 @@ library LiquidityOps {
         } else {
             revert BelowThreshold();
         }  
-        
     }
 
+    /**
+     * @notice Internal function to shift liquidity positions.
+     * @param addresses Protocol addresses.
+     * @param params Shift parameters.
+     * @return newPositions The new liquidity positions after shifting.
+     */
     function _shiftPositions(
         ProtocolAddresses memory addresses,
         ShiftParameters memory params
@@ -397,6 +433,13 @@ library LiquidityOps {
         );       
     }
 
+    /**
+     * @notice Internal function to slide liquidity positions.
+     * @param addresses Protocol addresses.
+     * @param positions Current liquidity positions.
+     * @param anchorToken1Balance The balance of token1 in the anchor position.
+     * @return newPositions The new liquidity positions after sliding.
+     */
     function _slidePositions(
         ProtocolAddresses memory addresses,
         LiquidityPosition[3] memory positions,
@@ -447,6 +490,13 @@ library LiquidityOps {
         );    
     }
 
+    /**
+     * @notice Redeploys a liquidity position.
+     * @param addresses Protocol addresses.
+     * @param params Liquidity internal parameters.
+     * @param isShift Whether the operation is a shift.
+     * @return newPosition The new liquidity position after redeployment.
+     */
     function reDeploy(
         ProtocolAddresses memory addresses,
         LiquidityInternalPars memory params,
@@ -565,6 +615,14 @@ library LiquidityOps {
         );     
     }
     
+    /**
+     * @notice Retrieves vault data including circulating supply and token balances.
+     * @param addresses Protocol addresses.
+     * @return circulatingSupply The circulating supply of the vault.
+     * @return anchorToken1Balance The balance of token1 in the anchor position.
+     * @return discoveryToken1Balance The balance of token1 in the discovery position.
+     * @return discoveryToken0Balance The balance of token0 in the discovery position.
+     */
     function getVaultData(ProtocolAddresses memory addresses) internal view returns (uint256, uint256, uint256, uint256) {
         (,,, uint256 anchorToken1Balance) = IModelHelper(addresses.modelHelper)
         .getUnderlyingBalances(
@@ -589,6 +647,15 @@ library LiquidityOps {
         return (circulatingSupply, anchorToken1Balance, discoveryToken1Balance, discoveryToken0Balance);
     }
 
+    /**
+     * @notice Calculates the fees earned by the liquidity positions.
+     * @param pool The Uniswap V3 pool address.
+     * @param positions The liquidity positions.
+     * @return feesPosition0Token0 The fees earned by position 0 in token0.
+     * @return feesPosition0Token1 The fees earned by position 0 in token1.
+     * @return feesPosition1Token0 The fees earned by position 1 in token0.
+     * @return feesPosition1Token1 The fees earned by position 1 in token1.
+     */
     function _calculateFees(
         address pool, 
         LiquidityPosition[3] memory positions
@@ -640,6 +707,11 @@ library LiquidityOps {
         return (feesPosition0Token0, feesPosition0Token1, feesPosition1Token0, feesPosition1Token1);
     }
 
+    /**
+     * @notice Modifier to ensure that all positions have liquidity.
+     * @param pool The Uniswap V3 pool address.
+     * @param positions The liquidity positions.
+     */
     modifier onlyNotEmptyPositions(
         address pool,
         LiquidityPosition[3] memory positions
@@ -662,5 +734,4 @@ library LiquidityOps {
         }
         _;
     }
-
 }

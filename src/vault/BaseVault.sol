@@ -33,6 +33,7 @@ interface ILendingVault {
     function setFee(uint256 fee, uint256 feeToTreasury) external;
 }
 
+// Custom errors
 error AlreadyInitialized();
 error InvalidPosition();
 error OnlyFactory();
@@ -41,13 +42,22 @@ error OnlyInternalCalls();
 error CallbackCaller();
 error ResolverNotSet();
 
+/**
+ * @title BaseVault
+ * @notice A base contract for managing a vault's liquidity positions and interactions with Uniswap V3.
+ * @dev This contract handles initialization, fee management, and interactions with the Uniswap V3 pool.
+ */
 contract BaseVault {
     VaultStorage internal _v;
 
+    // Events
     event FloorUpdated(uint256 floorPrice, uint256 floorCapacity);
 
     /**
-     * @notice Uniswap V3 callback function, called back on pool.mint
+     * @notice Uniswap V3 callback function, called back on pool.mint.
+     * @param amount0Owed The amount of token0 owed to the pool.
+     * @param amount1Owed The amount of token1 owed to the pool.
+     * @param data Additional data passed to the callback.
      */
     function uniswapV3MintCallback(
         uint256 amount0Owed, 
@@ -70,6 +80,16 @@ contract BaseVault {
         } 
     }
 
+    /**
+     * @notice Initializes the vault with the necessary parameters.
+     * @param _factory The address of the factory contract.
+     * @param _owner The address of the vault owner.
+     * @param _deployer The address of the deployer contract.
+     * @param _pool The address of the Uniswap V3 pool.
+     * @param _stakingContract The address of the staking contract.
+     * @param _proxyAddress The address of the proxy contract.
+     * @param _params The protocol parameters.
+     */
     function initialize(
         address _factory,
         address _owner,
@@ -104,6 +124,10 @@ contract BaseVault {
     
     // *** MUTATIVE FUNCTIONS *** //
 
+    /**
+     * @notice Initializes the liquidity positions for the vault.
+     * @param positions An array of liquidity positions (Floor, Anchor, Discovery).
+     */
     function initializeLiquidity(
         LiquidityPosition[3] memory positions
     ) public onlyDeployer {
@@ -122,6 +146,11 @@ contract BaseVault {
         _v.discoveryPosition = positions[2];
     }
 
+    /**
+     * @notice Sets the accumulated fees for token0 and token1.
+     * @param _feesAccumulatedToken0 The accumulated fees for token0.
+     * @param _feesAccumulatedToken1 The accumulated fees for token1.
+     */
     function setFees(
         uint256 _feesAccumulatedToken0, 
         uint256 _feesAccumulatedToken1
@@ -132,6 +161,14 @@ contract BaseVault {
 
     // *** VIEW FUNCTIONS *** //
 
+    /**
+     * @notice Retrieves the underlying balances for a specific liquidity type.
+     * @param liquidityType The type of liquidity position (Floor, Anchor, Discovery).
+     * @return lowerTick The lower tick of the position.
+     * @return upperTick The upper tick of the position.
+     * @return amount0Current The amount of token0 in the position.
+     * @return amount1Current The amount of token1 in the position.
+     */
     function getUnderlyingBalances(
         LiquidityType liquidityType
     ) external view 
@@ -147,6 +184,10 @@ contract BaseVault {
         ); 
     }    
 
+    /**
+     * @notice Retrieves the vault's information.
+     * @return vaultInfo The vault's information.
+     */
     function getVaultInfo() public view 
     returns (
         VaultInfo memory vaultInfo
@@ -164,6 +205,10 @@ contract BaseVault {
         );
     }
 
+    /**
+     * @notice Retrieves the excess reserve balance of token1.
+     * @return The excess reserve balance of token1.
+     */
     function getExcessReserveToken1() external view returns (uint256) {
         bool isToken0 = false;
         return IModelHelper(
@@ -176,6 +221,10 @@ contract BaseVault {
         );
     }
 
+    /**
+     * @notice Retrieves the protocol addresses.
+     * @return The protocol addresses.
+     */
     function getProtocolAddresses() public view returns (ProtocolAddresses memory) {
         return ProtocolAddresses({
             pool: address(_v.pool),
@@ -188,6 +237,10 @@ contract BaseVault {
 
     // *** ADDRESS RESOLVER *** //
 
+    /**
+     * @notice Retrieves the address resolver.
+     * @return resolver The address resolver.
+     */
     function _getResolver() internal view returns (IAddressResolver resolver) {
         resolver = _v.resolver;
         if (address(resolver) == address(0)) {
@@ -197,6 +250,10 @@ contract BaseVault {
         }
     }
 
+    /**
+     * @notice Retrieves the address of the adaptive supply controller.
+     * @return The address of the adaptive supply controller.
+     */
     function adaptiveSupply() public view returns (address) {
         IAddressResolver resolver = _getResolver();
         return resolver
@@ -206,6 +263,10 @@ contract BaseVault {
             );
     }
 
+    /**
+     * @notice Retrieves the address of the model helper.
+     * @return The address of the model helper.
+     */
     function modelHelper() public view returns (address) {
         IAddressResolver resolver = _getResolver();
         return resolver
@@ -217,16 +278,25 @@ contract BaseVault {
 
     // *** MODIFIERS *** //
 
+    /**
+     * @notice Modifier to restrict access to the deployer contract.
+     */
     modifier onlyDeployer() {
         if (msg.sender != _v.deployerContract) revert OnlyDeployer();
         _;
     }
 
+    /**
+     * @notice Modifier to restrict access to internal calls.
+     */
     modifier onlyInternalCalls() {
         if (msg.sender != _v.factory && msg.sender != address(this)) revert OnlyInternalCalls();
         _;        
     }
 
+    /**
+     * @notice Modifier to restrict access to the factory contract.
+     */
     modifier onlyFactory() {
         IAddressResolver resolver = _getResolver();
         address factory = resolver
@@ -240,6 +310,10 @@ contract BaseVault {
 
     // *** FUNCTION SELECTORS *** //
 
+    /**
+     * @notice Retrieves the function selectors for this contract.
+     * @return selectors An array of function selectors.
+     */
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](9);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
@@ -253,5 +327,4 @@ contract BaseVault {
         selectors[8] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));
         return selectors;
     }
-
 }

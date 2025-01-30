@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-
 import {BaseVault} from "./BaseVault.sol";
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
 import {IDeployer} from "../interfaces/IDeployer.sol";
@@ -31,6 +30,7 @@ interface IRewardsCalculator {
     function calculateRewards(RewardParams memory params, uint256 timeElapsed, address token0) external pure returns (uint256);
 }
 
+// Custom errors
 error NotInitialized();
 error LiquidityRatioOutOfRange();
 error StakingContractNotSet();
@@ -38,8 +38,17 @@ error Unauthorized();
 error NoStakingRewards();
 error StakingNotEnabled();
 
+/**
+ * @title StakingVault
+ * @notice A contract for managing staking rewards and distributing them to stakers.
+ * @dev This contract extends the `BaseVault` contract and provides functionality for minting and distributing staking rewards.
+ */
 contract StakingVault is BaseVault {
 
+    /**
+     * @notice Mints and distributes staking rewards to the staking contract.
+     * @param addresses The protocol addresses.
+     */
     function mintAndDistributeRewards(ProtocolAddresses memory addresses) public onlyInternalCalls {
         if (msg.sender != address(this)) {
             revert Unauthorized();
@@ -107,6 +116,12 @@ contract StakingVault is BaseVault {
         }
     }
 
+    /**
+     * @notice Sends token1 to the floor position.
+     * @param positions The current liquidity positions.
+     * @param addresses The protocol addresses.
+     * @param toMint The amount of tokens to mint.
+     */
     function _sendToken1ToFloor(
         LiquidityPosition[3] memory positions, 
         ProtocolAddresses memory addresses,
@@ -152,7 +167,12 @@ contract StakingVault is BaseVault {
         }  
     }
 
-    function collectLiquidity(
+    /**
+     * @notice Collects liquidity from all positions.
+     * @param positions The current liquidity positions.
+     * @param addresses The protocol addresses.
+     */
+    function _collectLiquidity(
         LiquidityPosition[3] memory positions,
         ProtocolAddresses memory addresses
     ) internal {
@@ -181,6 +201,14 @@ contract StakingVault is BaseVault {
         );
     }
 
+    /**
+     * @notice Shifts the liquidity positions to adjust for new rewards.
+     * @param positions The current liquidity positions.
+     * @param addresses The protocol addresses.
+     * @param newFloorPrice The new floor price.
+     * @param toMint The amount of tokens to mint.
+     * @param floorToken1Balance The balance of token1 in the floor position.
+     */
     function _shiftPositions(
         LiquidityPosition[3] memory positions, 
         ProtocolAddresses memory addresses,
@@ -195,10 +223,11 @@ contract StakingVault is BaseVault {
         ) = LiquidityOps.getVaultData(addresses);
 
         // Collect all liquidity
-        collectLiquidity(positions, addresses);
+        _collectLiquidity(positions, addresses);
 
+        // TODO check this
         if (floorToken1Balance + toMint > floorToken1Balance) {
-            transferExcessBalance(addresses, floorToken1Balance + toMint);
+            _transferExcessBalance(addresses, floorToken1Balance + toMint);
         }
 
         _deployNewPositions(
@@ -216,11 +245,27 @@ contract StakingVault is BaseVault {
             .enforceSolvencyInvariant(address(this));   
     }
 
-    function transferExcessBalance(ProtocolAddresses memory addresses, uint256 totalAmount) internal {
+    /**
+     * @notice Transfers excess balance to the deployer.
+     * @param addresses The protocol addresses.
+     * @param totalAmount The total amount to transfer.
+     */
+    function _transferExcessBalance(ProtocolAddresses memory addresses, uint256 totalAmount) internal {
         IERC20Metadata token1 = IERC20Metadata(IUniswapV3Pool(addresses.pool).token1());
         token1.transfer(addresses.deployer, totalAmount);
     }
 
+    /**
+     * @notice Deploys new liquidity positions.
+     * @param positions The current liquidity positions.
+     * @param addresses The protocol addresses.
+     * @param newFloorPrice The new floor price.
+     * @param toMint The amount of tokens to mint.
+     * @param floorToken1Balance The balance of token1 in the floor position.
+     * @param anchorToken1Balance The balance of token1 in the anchor position.
+     * @param discoveryToken1Balance The balance of token1 in the discovery position.
+     * @param sqrtRatioX96 The current sqrt price of the pool.
+     */
     function _deployNewPositions(
         LiquidityPosition[3] memory positions, 
         ProtocolAddresses memory addresses,
@@ -260,6 +305,15 @@ contract StakingVault is BaseVault {
         IVault(address(this)).updatePositions(positions);  
     }
 
+    /**
+     * @notice Shifts the floor position to a new price.
+     * @param floorPosition The current floor position.
+     * @param addresses The protocol addresses.
+     * @param newFloorPrice The new floor price.
+     * @param floorToken1Balance The balance of token1 in the floor position.
+     * @param toMint The amount of tokens to mint.
+     * @return The new floor position.
+     */
     function _shiftFloorPosition(
         LiquidityPosition memory floorPosition,
         ProtocolAddresses memory addresses,
@@ -284,6 +338,17 @@ contract StakingVault is BaseVault {
         );
     }
 
+    /**
+     * @notice Deploys a new anchor position.
+     * @param upperTick The upper tick of the floor position.
+     * @param tickSpacing The tick spacing of the pool.
+     * @param addresses The protocol addresses.
+     * @param anchorToken1Balance The balance of token1 in the anchor position.
+     * @param discoveryToken1Balance The balance of token1 in the discovery position.
+     * @param toMint The amount of tokens to mint.
+     * @param sqrtRatioX96 The current sqrt price of the pool.
+     * @return The new anchor position.
+     */
     function _deployAnchorPosition(
         int24 upperTick,
         int24 tickSpacing,
@@ -308,6 +373,15 @@ contract StakingVault is BaseVault {
         );
     }
 
+    /**
+     * @notice Deploys a new discovery position.
+     * @param anchorUpperTick The upper tick of the anchor position.
+     * @param tickSpacing The tick spacing of the pool.
+     * @param addresses The protocol addresses.
+     * @param discoveryToken1Balance The balance of token1 in the discovery position.
+     * @param sqrtRatioX96 The current sqrt price of the pool.
+     * @return The new discovery position.
+     */
     function _deployDiscoveryPosition(
         int24 anchorUpperTick,
         int24 tickSpacing,
@@ -342,23 +416,42 @@ contract StakingVault is BaseVault {
         );
     }
 
+    /**
+     * @notice Retrieves the address of the rewards calculator.
+     * @return The address of the rewards calculator.
+     */
     function rewardsCalculator() public view returns (address) {
         return _v.resolver
         .requireAndGetAddress("RewardsCalculator", "No rewards calculator");
     }
 
+    /**
+     * @notice Sets the staking contract address.
+     * @param _stakingContract The address of the staking contract.
+     */
     function setStakingContract(address _stakingContract) external onlyManager {
         _v.stakingContract = _stakingContract;
     }
 
+    /**
+     * @notice Retrieves the staking contract address.
+     * @return The address of the staking contract.
+     */
     function getStakingContract() external view returns (address) {
         return _v.stakingContract;
     }
 
+    /**
+     * @notice Checks if staking is enabled.
+     * @return True if staking is enabled, false otherwise.
+     */
     function stakingEnabled() external view returns (bool) {
         return _v.stakingEnabled;
     }
 
+    /**
+     * @notice Modifier to restrict access to the manager.
+     */
     modifier onlyManager() {
         if (msg.sender != _v.manager) {
             revert Unauthorized();
@@ -366,6 +459,10 @@ contract StakingVault is BaseVault {
         _;
     }
 
+    /**
+     * @notice Retrieves the function selectors for this contract.
+     * @return selectors An array of function selectors.
+     */
     function getFunctionSelectors() external pure  override returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](4);
         selectors[0] = bytes4(keccak256(bytes("mintAndDistributeRewards((address,address,address,address,address))"))); 

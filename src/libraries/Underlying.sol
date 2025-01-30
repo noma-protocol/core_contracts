@@ -1,14 +1,27 @@
-
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
+
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 import {LiquidityPosition} from "../types/Types.sol";
 import {FullMath} from 'v3-core/libraries/FullMath.sol';
 import {TickMath} from 'v3-core/libraries/TickMath.sol';
 
+/**
+ * @title Underlying
+ * @notice A library for computing fees earned and retrieving underlying balances of liquidity positions in a Uniswap V3 pool.
+ */
 library Underlying {
 
+    /**
+     * @notice Computes the fees earned by a liquidity position.
+     * @param position The liquidity position.
+     * @param vault The address of the vault holding the position.
+     * @param pool The address of the Uniswap V3 pool.
+     * @param isToken0 Whether to compute fees for token0 (true) or token1 (false).
+     * @param tick The current tick of the pool.
+     * @return fee The amount of fees earned by the position.
+     */
     function computeFeesEarned(
         LiquidityPosition memory position,
         address vault,
@@ -71,6 +84,16 @@ library Underlying {
         }
     }
 
+    /**
+     * @notice Retrieves the underlying balances of a liquidity position.
+     * @param pool The address of the Uniswap V3 pool.
+     * @param vault The address of the vault holding the position.
+     * @param position The liquidity position.
+     * @return lowerTick The lower tick of the position.
+     * @return upperTick The upper tick of the position.
+     * @return amount0Current The current amount of token0 in the position.
+     * @return amount1Current The current amount of token1 in the position.
+     */
     function getUnderlyingBalances(
         address pool,
         address vault,

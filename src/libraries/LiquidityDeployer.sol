@@ -20,6 +20,10 @@ import {
     AmountsToMint
 } from "../types/Types.sol";
 
+/**
+ * @title LiquidityDeployer
+ * @notice A library for deploying and managing liquidity positions in a Uniswap V3 pool.
+ */
 library LiquidityDeployer {
     
     // Custom errors
@@ -27,6 +31,16 @@ library LiquidityDeployer {
     error EmptyFloor();
     error NoLiquidity();
 
+    /**
+     * @notice Deploys an anchor liquidity position.
+     * @param pool The address of the Uniswap V3 pool.
+     * @param receiver The address that will receive the liquidity position.
+     * @param amount0 The amount of token0 to deploy.
+     * @param floorPosition The current floor liquidity position.
+     * @param deployParams Parameters for deploying the liquidity position.
+     * @return newPosition The new liquidity position.
+     * @return liquidityType The type of liquidity position (Anchor).
+     */
     function deployAnchor(
         address pool,
         address receiver,
@@ -77,6 +91,16 @@ library LiquidityDeployer {
         return (newPosition, LiquidityType.Anchor);
     }
 
+    /**
+     * @notice Deploys a discovery liquidity position.
+     * @param pool The address of the Uniswap V3 pool.
+     * @param receiver The address that will receive the liquidity position.
+     * @param upperDiscoveryPrice The upper price bound for the discovery position.
+     * @param discoveryTickSpacing The tick spacing for the discovery position.
+     * @param anchorPosition The current anchor liquidity position.
+     * @return newPosition The new liquidity position.
+     * @return liquidityType The type of liquidity position (Discovery).
+     */
     function deployDiscovery(
         address pool,
         address receiver,
@@ -130,6 +154,17 @@ library LiquidityDeployer {
         return (newPosition, LiquidityType.Discovery);
     }
 
+    /**
+     * @notice Shifts the floor liquidity position to a new price range.
+     * @param pool The address of the Uniswap V3 pool.
+     * @param receiver The address that will receive the new liquidity position.
+     * @param currentFloorPrice The current floor price.
+     * @param newFloorPrice The new floor price.
+     * @param newFloorBalance The new balance of token1 for the floor position.
+     * @param currentFloorBalance The current balance of token1 for the floor position.
+     * @param floorPosition The current floor liquidity position.
+     * @return newPosition The new liquidity position.
+     */
     function shiftFloor(
         address pool,
         address receiver,
@@ -200,6 +235,17 @@ library LiquidityDeployer {
         return newPosition;
     }
 
+    /**
+     * @notice Internal function to deploy a liquidity position.
+     * @param pool The address of the Uniswap V3 pool.
+     * @param receiver The address that will receive the liquidity position.
+     * @param lowerTick The lower tick of the position.
+     * @param upperTick The upper tick of the position.
+     * @param tickSpacing The tick spacing of the position.
+     * @param liquidityType The type of liquidity position (Floor, Anchor, Discovery).
+     * @param amounts The amounts of token0 and token1 to deploy.
+     * @return newPosition The new liquidity position.
+     */
     function _deployPosition(
         address pool,
         address receiver,
@@ -263,6 +309,13 @@ library LiquidityDeployer {
         });    
     }
 
+    /**
+     * @notice Redeploys the floor liquidity position.
+     * @param pool The address of the Uniswap V3 pool.
+     * @param amount1ToDeploy The amount of token1 to deploy.
+     * @param positions The current liquidity positions.
+     * @return newPosition The new floor liquidity position.
+     */
     function reDeployFloor(
         address pool,
         uint256 amount1ToDeploy,
@@ -299,6 +352,14 @@ library LiquidityDeployer {
         );            
     }
 
+    /**
+     * @notice Computes the new floor price based on the provided parameters.
+     * @param toSkim The amount of token1 to skim.
+     * @param floorNewToken1Balance The new balance of token1 for the floor position.
+     * @param circulatingSupply The circulating supply of the vault.
+     * @param positions The current liquidity positions.
+     * @return newFloorPrice The new floor price.
+     */
     function computeNewFloorPrice(
         uint256 toSkim,
         uint256 floorNewToken1Balance,
@@ -321,5 +382,4 @@ library LiquidityDeployer {
 
         return newFloorPrice;  
     }
-    
 }

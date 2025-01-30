@@ -19,14 +19,26 @@ interface ILendingVault {
     function rollLoan(address who) external;
 }
 
+// Events
 event Borrow(address indexed who, uint256 borrowAmount, uint256 duration);
 event Payback(address indexed who);
 event RollLoan(address indexed who);
 event Shift();
 event Slide();
 
+/**
+ * @title ExtVault
+ * @notice A contract for extending the functionality of a vault, including borrowing, paying back loans, and managing liquidity positions.
+ * @dev This contract interacts with the `LendingVault` and `StakingVault` to provide additional functionality.
+ */
 contract ExtVault {
 
+    /**
+     * @notice Allows a user to borrow tokens from the vault's floor liquidity.
+     * @param who The address of the borrower.
+     * @param borrowAmount The amount of tokens to borrow.
+     * @param duration The duration of the loan.
+     */
     function borrow(
         address who,
         uint256 borrowAmount,
@@ -42,7 +54,10 @@ contract ExtVault {
         emit Borrow(who, borrowAmount, duration);
     }
 
-
+    /**
+     * @notice Allows a user to pay back a loan.
+     * @param who The address of the borrower.
+     */
     function payback(
         address who
     ) external {
@@ -54,6 +69,10 @@ contract ExtVault {
         emit Payback(who);
     }
 
+    /**
+     * @notice Allows a user to roll over a loan.
+     * @param who The address of the borrower.
+     */
     function roll(
         address who
     ) external {
@@ -65,6 +84,10 @@ contract ExtVault {
         emit RollLoan(who);
     }
 
+    /**
+     * @notice Shifts the liquidity positions in the vault.
+     * @dev This function adjusts the liquidity positions and distributes staking rewards.
+     */
     function shift() public {
 
         LiquidityPosition[3] memory positions = IVault(address(this)).getPositions();
@@ -80,6 +103,10 @@ contract ExtVault {
         emit Shift();
     }    
 
+    /**
+     * @notice Slides the liquidity positions in the vault.
+     * @dev This function adjusts the liquidity positions without distributing staking rewards.
+     */
     function slide() public  {
 
         LiquidityPosition[3] memory positions = IVault(address(this)).getPositions();
@@ -93,6 +120,10 @@ contract ExtVault {
         emit Slide();
     }
 
+    /**
+     * @notice Retrieves the function selectors for this contract.
+     * @return selectors An array of function selectors.
+     */
     function getFunctionSelectors() external pure  returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](5);
         selectors[0] = bytes4(keccak256(bytes("shift()")));

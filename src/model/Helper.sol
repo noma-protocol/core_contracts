@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
@@ -20,11 +19,22 @@ import {
     VaultInfo
 } from "../types/Types.sol";
 
+// Custom errors
 error NoLiquidity();
 error InsolvencyInvariant();
 
+/**
+ * @title ModelHelper
+ * @notice A contract providing helper functions for calculating liquidity ratios, position capacities, and other vault-related metrics.
+ */
 contract ModelHelper {
 
+    /**
+     * @notice Calculates the liquidity ratio of the vault.
+     * @param pool The address of the Uniswap V3 pool.
+     * @param vault The address of the vault.
+     * @return liquidityRatio The liquidity ratio of the vault.
+     */
     function getLiquidityRatio(
         address pool,
         address vault
@@ -42,6 +52,14 @@ contract ModelHelper {
         liquidityRatio = DecimalMath.divideDecimal(anchorUpperPrice, spotPrice);
     }
 
+    /**
+     * @notice Calculates the capacity of a liquidity position.
+     * @param pool The address of the Uniswap V3 pool.
+     * @param vault The address of the vault.
+     * @param position The liquidity position.
+     * @param liquidityType The type of liquidity position (Floor, Anchor, Discovery).
+     * @return amount0Current The capacity of the position in token0.
+     */
     function getPositionCapacity(
         address pool,
         address vault,
@@ -79,6 +97,16 @@ contract ModelHelper {
         return amount0Current;
     } 
 
+    /**
+     * @notice Retrieves the underlying balances of a liquidity position.
+     * @param pool The address of the Uniswap V3 pool.
+     * @param vault The address of the vault.
+     * @param liquidityType The type of liquidity position (Floor, Anchor, Discovery).
+     * @return lowerTick The lower tick of the position.
+     * @return upperTick The upper tick of the position.
+     * @return amount0Current The amount of token0 in the position.
+     * @return amount1Current The amount of token1 in the position.
+     */
     function getUnderlyingBalances(
         address pool,
         address vault,
@@ -102,6 +130,13 @@ contract ModelHelper {
         return Underlying.getUnderlyingBalances(address(pool), vault, position);
     }
 
+    /**
+     * @notice Retrieves information about the vault.
+     * @param pool The address of the Uniswap V3 pool.
+     * @param vault The address of the vault.
+     * @param tokenInfo Information about the tokens in the pool.
+     * @return vaultInfo Information about the vault.
+     */
     function getVaultInfo(
         address pool,
         address vault,
@@ -113,6 +148,13 @@ contract ModelHelper {
         return _getVaultInfo(pool, vault, tokenInfo);
     }   
 
+    /**
+     * @notice Internal function to retrieve information about the vault.
+     * @param pool The address of the Uniswap V3 pool.
+     * @param vault The address of the vault.
+     * @param tokenInfo Information about the tokens in the pool.
+     * @return vaultInfo Information about the vault.
+     */
     function _getVaultInfo(
         address pool,
         address vault,
@@ -135,6 +177,12 @@ contract ModelHelper {
         return vaultInfo;
     }
 
+    /**
+     * @notice Calculates the circulating supply of the vault.
+     * @param pool The address of the Uniswap V3 pool.
+     * @param vault The address of the vault.
+     * @return The circulating supply of the vault.
+     */
     function getCirculatingSupply(
         address pool,
         address vault
@@ -166,6 +214,12 @@ contract ModelHelper {
         );
     } 
 
+    /**
+     * @notice Retrieves the total supply of a token in the pool.
+     * @param pool The address of the Uniswap V3 pool.
+     * @param isToken0 Whether to retrieve the supply of token0 (true) or token1 (false).
+     * @return totalSupply The total supply of the token.
+     */
     function getTotalSupply(
         address pool,
         bool isToken0
@@ -181,6 +235,13 @@ contract ModelHelper {
       return totalSupply;
     }
 
+    /**
+     * @notice Retrieves the excess reserve balance of a token in the vault.
+     * @param pool The address of the Uniswap V3 pool.
+     * @param vault The address of the vault.
+     * @param isToken0 Whether to retrieve the balance of token0 (true) or token1 (false).
+     * @return The excess reserve balance of the token.
+     */
     function getExcessReserveBalance(
         address pool,
         address vault,
@@ -195,6 +256,11 @@ contract ModelHelper {
         return protocolUnusedBalance - fees;
     }
 
+    /**
+     * @notice Retrieves the intrinsic minimum value of the vault.
+     * @param _vault The address of the vault.
+     * @return The intrinsic minimum value of the vault.
+     */
     function getIntrinsicMinimumValue(address _vault) public view returns (uint256) {
         LiquidityPosition[3] memory positions = IVault(_vault).getPositions();
 
@@ -204,6 +270,10 @@ contract ModelHelper {
         return Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
     }
 
+    /**
+     * @notice Enforces the solvency invariant of the vault.
+     * @param _vault The address of the vault.
+     */
     function enforceSolvencyInvariant(address _vault) public view {
  
         VaultInfo memory vaultInfo = IVault(_vault).getVaultInfo();

@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
@@ -12,16 +11,27 @@ import { IDiamond } from "../../interfaces/IDiamond.sol";
 import { Utils } from "../../libraries/Utils.sol";
 import { IAddressResolver } from "../../interfaces/IAddressResolver.sol";
 
+/**
+ * @title EtchVault
+ * @notice A contract for deploying and initializing a Diamond proxy vault.
+ * @dev This contract is responsible for deploying the Diamond proxy, adding facets, and initializing the vault.
+ */
 contract EtchVault {
 
-    Diamond diamond;
-    DiamondCutFacet dCutFacet;
-    OwnershipFacet ownerF;
-    DiamondInit dInit;
+    // State variables
+    Diamond diamond; // The Diamond proxy contract.
+    DiamondCutFacet dCutFacet; // The DiamondCutFacet contract.
+    OwnershipFacet ownerF; // The OwnershipFacet contract.
+    DiamondInit dInit; // The DiamondInit contract.
     
-    address private immutable factory;
-    IAddressResolver private resolver;
+    address private immutable factory; // The address of the factory contract.
+    IAddressResolver private resolver; // The address resolver contract.
 
+    /**
+     * @notice Constructor to initialize the EtchVault contract.
+     * @param _factory The address of the factory contract.
+     * @param _resolver The address of the resolver contract.
+     */
     constructor(
         address _factory,
         address _resolver 
@@ -30,6 +40,12 @@ contract EtchVault {
         resolver = IAddressResolver(_resolver);
     }
 
+    /**
+     * @notice Pre-deploys a vault by deploying the Diamond proxy, adding facets, and initializing it.
+     * @param _resolver The address of the resolver contract.
+     * @return vault The address of the deployed Diamond proxy.
+     * @return vaultUpgrade The address of the vault upgrade contract.
+     */
     function preDeployVault(
         address _resolver
     )
@@ -37,13 +53,13 @@ contract EtchVault {
         onlyFactory
         returns (address vault, address vaultUpgrade)
     {
-        //deploy facets
+        // Deploy facets
         dCutFacet = new DiamondCutFacet();
         diamond = new Diamond(address(this), address(dCutFacet));
         ownerF = new OwnershipFacet();
         dInit = new DiamondInit();
 
-        //build cut struct
+        // Build cut struct
         IDiamondCut.FacetCut[] memory cut = new IDiamondCut.FacetCut[](3);
 
         cut[0] = (
@@ -78,21 +94,22 @@ contract EtchVault {
             "no VaultUpgrade"
         );
 
-        //upgrade diamond
+        // Upgrade diamond
         IDiamondCut(address(diamond)).diamondCut(cut, address(0x0), "");
         IDiamond(address(diamond)).transferOwnership(vaultUpgrade);
             
-        //Initialization
+        // Initialization
         DiamondInit(address(diamond)).init(_resolver);
         vault = address(diamond);
 
         return (vault, vaultUpgrade);
     }
     
-
+    /**
+     * @notice Modifier to restrict access to the factory contract.
+     */
     modifier onlyFactory() {
         require(msg.sender == factory, "Only factory");
         _;
     }
-
 }

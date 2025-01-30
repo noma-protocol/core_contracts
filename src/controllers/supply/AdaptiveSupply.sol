@@ -13,6 +13,8 @@ interface IVault {
     function pool() external view returns (IUniswapV3Pool);
 }
 
+/// @title AdaptiveSupply
+/// @notice A contract to compute the mint amount based on supply, time, and price factors.
 contract AdaptiveSupply {
     using FixedPointMathLib for uint256;
     using MathInt for int256;
@@ -26,6 +28,12 @@ contract AdaptiveSupply {
     error InvalidDenominator();
     error InvalidSqrtTimeElapsed();
 
+    /// @notice Computes the mint amount based on supply delta, time elapsed, spot price, and IMV.
+    /// @param deltaSupply The change in supply.
+    /// @param timeElapsed The time elapsed since the last computation.
+    /// @param spotPrice The current spot price.
+    /// @param imv The implied market volatility.
+    /// @return mintAmount The computed mint amount.
     function computeMintAmount(
         uint256 deltaSupply,
         uint256 timeElapsed,
@@ -54,6 +62,8 @@ contract AdaptiveSupply {
         mintAmount = mintAmount / scaleFactor;
     }
 
+    /// @notice Computes the scale factor based on the token decimals.
+    /// @return scaleFactor The computed scale factor.
     function computeScaleFactor() internal view returns (uint256) {
         uint256 tokenDecimals = IERC20(
             IUniswapV3Pool(
@@ -64,6 +74,10 @@ contract AdaptiveSupply {
         return 10**(18 - tokenDecimals);
     }
 
+    /// @notice Computes the sigmoid function value based on supply delta and time elapsed.
+    /// @param deltaSupply The change in supply.
+    /// @param timeElapsed The time elapsed since the last computation.
+    /// @return sigmoid The computed sigmoid value.
     function computeSigmoid(uint256 deltaSupply, uint256 timeElapsed) internal pure returns (uint256) {
         uint256 denominator = deltaSupply + timeElapsed;
         if (denominator == 0) revert InvalidDenominator();
@@ -89,6 +103,10 @@ contract AdaptiveSupply {
         return uint256(1e18).divWadDown(1e18 + exponent.expWad());
     }
 
+    /// @notice Computes the time adjustment factor based on the ratio and time elapsed.
+    /// @param ratio The ratio of spot price to IMV.
+    /// @param timeElapsed The time elapsed since the last computation.
+    /// @return timeAdjustment The computed time adjustment factor.
     function computeTimeAdjustment(uint256 ratio, uint256 timeElapsed) internal pure returns (uint256) {
         // Combine ratio and timeElapsed to create an adjustment factor
         uint256 ratioFactor = ratio.divWadDown(1e18); // Normalize ratio to a factor
