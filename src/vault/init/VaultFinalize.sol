@@ -6,6 +6,11 @@ import { ExtVault } from "../ExtVault.sol";
 import { IDiamondCut } from "../../interfaces/IDiamondCut.sol";
 import { IFacet } from "../../interfaces/IFacet.sol";
 
+interface IDiamondInterface {
+    function initialize() external;
+    function transferOwnership(address) external;
+}
+
 /**
  * @title VaultFinalize
  * @notice A contract for finalizing the upgrade of a Diamond proxy vault.
