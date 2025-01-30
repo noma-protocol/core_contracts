@@ -21,7 +21,7 @@ contract RewardsCalculator {
         RewardParams memory params,
         uint256 timeElapsed,
         address token // Token address to determine decimals
-    ) public view returns (uint256) {
+    ) public pure returns (uint256) {
         require(params.totalSupply > 0, "Total supply must be greater than zero");
         require(params.imv > 0, "IMV must be greater than zero");
         require(timeElapsed > 0, "Time elapsed must be greater than zero");

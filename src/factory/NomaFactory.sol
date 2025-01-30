@@ -216,10 +216,8 @@ contract NomaFactory {
             msg.sender,
             address(deployer), 
             address(pool), 
-            modelHelper(), 
             stakingContract,
             address(proxy),
-            adaptiveSupply(),
             getProtocolParameters()
         );
 
@@ -392,10 +390,8 @@ contract NomaFactory {
     * @param _owner The address of the vault owner.
     * @param _deployer The address of the deployer contract.
     * @param _pool The address of the associated Uniswap V3 pool.
-    * @param _modelHelper The address of the model helper contract.
     * @param _stakingContract The address of the staking contract.
     * @param _token0 The address of the primary token (token0).
-    * @param _adaptiveSupply The address of the adaptive supply contract.
     * @param _params The liquidity structure parameters.
     * @dev This internal function initializes the vault by setting its parameters and linking it with the necessary contracts.
     */
@@ -404,10 +400,8 @@ contract NomaFactory {
         address _owner,
         address _deployer,
         address _pool,
-        address _modelHelper,
         address _stakingContract,
         address _token0,
-        address _adaptiveSupply,
         ProtocolParameters memory _params
     ) internal {
         BaseVault vault = BaseVault(_vault);
@@ -448,7 +442,7 @@ contract NomaFactory {
     * @param _params The new liquidity structure parameters.
     * @dev This function can only be called by the authority.
     */
-    function setProtocolParameters(
+    function setProtocolParameters( //TODO check this
         ProtocolParameters memory _params
     ) public isAuthority {
         protocolParameters = _params;

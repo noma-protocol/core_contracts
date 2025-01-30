@@ -82,6 +82,7 @@ struct VaultInfo {
 /// @param _totalSupply Total supply of the token.
 /// @param _IDOPrice Initial price of the token in the IDO.
 /// @param token1 Address of token1.
+/// @param feeTier Fee tier for the pool.
 struct VaultDeployParams {
     string _name;
     string _symbol;
@@ -185,12 +186,13 @@ struct LoanPosition {
     uint256 duration;
 }
 
-/// @notice Parameters for a loan.
-/// @param borrowAmount Amount to borrow.
-/// @param collateralAmount Amount of collateral to provide.
-/// @param fees Fees associated with the loan.
-/// @param expiry Expiry timestamp of the loan.
-/// @param duration Duration of the loan.
+/// @notice Parameters for calculating rewards.
+/// @param ethAmount Amount of ETH provided.
+/// @param imv Token price in ETH.
+/// @param spotPrice Spot price in ETH.
+/// @param circulating Circulating supply.
+/// @param totalSupply Total supply.
+/// @param kr Sensitivity for r adjustment.
 struct RewardParams {
     uint256 ethAmount;   // Amount of ETH provided 
     uint256 imv;         // Token price in ETH 
@@ -200,7 +202,7 @@ struct RewardParams {
     uint256 kr;          // Sensitivity for r adjustment (e.g., 10e18)
 }
 
-/// @notice Parameters for structuring liquidity.
+/// @notice Parameters for configuring the protocol.
 /// @param floorPercentage Percentage allocated to floor liquidity.
 /// @param anchorPercentage Percentage allocated to anchor liquidity.
 /// @param idoPriceMultiplier Multiplier for the IDO price.
