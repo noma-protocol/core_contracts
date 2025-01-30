@@ -29,6 +29,11 @@ interface IDiamondInterface {
     function transferOwnership(address) external;
 }
 
+error OnlyFactory();
+error OnlyOwner();
+error InvalidAddress();
+error NotAuthorized();
+
 /**
  * @title VaultUpgrade
  * @notice A contract for starting the upgrade process of a Diamond proxy vault.
@@ -36,10 +41,10 @@ interface IDiamondInterface {
  */
 contract VaultUpgrade {
     address private owner; // The address of the contract owner.
-    address private someContract; // The address of the someContract.
     address private factory; // The address of the factory contract.
     address private upgradeStep1; // The address of the first upgrade step contract.
     address private upgradeFinalize; // The address of the final upgrade step contract.
+
 
     /**
      * @notice Constructor to initialize the VaultUpgrade contract.
@@ -53,12 +58,12 @@ contract VaultUpgrade {
 
     /**
      * @notice Initializes the contract with the someContract and the first upgrade step contract.
-     * @param _someContract The address of the someContract.
      * @param _upgradeStep1 The address of the first upgrade step contract.
      */
-    function init(address _someContract, address _upgradeStep1) onlyOwner public {
-        require(_upgradeStep1 != address(0), "Invalid address");
-        someContract = _someContract;
+    function init(address _upgradeStep1) onlyOwner public {
+        if (_upgradeStep1 == address(0)) {
+            revert InvalidAddress();
+        }
         upgradeStep1 = _upgradeStep1;
     }
 
@@ -68,7 +73,9 @@ contract VaultUpgrade {
      * @param _vaultUpgradeFinalize The address of the final upgrade step contract.
      */
     function doUpgradeStart(address diamond, address _vaultUpgradeFinalize) public onlyFactory {
-        require(_vaultUpgradeFinalize != address(0), "Invalid upgrade address");
+        if (diamond == address(0) || _vaultUpgradeFinalize == address(0)) {
+            revert InvalidAddress();
+        }
 
         address[] memory newFacets = new address[](1);
         IDiamondCut.FacetCutAction[] memory actions = new IDiamondCut.FacetCutAction[](1);
@@ -96,7 +103,9 @@ contract VaultUpgrade {
      * @notice Modifier to restrict access to the contract owner.
      */
     modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner");
+        if (msg.sender != owner) {
+            revert OnlyOwner();
+        }
         _;
     }
 
@@ -105,14 +114,7 @@ contract VaultUpgrade {
      */
     modifier onlyFactory() {
         if (msg.sender != factory) {
-            revert(
-                string(
-                    abi.encodePacked(
-                        "onlyFactory : ", 
-                        Utils.addressToString(someContract) // TODO check this
-                    )
-                )
-            );
+            revert OnlyFactory();
         }
         _;
     }
@@ -142,7 +144,9 @@ contract VaultUpgradeStep1  {
      * @param _upgradePreviousStep The address of the previous upgrade step contract.
      */
     function init(address _upgradeNextStep, address _upgradePreviousStep) onlyOwner public {
-        require(_upgradePreviousStep != address(0), "Invalid address");
+        if (_upgradePreviousStep == address(0)) {
+            revert InvalidAddress();
+        }
         upgradePreviousStep = _upgradePreviousStep;
         upgradeNextStep = _upgradeNextStep;
     }
@@ -179,7 +183,9 @@ contract VaultUpgradeStep1  {
      * @notice Modifier to restrict access to the contract owner.
      */
     modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner");
+        if (msg.sender != owner) {
+            revert OnlyOwner();
+        }
         _;
     }
 
@@ -187,7 +193,9 @@ contract VaultUpgradeStep1  {
      * @notice Modifier to restrict access to the previous upgrade step contract.
      */
     modifier authorized() {
-        require(msg.sender == upgradePreviousStep, "Only UpgradePreviousStep");
+        if (msg.sender != upgradePreviousStep) {
+            revert NotAuthorized();
+        }
         _;
     }
 }
@@ -253,7 +261,9 @@ contract VaultUpgradeStep2  {
      * @notice Modifier to restrict access to the contract owner.
      */
     modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner");
+        if (msg.sender != owner) {
+            revert OnlyOwner();
+        }
         _;
     }
 
@@ -261,7 +271,9 @@ contract VaultUpgradeStep2  {
      * @notice Modifier to restrict access to the previous upgrade step contract.
      */
     modifier authorized() {
-        require(msg.sender == upgradePreviousStep, "Only UpgradePreviousStep");
+        if (msg.sender != upgradePreviousStep) {
+            revert NotAuthorized();
+        }
         _;
     }
 }

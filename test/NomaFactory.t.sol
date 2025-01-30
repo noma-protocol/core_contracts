@@ -98,7 +98,7 @@ contract NomaFactoryTest is Test {
         VaultFinalize vaultFinalize = new VaultFinalize(deployer);
        
         vm.prank(deployer);
-        vaultUpgrade.init(address(0), address(vaultUpgradeStep1));
+        vaultUpgrade.init(address(vaultUpgradeStep1));
         vm.prank(deployer);
         vaultUpgradeStep1.init(address(vaultUpgradeStep2), address(vaultUpgrade));
         vm.prank(deployer);

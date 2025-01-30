@@ -145,7 +145,7 @@ contract DeployFactory is Script {
         VaultUpgradeStep2 vaultUpgradeStep2 = new VaultUpgradeStep2(deployer);
         VaultFinalize vaultFinalize = new VaultFinalize(deployer);
 
-        vaultUpgrade.init(address(0), address(vaultUpgradeStep1));
+        vaultUpgrade.init(address(vaultUpgradeStep1));
         vaultUpgradeStep1.init(address(vaultUpgradeStep2), address(vaultUpgrade));
         vaultUpgradeStep2.init(address(vaultFinalize), address(vaultUpgradeStep1));
         vaultFinalize.init(/*address(nomaFactory)*/ deployer, address(vaultUpgradeStep2));
