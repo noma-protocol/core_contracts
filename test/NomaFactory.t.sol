@@ -149,7 +149,6 @@ contract NomaFactoryTest is Test {
                 "NOMA",       // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
-                10,           // Percentage for sale
                 1e18,         // IDO Price
                 WETH,         // Token1 address
                 3000          // Uniswap V3 Fee tier
@@ -177,7 +176,6 @@ contract NomaFactoryTest is Test {
                 "NOMA",       // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
-                10,           // Percentage for sale
                 1e18,         // IDO Price
                 WETH,         // Token1 address
                 3000          // Uniswap V3 Fee tier
@@ -203,7 +201,6 @@ contract NomaFactoryTest is Test {
                 "NOMA",       // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
-                10,           // Percentage for sale
                 1e18,         // IDO Price
                 WETH,         // Token1 address
                 3000          // Uniswap V3 Fee tier
@@ -222,7 +219,6 @@ contract NomaFactoryTest is Test {
                 "NOMA",       // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
-                10,           // Percentage for sale
                 1e18,         // IDO Price
                 WETH,         // Token1 address
                 3000          // Uniswap V3 Fee tier
@@ -282,7 +278,6 @@ contract NomaFactoryTest is Test {
                 "NOMA",       // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
-                10,           // Percentage for sale
                 1e18,         // IDO Price
                 WETH,         // Token1 address
                 3000          // Uniswap V3 Fee tier
@@ -308,7 +303,6 @@ contract NomaFactoryTest is Test {
                 "NOMA",       // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
-                10,           // Percentage for sale
                 1e18,         // IDO Price
                 WETH,         // Token1 address
                 3000          // Uniswap V3 Fee tier
@@ -334,7 +328,6 @@ contract NomaFactoryTest is Test {
                 "NOMA",       // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
-                10,           // Percentage for sale
                 1e18,         // IDO Price
                 WETH,         // Token1 address
                 3000          // Uniswap V3 Fee tier
@@ -367,7 +360,6 @@ contract NomaFactoryTest is Test {
                 "TEST",       // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
-                10,           // Percentage for sale
                 1e18,         // IDO Price
                 WETH,         // Token1 address
                 3000          // Uniswap V3 Fee tier
@@ -406,7 +398,6 @@ contract NomaFactoryTest is Test {
             "V1",               // Symbol
             18,                 // Decimals
             100e18,             // Total supply
-            10,                 // Percentage for sale
             1e18,               // IDO Price
             WETH,               // Token1 address
             3000                // Uniswap V3 Fee tier
@@ -418,7 +409,6 @@ contract NomaFactoryTest is Test {
             "V2",               // Symbol
             18,                 // Decimals
             200e18,             // Total supply
-            15,                 // Percentage for sale
             2e18,               // IDO Price
             WETH,               // Token1 address
             3000                // Uniswap V3 Fee tier

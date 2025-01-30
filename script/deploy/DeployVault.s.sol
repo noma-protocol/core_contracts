@@ -29,7 +29,6 @@ contract DeployVault is Script {
             "NOMA",
             18,
             100e18,
-            10,
             1e18,
             WETH,
             3000

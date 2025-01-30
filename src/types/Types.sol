@@ -80,7 +80,6 @@ struct VaultInfo {
 /// @param _symbol Symbol of the vault token.
 /// @param _decimals Number of decimals for the token.
 /// @param _totalSupply Total supply of the token.
-/// @param _percentageForSale Percentage of tokens allocated for sale.
 /// @param _IDOPrice Initial price of the token in the IDO.
 /// @param token1 Address of token1.
 struct VaultDeployParams {
@@ -88,7 +87,6 @@ struct VaultDeployParams {
     string _symbol;
     uint8 _decimals;
     uint256 _totalSupply;
-    uint16 _percentageForSale;
     uint256 _IDOPrice;
     address token1;
     uint24 feeTier;
