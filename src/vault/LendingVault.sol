@@ -142,38 +142,58 @@ contract LendingVault is BaseVault {
      * @notice Allows a user to roll over a loan.
      * @param who The address of the borrower.
      */
-    function rollLoan(address who) public onlyInternalCalls {
+    function rollLoan(address who, uint256 newDuration) public onlyInternalCalls {
+        // Fetch the loan position
         LoanPosition storage loan = _v.loanPositions[who];
 
+        // Check if the loan exists
         if (loan.borrowAmount == 0) revert NoActiveLoan();
+
+        // Check if the loan has expired
         if (block.timestamp > loan.expiry) revert LoanExpired();
 
+        // Ensure the new duration is valid
+        if (newDuration == 0) revert InvalidDuration("Duration cannot be zero");
+        if (newDuration > loan.duration) revert InvalidDuration("New duration cannot exceed original duration");
+
+        // Recalculate the collateral value
         uint256 newCollateralValue = DecimalMath.multiplyDecimal(
             loan.collateralAmount, 
             IModelHelper(modelHelper()).getIntrinsicMinimumValue(address(this))
         );
 
+        // Ensure the new collateral value is sufficient to cover the borrow amount
         if (newCollateralValue <= loan.borrowAmount) revert CantRollLoan();
 
+        // Calculate the new borrow amount and fees
         uint256 newBorrowAmount = newCollateralValue - loan.borrowAmount;
-        uint256 newFees = _calculateLoanFees(newBorrowAmount, loan.expiry - block.timestamp);
+        uint256 newFees = _calculateLoanFees(newBorrowAmount, newDuration);
 
+        // Update the loan's expiry to reflect the new duration
+        loan.expiry = block.timestamp + newDuration;
+
+        // Collect fees from the Uniswap pool
         (,,, uint256 floorToken1Balance) = IModelHelper(modelHelper())
-        .getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
+            .getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
 
+        // Redeploy floor liquidity
         LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
         Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick);      
-           
         LiquidityDeployer.reDeployFloor(
             address(_v.pool), 
             floorToken1Balance - newBorrowAmount, 
             positions
         );
 
+        // Transfer the new borrow amount (minus fees) to the borrower
         IERC20(_v.pool.token1()).transfer(who, newBorrowAmount - newFees);     
+
+        // Update the vault's liquidity positions
         IVault(address(this)).updatePositions([_v.floorPosition, _v.anchorPosition, _v.discoveryPosition]);
 
-        // enforce insolvency invariant
+        // Enforce insolvency invariant
+         IModelHelper(modelHelper())
+        .enforceSolvencyInvariant(address(this));                  
     }
 
     /**
@@ -200,6 +220,7 @@ contract LendingVault is BaseVault {
         uint256 collateralAmount = loan.collateralAmount;
         IERC20(_v.pool.token0()).transfer(address(this), collateralAmount);
         _v.collateralAmount -= collateralAmount;
+        // TODO send collateral to vault
     }
 
     /**
