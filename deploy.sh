@@ -8,10 +8,7 @@ fi
 OUT="$(dirname "$0")/deploy_helper/out"
 
 if [ ! -d "$OUT" ]; then
-  echo "Directory does not exist. Creating it..."
   mkdir -p "$OUT"
-else
-  echo "Directory already exists."
 fi
 
 # Define the output files
