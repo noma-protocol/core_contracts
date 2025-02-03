@@ -2,7 +2,9 @@
 pragma solidity ^0.8.0;
 
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {LiquidityDeployer} from "./libraries/LiquidityDeployer.sol";
 import {DeployHelper} from "./libraries/DeployHelper.sol";
@@ -31,6 +33,7 @@ interface IVault {
 /// @notice This contract manages the deployment of liquidity positions, including floor, anchor, and discovery positions.
 /// @dev Integrates with Uniswap V3 for liquidity management and includes safety mechanisms like reentrancy protection.
 contract Deployer is Ownable {
+    using SafeERC20 for IERC20;
 
     /// @notice Stores the floor liquidity position details.
     LiquidityPosition private floorPosition;
@@ -147,17 +150,17 @@ contract Deployer is Ownable {
         uint256 token1Balance = IERC20(token1).balanceOf(address(this));
 
         if (token0Balance >= amount0Owed) {
-            if (amount0Owed > 0) IERC20(token0).transfer(msg.sender, amount0Owed);
+            if (amount0Owed > 0) IERC20(token0).safeTransfer(msg.sender, amount0Owed);
         } else {
-            IERC20(token0).transferFrom(vault, address(this), amount0Owed);
-            IERC20(token0).transfer(msg.sender, amount0Owed);
+            IERC20(token0).safeTransferFrom(vault, address(this), amount0Owed);
+            IERC20(token0).safeTransfer(msg.sender, amount0Owed);
         }
 
         if (token1Balance >= amount1Owed) {
-            if (amount1Owed > 0) IERC20(token1).transfer(msg.sender, amount1Owed);
+            if (amount1Owed > 0) IERC20(token1).safeTransfer(msg.sender, amount1Owed);
         } else {
-            IERC20(token1).transferFrom(vault, address(this), amount1Owed);
-            IERC20(token1).transfer(msg.sender, amount1Owed);
+            IERC20(token1).safeTransferFrom(vault, address(this), amount1Owed);
+            IERC20(token1).safeTransfer(msg.sender, amount1Owed);
         }
     }
 
@@ -324,7 +327,7 @@ contract Deployer is Ownable {
         LiquidityPosition[3] memory positions = [floorPosition, anchorPosition, discoveryPosition];
 
         uint256 balanceToken0 = IERC20(token0).balanceOf(address(this));
-        IERC20(token0).transfer(vault, balanceToken0);
+        IERC20(token0).safeTransfer(vault, balanceToken0);
         IVault(vault).initializeLiquidity(positions);
     }
 

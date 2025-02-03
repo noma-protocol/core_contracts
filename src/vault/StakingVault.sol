@@ -6,6 +6,9 @@ import {IModelHelper} from "../interfaces/IModelHelper.sol";
 import {IDeployer} from "../interfaces/IDeployer.sol";
 import {LiquidityOps} from "../libraries/LiquidityOps.sol";
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
+
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {Conversions} from "../libraries/Conversions.sol";
@@ -44,6 +47,7 @@ error StakingNotEnabled();
  * @dev This contract extends the `BaseVault` contract and provides functionality for minting and distributing staking rewards.
  */
 contract StakingVault is BaseVault {
+    using SafeERC20 for IERC20;
 
     /**
      * @notice Mints and distributes staking rewards to the staking contract.
@@ -79,7 +83,7 @@ contract StakingVault is BaseVault {
         .getIntrinsicMinimumValue(address(this));
 
         uint256 circulatingSupply = IModelHelper(modelHelper()).getCirculatingSupply(addresses.pool, address(this));
-        uint256 totalSupply = IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).totalSupply();
+        uint256 totalSupply = IERC20(IUniswapV3Pool(addresses.pool).token0()).totalSupply();
 
         (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(addresses.pool).slot0();
 
@@ -101,7 +105,7 @@ contract StakingVault is BaseVault {
         );
                 
         if (toMint > 0) {        
-            IERC20Metadata(_v.tokenInfo.token0).approve(_v.stakingContract, toMint);
+            IERC20(_v.tokenInfo.token0).approve(_v.stakingContract, toMint);
             IVault(address(this)).mintTokens(_v.stakingContract, toMint);
             // Update total minted (NOMA)
             _v.totalMinted += toMint;
@@ -251,8 +255,8 @@ contract StakingVault is BaseVault {
      * @param totalAmount The total amount to transfer.
      */
     function _transferExcessBalance(ProtocolAddresses memory addresses, uint256 totalAmount) internal {
-        IERC20Metadata token1 = IERC20Metadata(IUniswapV3Pool(addresses.pool).token1());
-        token1.transfer(addresses.deployer, totalAmount);
+        IERC20 token1 = IERC20(IUniswapV3Pool(addresses.pool).token1());
+        token1.safeTransfer(addresses.deployer, totalAmount);
     }
 
     /**

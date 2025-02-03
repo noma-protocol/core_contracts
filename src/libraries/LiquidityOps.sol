@@ -3,8 +3,9 @@ pragma solidity ^0.8.0;
 
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {TickMath} from 'v3-core/libraries/TickMath.sol';
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-
 import {Uniswap} from "./Uniswap.sol";
 import {Utils} from "./Utils.sol";
 import {Conversions} from "./Conversions.sol";
@@ -57,7 +58,8 @@ interface IAdaptiveSupply {
  * @notice Library for managing liquidity positions in a Uniswap V3 pool.
  */
 library LiquidityOps {
-    
+    using SafeERC20 for IERC20;
+
     error InvalidTick();
     error AboveThreshold();
     error BelowThreshold();
@@ -252,7 +254,7 @@ library LiquidityOps {
             ); 
 
             if (params.floorToken1Balance + params.toSkim > params.floorToken1Balance) {
-                IERC20Metadata(IUniswapV3Pool(params.pool).token1()).transfer(
+                IERC20(IUniswapV3Pool(params.pool).token1()).safeTransfer(
                     params.deployer, 
                     params.floorToken1Balance + params.toSkim
                 );
@@ -561,7 +563,7 @@ library LiquidityOps {
                     address teamMultisig = IVault(address(this)).teamMultiSig();
 
                     if (teamMultisig != address(0)) {
-                        IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).transfer(
+                        IERC20(IUniswapV3Pool(addresses.pool).token0()).safeTransfer(
                             teamMultisig, 
                             mintAmount - (mintAmount * (IVault(address(this)).getProtocolParameters().inflationFee / 1e18))
                         );
