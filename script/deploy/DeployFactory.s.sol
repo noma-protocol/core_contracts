@@ -10,7 +10,7 @@ import { Resolver } from "../../src/Resolver.sol";
 import { ModelHelper } from "../../src/model/Helper.sol";
 import { Deployer } from "../../src/Deployer.sol";
 import { NomaFactory } from "../../src/factory/NomaFactory.sol";
-import { VaultDeployParams, VaultDescription, ProtocolParameters } from "../../src/types/Types.sol";
+import { VaultDeployParams, VaultDescription, ProtocolParameters, PresaleProtocolParams } from "../../src/types/Types.sol";
 import { 
     VaultUpgrade, 
     VaultUpgradeStep1, 
@@ -24,6 +24,8 @@ import { DeployerFactory } from "../../src/factory/DeployerFactory.sol";
 import { ExtFactory } from "../../src/factory/ExtFactory.sol";
 import { AdaptiveSupply } from "../../src/controllers/supply/AdaptiveSupply.sol";
 import { RewardsCalculator } from "../../src/controllers/supply/RewardsCalculator.sol";
+import { PresaleFactory } from "../../src/factory/PresaleFactory.sol";
+import { TokenFactory } from "../../src/factory/TokenFactory.sol";
 
 interface IWETH {
     function mintTo(address to, uint256 amount) external;
@@ -61,6 +63,7 @@ contract DeployFactory is Script {
     GonsToken private sNoma;
     AdaptiveSupply private adaptiveSupply;
     RewardsCalculator private rewardsCalculator;
+    TokenFactory private tokenFactory;
 
     function run() public {  
 
@@ -99,6 +102,20 @@ contract DeployFactory is Script {
 
         console.log("Resolver address: ", address(resolver));
 
+        // Token Factory
+        tokenFactory = new TokenFactory(address(resolver));
+
+        expectedAddressesInResolver.push(
+            ContractInfo("TokenFactory", address(tokenFactory))
+        );
+        
+        // Presale Factory
+        PresaleFactory presaleFactory = new PresaleFactory(address(resolver));
+
+        expectedAddressesInResolver.push(
+            ContractInfo("PresaleFactory", address(presaleFactory))
+        );
+
         DeployerFactory deploymentFactory = new DeployerFactory(address(resolver));
         ExtFactory extFactory = new ExtFactory(address(resolver));
 
@@ -107,7 +124,8 @@ contract DeployFactory is Script {
             uniswapFactory,
             address(resolver),
             address(deploymentFactory),
-            address(extFactory)
+            address(extFactory),
+            address(presaleFactory)
         );
         
         expectedAddressesInResolver.push(
@@ -128,10 +146,23 @@ contract DeployFactory is Script {
             100,        // lowBalanceThresholdFactor
             100,        // highBalanceThresholdFactor
             5e15,       // inflationFee
-            27          // loanFee
+            27,         // loanFee
+            0.01e18,    // deployFee (ETH)
+            25          // presalePremium (25%)
+        );
+
+        PresaleProtocolParams memory _presaleParams =
+        PresaleProtocolParams(
+            60e16,      // Max soft cap (60%)
+            100,        // Min contribution ratio 
+            25,         // Max contribution ratio 
+            20e16,      // Percentage of funds kept from presale (20%)
+            30 days,    // Min deadline
+            90 days     // Max deadline
         );
 
         nomaFactory.setProtocolParameters(_params);
+        nomaFactory.setPresaleProtocolParams(_presaleParams);
 
         resolver.initFactory(address(nomaFactory));
         etchVault = new EtchVault(address(nomaFactory), address(resolver));
