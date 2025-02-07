@@ -63,7 +63,7 @@ contract Presale is pAsset, Ownable {
     mapping(bytes32 => uint256) public referralEarnings;
 
     /// @notice Referral percentage (3%).
-    uint256 public constant REFERRAL_PERCENTAGE = 3;
+    uint256 public constant referralPercentage = 3;
 
     /// @notice Tracks all contributors.
     address[] public contributors;
@@ -116,8 +116,9 @@ contract Presale is pAsset, Ownable {
         launchSupply = params.totalSupply;
         floorPercentage = params.floorPercentage;
         protocolParams = protocolParams;
+        referralPercentage = protocolParams.referralPercentage;
         hardCap = ((launchSupply * floorPercentage) / 100) / ((initialPrice * 80 / 100) / 1e18);
-
+        
         uint256 token0Decimals = IERC20Metadata(pool.token0()).decimals();
         uint256 floorToken1Amount = ((launchSupply * floorPercentage / 100) / initialPrice) * 10 ** token0Decimals;
 
@@ -180,7 +181,7 @@ contract Presale is pAsset, Ownable {
 
         // Handle referrals
         if (referralCode != bytes32(0)) {
-            uint256 referralFee = (msg.value * REFERRAL_PERCENTAGE) / 100;
+            uint256 referralFee = (msg.value * referralPercentage) / 100;
             referralEarnings[referralCode] += referralFee;
         }
         

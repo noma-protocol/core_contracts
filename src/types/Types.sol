@@ -100,9 +100,9 @@ struct VaultDeployParams {
 }
 
 struct PresaleUserParams {
-    uint256 _softCap;
-    uint256 _initialPrice;
-    uint256 _deadline;
+    uint256 softCap;
+    uint256 initialPrice;
+    uint256 deadline;
 }
 
 struct PresaleDeployParams {
@@ -134,6 +134,7 @@ struct PresaleProtocolParams {
     uint256 presalePercentage;
     uint256 minDuration;
     uint256 maxDuration;
+    uint256 referralPercentage;
 }
 
 /// @notice Parameters for deploying liquidity positions.
