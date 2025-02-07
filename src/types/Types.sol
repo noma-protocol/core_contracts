@@ -1,9 +1,28 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import { IUniswapV3Pool } from "v3-core/interfaces/IUniswapV3Pool.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+
 /// @title Liquidity Management Structs and Constants
 /// @notice This contract defines various structs and constants used in liquidity management operations.
 
+
+/// @notice Struct for representing token amounts to mint.
+/// @param amount0 Amount of token0 to mint.
+/// @param amount1 Amount of token1 to mint.
+struct AmountsToMint {
+    uint256 amount0;
+    uint256 amount1;
+}
+
+/// @notice Information about the tokens in a pair.
+/// @param token0 Address of the first token.
+/// @param token1 Address of the second token.
+struct TokenInfo {
+    address token0;
+    address token1;
+}
 /// @notice Represents a liquidity position within specified tick ranges.
 /// @param lowerTick The lower tick of the position.
 /// @param upperTick The upper tick of the position.
@@ -25,22 +44,6 @@ enum LiquidityType {
     Discovery
 }
 
-/// @notice Struct for representing token amounts to mint.
-/// @param amount0 Amount of token0 to mint.
-/// @param amount1 Amount of token1 to mint.
-struct AmountsToMint {
-    uint256 amount0;
-    uint256 amount1;
-}
-
-/// @notice Information about the tokens in a pair.
-/// @param token0 Address of the first token.
-/// @param token1 Address of the second token.
-struct TokenInfo {
-    address token0;
-    address token1;
-}
-
 /// @notice Addresses used by the protocol.
 /// @param pool Address of the liquidity pool.
 /// @param vault Address of the vault contract.
@@ -52,6 +55,7 @@ struct ProtocolAddresses {
     address vault;
     address deployer;
     address modelHelper;
+    address presaleContract;
     address adaptiveSupplyController;
 }
 
@@ -76,21 +80,60 @@ struct VaultInfo {
 }
 
 /// @notice Parameters for deploying a vault.
-/// @param _name Name of the vault token.
-/// @param _symbol Symbol of the vault token.
-/// @param _decimals Number of decimals for the token.
-/// @param _totalSupply Total supply of the token.
-/// @param _IDOPrice Initial price of the token in the IDO.
+/// @param name Name of the vault token.
+/// @param symbol Symbol of the vault token.
+/// @param decimals Number of decimals for the token.
+/// @param totalSupply Total supply of the token.
+/// @param IDOPrice Initial price of the token in the IDO.
 /// @param token1 Address of token1.
 /// @param feeTier Fee tier for the pool.
 struct VaultDeployParams {
-    string _name;
-    string _symbol;
-    uint8 _decimals;
-    uint256 _totalSupply;
-    uint256 _IDOPrice;
+    string name;
+    string symbol;
+    uint8 decimals;
+    uint256 totalSupply;
+    uint256 IDOPrice;
+    uint256 floorPrice;
     address token1;
     uint24 feeTier;
+    uint8  presale;
+}
+
+struct PresaleUserParams {
+    uint256 _softCap;
+    uint256 _initialPrice;
+    uint256 _deadline;
+}
+
+struct PresaleDeployParams {
+    address deployer;
+    address vaultAddress;
+    address pool;
+    uint256 softCap;
+    uint256 initialPrice;
+    uint256 deadline;
+    string name;
+    string symbol;
+    uint8 decimals;
+    int24 tickSpacing;
+    uint256 floorPercentage;
+    uint256 totalSupply;    
+}
+
+struct LivePresaleParams {
+    uint256 softCap;
+    uint256 initialPrice;
+    uint256 deadline;
+    uint256 launchSupply;
+}
+
+struct PresaleProtocolParams {
+    uint256 maxSoftCap;
+    uint256 minContributionRatio;
+    uint256 maxContributionRatio;
+    uint256 presalePercentage;
+    uint256 minDuration;
+    uint256 maxDuration;
 }
 
 /// @notice Parameters for deploying liquidity positions.
@@ -123,6 +166,7 @@ struct VaultDescription {
     address token1;
     address deployer;
     address vault;
+    address presaleContract;
 }
 
 /// @notice Parameters used before a shift operation.
@@ -224,6 +268,8 @@ struct ProtocolParameters {
     uint256 highBalanceThresholdFactor;
     uint256 inflationFee;
     uint256 loanFee;
+    uint256 deployFee;
+    uint256 presalePremium;
 }
 
 /// @notice Parameters for structuring liquidity.
@@ -239,4 +285,17 @@ struct LiquidityInternalPars {
     int24 upperTick;
     uint256 amount1ToDeploy;
     LiquidityType liquidityType;
+}
+
+struct DeploymentData {
+    PresaleUserParams presaleParams;
+    VaultDeployParams vaultDeployParams;
+    IUniswapV3Pool pool;
+    ERC1967Proxy proxy;
+    int24 tickSpacing;
+    address vaultAddress;
+    address vaultUpgrade;
+    address sNoma;
+    address stakingContract;
+    address presaleContract;
 }
