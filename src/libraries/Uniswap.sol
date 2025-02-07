@@ -143,7 +143,7 @@ library Uniswap {
     ) internal {
         
         uint256 balanceBeforeSwap = IERC20Metadata(zeroForOne ? token1 : token0).balanceOf(receiver);
-        uint160 slippagePrice = zeroForOne ? basePrice - (basePrice / 25) : basePrice + (basePrice / 25);
+        uint160 slippagePrice = zeroForOne ? basePrice - (basePrice * 5/100) : basePrice + (basePrice * 5/100);
 
         try IUniswapV3Pool(pool).swap(
             receiver, 
