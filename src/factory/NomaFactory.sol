@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 import { IUniswapV3Factory } from "v3-core/interfaces/IUniswapV3Factory.sol";
 import { IUniswapV3Pool } from "v3-core/interfaces/IUniswapV3Pool.sol";
@@ -18,8 +20,12 @@ import { MockNomaToken } from "../token/MockNomaToken.sol";
 import { Deployer } from "../Deployer.sol";
 
 import {
+    PresaleUserParams,
+    PresaleDeployParams,
     VaultDeployParams,
-    ProtocolParameters
+    ProtocolParameters,
+    PresaleProtocolParams,
+    DeploymentData
 } from "../types/Types.sol";
 
 import {IVaultUpgrade, IEtchVault, IExtFactory, IDeployerFactory} from "../interfaces/IVaultUpgrades.sol";
@@ -28,7 +34,7 @@ import {IVaultUpgrade, IEtchVault, IExtFactory, IDeployerFactory} from "../inter
  * @title IERC20
  * @notice Interface for the ERC20 standard token, including a mint function.
  */
-interface IERC20 {
+interface IERC20Extended {
     /**
      * @notice Mints new tokens to a specified address.
      * @param to The address to receive the newly minted tokens.
@@ -36,53 +42,26 @@ interface IERC20 {
      */
     function mint(address to, uint256 amount) external;
     function burn(address from, uint256 amount) external;
-    function totalSupply() external view returns (uint256);
 }
 
-/**
- * @dev Thrown when a function is called by an address that is not recognized as an authorized vault.
- */
+interface IPresaleFactory {
+    function createPresale(
+        PresaleDeployParams memory params,
+        PresaleProtocolParams memory protocolParams
+    ) external returns (address);
+}
+
+interface ITokenFactory {
+    function deployNomaToken(VaultDeployParams memory vaultDeployParams) external returns (MockNomaToken, ERC1967Proxy, bytes32);
+}
+
 error OnlyVaultsError();
-
-/**
- * @dev Thrown when a function is called by an address that does not have the required authority.
- */
 error NotAuthorityError();
-
-/**
- * @dev Thrown when an invalid token address is encountered, such as when the token address is greater than or equal to the paired token address.
- */
-error InvalidTokenAddressError();
-
-/**
- * @dev Thrown when the transfer of the total supply to the deployer contract fails.
- */
 error SupplyTransferError();
-
-/**
- * @dev Thrown when attempting to deploy a token that has already been deployed.
- */
-error TokenAlreadyExistsError();
-
-/**
- * @dev Thrown when a token's symbol is invalid, such as being empty or not recognized.
- */
 error InvalidSymbol();
-
-/**
- * @dev Thrown when an address is zero.
- */
 error ZeroAddressError();
-
-/**
- * @dev Thrown when the tick spacing is invalid for the given fee tier.
- */
 error InvalidTickSpacing();
-
-/**
- * @dev Thrown when the fee tier is invalid.
- */
-error InvalidFeeTier();
+error TokenAlreadyExistsError();
 
 /**
  * @title NomaFactory
@@ -90,28 +69,32 @@ error InvalidFeeTier();
  */
 contract NomaFactory {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using SafeERC20 for IERC20;
 
     // Noma Factory state
-    IAddressResolver resolver;
-    Deployer deployer;
+    IAddressResolver private resolver;
+    Deployer private deployer;
 
-    address deployerFactory;
-    address extFactory;
-    address authority;
-    address uniswapV3Factory;
-    address teamMultisigAddress;
+    address private presaleFactory;
+    address private deployerFactory;
+    address private extFactory;
+    address private authority;
+    address private uniswapV3Factory;
+    address private teamMultisigAddress;
 
-    uint256 totalVaults;
+    uint256 private totalVaults;
     
-    bool permissionlessDeployEnabled;    
+    bool private permissionlessDeployEnabled;    
 
-    ProtocolParameters protocolParameters;
+    ProtocolParameters private protocolParameters;
+    PresaleProtocolParams private presaleProtocolParams;
+    EnumerableSet.AddressSet private deployers; 
 
-    EnumerableSet.AddressSet deployers; 
+    mapping(address => EnumerableSet.AddressSet) private _vaults;
+    mapping(address => VaultDescription) private vaultsRepository;
+    mapping(bytes32 => bool) private deployedTokenHashes;
 
-    mapping(address => EnumerableSet.AddressSet) _vaults;
-    mapping(address => VaultDescription) vaultsRepository;
-    mapping(bytes32 => bool) deployedTokenHashes;
+    mapping(address => VaultDeployParams) private deferredDeployParams;
 
     /**
      * @notice Constructor to initialize the NomaFactory contract.
@@ -124,13 +107,15 @@ contract NomaFactory {
         address _uniswapV3Factory,
         address _resolver,
         address _deployerFactory,
-        address _extFactory
+        address _extFactory,
+        address _presaleFactory
     ) {
         if (
             _uniswapV3Factory == address(0) || 
             _resolver == address(0)         || 
             _deployerFactory == address(0)  || 
-            _extFactory == address(0)
+            _extFactory == address(0)       ||
+            _presaleFactory == address(0)
         ) revert ZeroAddressError();
 
         authority = msg.sender;
@@ -138,183 +123,231 @@ contract NomaFactory {
         resolver = IAddressResolver(_resolver);
         deployerFactory = _deployerFactory;
         extFactory = _extFactory;
+        presaleFactory = _presaleFactory;
         permissionlessDeployEnabled = false;
     }
 
-    /**
-    * @notice Deploys a new vault with the specified parameters.
-    * @param _params The parameters required for vault deployment.
-    * @return vaultAddress The address of the newly deployed vault.
-    * @return poolAddress The address of the associated Uniswap V3 pool.
-    * @return nomaTokenAddress The address of the deployed Noma token.
-    * @dev This function validates the provided token, deploys a new Noma token, creates a Uniswap V3 pool, and initializes the vault.
-    * It also handles the deployment of liquidity and finalizes the deployment process.
-    * Access control: Deployment authority is required unless permissionless deployment is enabled.
-    */
     function deployVault(
-        VaultDeployParams memory _params
-    ) external checkDeployAuthority returns (address, address, address) {
-        _validateToken1(_params.token1);
-        int24 tickSpacing = _validateFeeTier(_params.feeTier);
-        require(tickSpacing == 60, "invalid fee tier");
+        PresaleUserParams memory presaleParams,
+        VaultDeployParams memory vaultDeployParams
+    ) public checkDeployAuthority returns (address, address, address) {
+        _validateToken1(vaultDeployParams.token1);
+        int24 tickSpacing = Utils._validateFeeTier(vaultDeployParams.feeTier);
+    
+        bytes32 tokenHash = keccak256(abi.encodePacked(vaultDeployParams.name, vaultDeployParams.symbol));
+        if (deployedTokenHashes[tokenHash]) revert TokenAlreadyExistsError();
 
-        (,ERC1967Proxy proxy) = _deployNomaToken(
-            _params._name,
-            _params._symbol,
-            _params.token1, 
-            _params._totalSupply
-        );
+        (MockNomaToken nomaToken, ERC1967Proxy proxy, ) =
+        ITokenFactory(tokenFactory())
+            .deployNomaToken(vaultDeployParams);
         
+        deployedTokenHashes[tokenHash] = true;
+
         IUniswapV3Pool pool = _deployPool(
-            _params._IDOPrice,
+            vaultDeployParams.IDOPrice,
             address(proxy), 
-            _params.token1,
-            _params.feeTier,
+            vaultDeployParams.token1,
+            vaultDeployParams.feeTier,
             tickSpacing
         );
 
-        (address vaultAddress, address vaultUpgrade) = IEtchVault(
+        DeploymentData memory data;
+        data.presaleParams = presaleParams;
+        data.vaultDeployParams = vaultDeployParams;
+        data.pool = pool;
+        data.proxy = proxy;
+        data.tickSpacing = tickSpacing;
+
+        return _finalizeVaultDeployment(data);
+    }
+
+    function _finalizeVaultDeployment(
+        DeploymentData memory data
+    ) internal returns (address, address, address) {
+        (data.vaultAddress, data.vaultUpgrade) = IEtchVault(
             resolver.requireAndGetAddress(
                 Utils.stringToBytes32("EtchVault"), 
                 "no EtchVault"
             )
         ).preDeployVault(address(resolver));
 
-        (address sNoma, address stakingContract) = IExtFactory(extFactory)
-        .deployAll(
-            address(this),
-            vaultAddress,
-            address(proxy)
-        );
+        (data.sNoma, data.stakingContract) = IExtFactory(extFactory)
+            .deployAll(
+                address(this),
+                data.vaultAddress,
+                address(data.proxy)
+            );
 
         deployer = Deployer(
             IDeployerFactory(deployerFactory)
-            .deployDeployer(
-                address(this), 
-                address(resolver)
-            )
+                .deployDeployer(
+                    address(this), 
+                    address(resolver)
+                )
         );
 
         deployer.initialize(
             address(this), 
-            vaultAddress, 
-            address(pool), 
+            data.vaultAddress, 
+            address(data.pool), 
             modelHelper()
         );
-        
-        IVaultUpgrade(vaultUpgrade).doUpgradeStart(
-            vaultAddress, 
-            resolver
-            .requireAndGetAddress(
+
+        IVaultUpgrade(data.vaultUpgrade).doUpgradeStart(
+            data.vaultAddress, 
+            resolver.requireAndGetAddress(
                 Utils.stringToBytes32("VaultUpgradeFinalize"), 
                 "no vaultUpgradeFinalize"
             )
         );
 
-        _initializeVault(
-            vaultAddress,
-            msg.sender,
-            address(deployer), 
-            address(pool), 
-            stakingContract,
-            address(proxy),
-            getProtocolParameters()
+        IERC20(address(data.proxy)).safeTransfer(address(deployer), data.vaultDeployParams.totalSupply);
+        if (IERC20(address(data.proxy)).balanceOf(address(deployer)) != data.vaultDeployParams.totalSupply) revert SupplyTransferError();
+
+        data.presaleContract = _configurePresale(
+            address(data.proxy),
+            address(deployer),
+            data.stakingContract,
+            address(data.pool),
+            data.vaultAddress,
+            data.vaultDeployParams,
+            data.presaleParams
         );
 
         VaultDescription memory vaultDesc = VaultDescription({
-            tokenName: _params._name,
-            tokenSymbol: _params._symbol,
-            tokenDecimals: _params._decimals,
-            token0: address(proxy),
-            token1: _params.token1,
+            tokenName: data.vaultDeployParams.name,
+            tokenSymbol: data.vaultDeployParams.symbol,
+            tokenDecimals: data.vaultDeployParams.decimals,
+            token0: address(data.proxy),
+            token1: data.vaultDeployParams.token1,
             deployer: msg.sender,
-            vault: vaultAddress
+            vault: data.vaultAddress,
+            presaleContract: data.presaleContract
         });
 
-        IERC20Metadata(address(proxy)).transfer(address(deployer), _params._totalSupply);
-        if (IERC20Metadata(address(proxy)).balanceOf(address(deployer)) != _params._totalSupply) revert SupplyTransferError();
-
-        _deployLiquidity(_params._IDOPrice, _params._totalSupply, tickSpacing, getProtocolParameters());
-
-        bytes32[] memory names = new bytes32[](4);
-        names[0] = Utils.stringToBytes32("AdaptiveSupply");
-        names[1] = Utils.stringToBytes32("ModelHelper");
-        names[2] = Utils.stringToBytes32("Staking");
-        names[3] = Utils.stringToBytes32("sNoma");
-
-        address[] memory destinations  = new address[](4);
-
-        destinations[0] = adaptiveSupply();
-        destinations[1] = modelHelper();
-        destinations[2] = stakingContract;
-        destinations[3] = sNoma;
-
-
-        resolver.configureDeployerACL(vaultAddress);  
-        resolver.importVaultAddress(vaultAddress, names, destinations);
-        deployer.finalize();
-
-        vaultsRepository[vaultAddress] = vaultDesc;
-        _vaults[msg.sender].add(vaultAddress);
+        vaultsRepository[data.vaultAddress] = vaultDesc;
+        _vaults[msg.sender].add(data.vaultAddress);
         deployers.add(msg.sender);
         totalVaults += 1;
 
-        return (vaultAddress, address(pool), address(proxy));
-    }
-
-    /**
-    * @notice Deploys a new Noma token with the specified parameters.
-    * @param _name The name of the token.
-    * @param _symbol The symbol of the token.
-    * @param _token1 The address of the paired token (token1).
-    * @param _totalSupply The total supply of the token.
-    * @return nomaToken The address of the newly deployed MockNomaToken.
-    * @dev This internal function ensures the token does not already exist, generates a unique address using a salt, and initializes the token.
-    * It reverts if the token address is invalid or if the token already exists.
-    */
-    function _deployNomaToken(
-        string memory _name,
-        string memory _symbol,
-        address _token1,
-        uint256 _totalSupply
-    ) internal returns  (MockNomaToken, ERC1967Proxy) {
-        bytes32 tokenHash = keccak256(abi.encodePacked(_name, _symbol));
-
-        if (deployedTokenHashes[tokenHash]) revert TokenAlreadyExistsError();
-
-        deployedTokenHashes[tokenHash] = true;
-        uint256 nonce = uint256(tokenHash);
-
-        MockNomaToken _nomaToken;
-        ERC1967Proxy proxy ;
-
-        // Encode the initialize function call
-        bytes memory data = abi.encodeWithSelector(
-            _nomaToken.initialize.selector,
-            address(this),    // Deployer address
-            _totalSupply,     // Initial supply
-            _name,            // Token name
-            _symbol,          // Token symbol
-            address(resolver) // Resolver address
+        Utils.configureVaultResolver(
+            address(resolver),
+            data.vaultAddress,
+            data.stakingContract,
+            data.sNoma,
+            data.presaleContract,
+            adaptiveSupply(),
+            modelHelper(),
+            address(deployer)
         );
 
-        do {
-            _nomaToken = new MockNomaToken{salt: bytes32(nonce)}();
-            // Deploy the proxy contract
-            proxy = new ERC1967Proxy{salt: bytes32(nonce)}(
-                address(_nomaToken),
-                data
+        return (data.vaultAddress, address(data.pool), address(data.proxy));
+    }
+
+    function _configurePresale(
+        address proxy,
+        address deployer,
+        address stakingContract,
+        address pool,
+        address vaultAddress,
+        VaultDeployParams memory vaultDeployParams,
+        PresaleUserParams memory presaleParams
+    ) internal returns (address) {
+
+        address presaleContract = 
+        _deferDeploy(
+            address(pool), 
+            vaultAddress,
+            stakingContract,
+            vaultDeployParams, 
+            presaleParams
+        );
+
+        if (vaultDeployParams.presale == 1) {
+            _initializeVault(
+                vaultAddress,
+                msg.sender,
+                deployer, 
+                pool, 
+                stakingContract,
+                presaleContract,
+                proxy,
+                getProtocolParameters()
             );
-            nonce++;
-        } while (address(proxy) >= _token1);
+        }
+        
+        return presaleContract;
+    }
 
-        if (address(proxy) >= _token1) revert InvalidTokenAddressError();
+    function _deferDeploy(
+        address pool,
+        address vaultAddress,
+        address stakingContract,
+        VaultDeployParams memory vaultDeployParams,
+        PresaleUserParams memory presaleParams
+    ) internal returns (address presaleAddress) {
+        int24 tickSpacing = Utils._validateFeeTier(vaultDeployParams.feeTier);
 
-        uint256 totalSupplyFromContract = IERC20(address(proxy)).totalSupply();
-        require(totalSupplyFromContract == _totalSupply, "wrong parameters");
+        if (vaultDeployParams.presale == 1) {
+            
+            deferredDeployParams[vaultAddress] = vaultDeployParams;
 
-        require(address(proxy) != address(0), "Token deploy failed");
-        return (_nomaToken, proxy);
+            presaleAddress = IPresaleFactory(presaleFactory)
+            .createPresale(
+                PresaleDeployParams({
+                    deployer: msg.sender,
+                    vaultAddress: vaultAddress,
+                    pool: pool,
+                    softCap: presaleParams._softCap,
+                    initialPrice: vaultDeployParams.IDOPrice + (vaultDeployParams.IDOPrice * getProtocolParameters().presalePremium / 100),
+                    deadline: presaleParams._deadline,
+                    name: vaultDeployParams.name,
+                    symbol: vaultDeployParams.symbol,
+                    decimals: vaultDeployParams.decimals,
+                    tickSpacing: tickSpacing,
+                    floorPercentage: getProtocolParameters().floorPercentage,
+                    totalSupply: vaultDeployParams.totalSupply
+                }),
+                getPresaleProtocolParams()
+            );
+
+            return presaleAddress;
+
+        } else {
+            _initializeVault(
+                vaultAddress,
+                msg.sender,
+                address(deployer), 
+                pool, 
+                stakingContract,
+                presaleAddress,
+                IUniswapV3Pool(pool).token0(),
+                getProtocolParameters()
+            );
+            _deployLiquidity(
+                vaultDeployParams.IDOPrice, 
+                vaultDeployParams.totalSupply, 
+                tickSpacing, 
+                getProtocolParameters()
+            );
+            deployer.finalize();
+        }    
+    }
+
+    function deferredDeploy(address _deployerContract) public onlyVaults {
+        VaultDeployParams memory _params = deferredDeployParams[msg.sender];   
+
+        int24 tickSpacing = Utils._validateFeeTier(_params.feeTier); 
+
+        _deployLiquidity(
+            _params.IDOPrice, 
+            _params.totalSupply, 
+            tickSpacing, 
+            getProtocolParameters()
+        );
+
+        Deployer(_deployerContract).finalize();
+        delete deferredDeployParams[msg.sender];        
     }
 
     /**
@@ -363,26 +396,25 @@ contract NomaFactory {
 
     /**
     * @notice Deploys liquidity for the vault based on the provided parameters.
-    * @param _IDOPrice The initial DEX offering price.
-    * @param _totalSupply The total supply of the token.
+    * @param IDOPrice The initial DEX offering price.
+    * @param totalSupply The total supply of the token.
     * @param _liquidityParams The parameters defining the liquidity structure.
     * @dev This internal function deploys floor, anchor, and discovery liquidity using the deployer contract.
     */
     function _deployLiquidity(
-        uint256 _IDOPrice,
-        uint256 _totalSupply,
+        uint256 IDOPrice,
+        uint256 totalSupply,
         int24 _tickSpacing,
         ProtocolParameters memory _liquidityParams
     ) internal {
-        deployer.deployFloor(_IDOPrice, _totalSupply * _liquidityParams.floorPercentage / 100, _tickSpacing);  
+        deployer.deployFloor(IDOPrice, totalSupply * _liquidityParams.floorPercentage / 100, _tickSpacing);  
         deployer.deployAnchor(
             _liquidityParams.floorBips[0], 
             _liquidityParams.floorBips[1], 
-            _totalSupply * _liquidityParams.anchorPercentage / 100
+            totalSupply * _liquidityParams.anchorPercentage / 100
         );
-        deployer.deployDiscovery(_IDOPrice * _liquidityParams.idoPriceMultiplier);
+        deployer.deployDiscovery(IDOPrice * _liquidityParams.idoPriceMultiplier);
     }
-
 
     /**
     * @notice Initializes the vault with the provided parameters.
@@ -401,6 +433,7 @@ contract NomaFactory {
         address _deployer,
         address _pool,
         address _stakingContract,
+        address _presaleContract,
         address _token0,
         ProtocolParameters memory _params
     ) internal {
@@ -413,6 +446,7 @@ contract NomaFactory {
             _pool,
             _stakingContract,
             _token0,
+            _presaleContract,
             _params
         );
     }
@@ -424,7 +458,7 @@ contract NomaFactory {
     * @dev This function can only be called by authorized vaults.
     */
     function mintTokens(address to, uint256 amount) public onlyVaults {
-        IERC20(vaultsRepository[msg.sender].token0).mint(to, amount);
+        IERC20Extended(vaultsRepository[msg.sender].token0).mint(to, amount);
     }
 
     /**
@@ -434,7 +468,7 @@ contract NomaFactory {
     * @dev This function can only be called by authorized vaults.
     */
     function burnFor(address from, uint256 amount) public onlyVaults {
-        IERC20(vaultsRepository[msg.sender].token0).burn(from, amount);
+        IERC20Extended(vaultsRepository[msg.sender].token0).burn(from, amount);
     }
 
     /**
@@ -446,6 +480,17 @@ contract NomaFactory {
         ProtocolParameters memory _params
     ) public isAuthority {
         protocolParameters = _params;
+    }
+
+    /**
+    * @notice Sets the parameters for the presale structure.
+    * @param _params The new presale structure parameters.
+    * @dev This function can only be called by the authority.
+    */
+    function setPresaleProtocolParams(
+        PresaleProtocolParams memory _params
+    ) public isAuthority {
+        presaleProtocolParams = _params;
     }
 
     /**
@@ -478,18 +523,6 @@ contract NomaFactory {
         resolver.requireAndGetAddress(result, "not a reserve token");
     }
 
-    function _validateFeeTier(uint24 _feeTier) internal pure returns (int24) {
-        return _getTickSpacing(_feeTier);
-    }
-
-    function _getTickSpacing(uint24 _feeTier) internal pure returns (int24) {
-        if (_feeTier == 100) return 1;
-        if (_feeTier == 500) return 10;
-        if (_feeTier == 3000) return 60;
-        if (_feeTier == 10000) return 200;
-        revert InvalidFeeTier();
-    }
-
     /**
     * @notice Retrieves the current liquidity structure parameters.
     * @return The current liquidity structure parameters.
@@ -499,6 +532,15 @@ contract NomaFactory {
         return protocolParameters;
     }
 
+    /**
+    * @notice Retrieves the current presale structure parameters.
+    * @return The current presale structure parameters.
+    */
+    function getPresaleProtocolParams() public view returns
+    (PresaleProtocolParams memory) {
+        return presaleProtocolParams;
+    }
+    
     /**
     * @notice Retrieves the description of a vault deployed by a specific deployer.
     * @param _deployer The address of the deployer.
@@ -605,6 +647,14 @@ contract NomaFactory {
                 .requireAndGetAddress(
                     Utils.stringToBytes32("AdaptiveSupply"), 
                     "no AdaptiveSupply"
+                );
+    }
+
+    function tokenFactory() public view returns (address) {
+        return resolver
+                .requireAndGetAddress(
+                    Utils.stringToBytes32("TokenFactory"), 
+                    "no TokenFactory"
                 );
     }
 
