@@ -14,12 +14,12 @@ import {
     ProtocolParameters
 } from "../types/Types.sol";
 
-import "../libraries/DecimalMath.sol"; 
-import "../libraries/Utils.sol";
+import {Utils} from "../libraries/Utils.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface INomaFactory {
+    function deferredDeploy(address deployer) external;
     function mintTokens(address to, uint256 amount) external;
     function burnFor(address from, uint256 amount) external;
     function teamMultiSig() external view returns (address);
@@ -97,6 +97,7 @@ contract BaseVault {
         address _pool, 
         address _stakingContract,
         address _proxyAddress,
+        address _presaleContract,
         ProtocolParameters memory _params
     ) public onlyFactory {
         LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
@@ -114,6 +115,7 @@ contract BaseVault {
         _v.stakingEnabled = false;
         _v.loanFee = _params.loanFee;
         _v.stakingContract = _stakingContract;
+        _v.presaleContract = _presaleContract;
         _v.proxyAddress = _proxyAddress;
         _v.deployerContract = _deployer;
         _v.protocolParameters = _params;
@@ -231,6 +233,7 @@ contract BaseVault {
             vault: address(this),
             deployer: _v.deployerContract,
             modelHelper: modelHelper(),
+            presaleContract: _v.presaleContract,
             adaptiveSupplyController: adaptiveSupply()
         });
     }
@@ -276,6 +279,14 @@ contract BaseVault {
             );
     }
 
+    function factory() public view returns (address) {
+        IAddressResolver resolver = _getResolver();
+        return resolver
+            .requireAndGetAddress(
+                Utils.stringToBytes32("NomaFactory"), 
+                "no Factory"
+            );
+    }
     // *** MODIFIERS *** //
 
     /**
@@ -298,13 +309,7 @@ contract BaseVault {
      * @notice Modifier to restrict access to the factory contract.
      */
     modifier onlyFactory() {
-        IAddressResolver resolver = _getResolver();
-        address factory = resolver
-                .requireAndGetAddress(
-                    Utils.stringToBytes32("NomaFactory"), 
-                    "no factory"
-                );
-        if (msg.sender != factory) revert OnlyFactory();
+        if (msg.sender != factory()) revert OnlyFactory();
         _;
     }
 
@@ -317,7 +322,7 @@ contract BaseVault {
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](8);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
-        selectors[1] = bytes4(keccak256(bytes("initialize(address,address,address,address,address,address,(uint8,uint8,uint8,uint16[2],uint256,uint256,int24,int24,int24,uint256,uint256,uint256,uint256))")));
+        selectors[1] = bytes4(keccak256(bytes("initialize(address,address,address,address,address,address,address,(uint8,uint8,uint8,uint16[2],uint256,uint256,int24,int24,int24,uint256,uint256,uint256,uint256,uint256,uint256))")));
         selectors[2] = bytes4(keccak256(bytes("initializeLiquidity((int24,int24,uint128,uint256,int24)[3])")));
         selectors[3] = bytes4(keccak256(bytes("uniswapV3MintCallback(uint256,uint256,bytes)")));
         selectors[4] = bytes4(keccak256(bytes("getUnderlyingBalances(uint8)")));
