@@ -469,7 +469,7 @@ contract StakingVault is BaseVault {
      */
     function getFunctionSelectors() external pure  override returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](4);
-        selectors[0] = bytes4(keccak256(bytes("mintAndDistributeRewards((address,address,address,address,address))"))); 
+        selectors[0] = bytes4(keccak256(bytes("mintAndDistributeRewards((address,address,address,address,address,address))"))); 
         selectors[1] = bytes4(keccak256(bytes("setStakingContract(address)")));
         selectors[2] = bytes4(keccak256(bytes("getStakingContract()")));
         selectors[3] = bytes4(keccak256(bytes("stakingEnabled()")));
