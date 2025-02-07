@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {Conversions} from "./Conversions.sol";
+import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
 
 /**
  * @title Utils
@@ -18,6 +19,7 @@ library Utils {
     error NegativeValue();
     error InvalidChars();
     error InvalidTickSpacing();
+    error InvalidFeeTier();
 
     /**
      * @notice Adds or subtracts basis points (bips) from a given price.
@@ -25,7 +27,7 @@ library Utils {
      * @param bips The basis points to add (positive) or subtract (negative).
      * @return The new price after applying the bips.
      */
-    function addBips(uint256 _price, int256 bips) public pure returns (uint256) {
+    function addBips(uint256 _price, int256 bips) internal pure returns (uint256) {
         if (bips >= 0) {
             uint256 increase = (_price * uint256(bips)) / 10_000;
             return _price + increase;
@@ -43,16 +45,16 @@ library Utils {
      * @notice Adds basis points (bips) to a tick value and returns the new tick.
      * @param currentTick The current tick value.
      * @param bips The basis points to add.
-     * @param _decimals The number of decimals for the price calculation.
+     * @param decimals The number of decimals for the price calculation.
      * @param _tickSpacing The tick spacing of the pool.
      * @return The new tick value after applying the bips.
      */
-    function addBipsToTick(int24 currentTick, int24 bips, uint8 _decimals, int24 _tickSpacing) public pure returns (int24) {
+    function addBipsToTick(int24 currentTick, int24 bips, uint8 decimals, int24 _tickSpacing) internal pure returns (int24) {
 
         uint256 tickToPrice = Conversions
         .sqrtPriceX96ToPrice(
             Conversions.tickToSqrtPriceX96(currentTick), 
-            _decimals
+            decimals
         );
 
         uint256 newPrice = addBips(tickToPrice, bips);
@@ -60,7 +62,7 @@ library Utils {
         .priceToTick(
             int256(newPrice), 
             _tickSpacing,
-            _decimals
+            decimals
         );
 
         // Ensure the new tick value is within the range of int24 and within Uniswap's tick range
@@ -70,7 +72,51 @@ library Utils {
 
         return newTickValue;
     }
-    
+
+
+    function _validateFeeTier(uint24 _feeTier) internal pure returns (int24) {
+        return _getTickSpacing(_feeTier);
+    }
+
+    function _getTickSpacing(uint24 _feeTier) internal pure returns (int24) {
+        if (_feeTier == 100) return 1;
+        if (_feeTier == 500) return 10;
+        if (_feeTier == 3000) return 60;
+        if (_feeTier == 10000) return 200;
+        revert InvalidFeeTier();
+    }
+
+    function configureVaultResolver(
+        address resolverAddress,
+        address vaultAddress,
+        address stakingContract,
+        address sNoma,
+        address presaleContract,
+        address adaptiveSupply,
+        address modelHelper,
+        address deployer
+    ) internal {
+        bytes32[] memory names = new bytes32[](6);
+        names[0] = Utils.stringToBytes32("AdaptiveSupply");
+        names[1] = Utils.stringToBytes32("ModelHelper");
+        names[2] = Utils.stringToBytes32("Staking");
+        names[3] = Utils.stringToBytes32("sNoma");
+        names[4] = Utils.stringToBytes32("Deployer");
+        names[5] = Utils.stringToBytes32("Presale");
+
+        address[] memory destinations  = new address[](6);
+
+        destinations[0] = adaptiveSupply;
+        destinations[1] = modelHelper;
+        destinations[2] = stakingContract;
+        destinations[3] = sNoma;
+        destinations[4] = deployer;
+        destinations[5] = presaleContract;
+
+        IAddressResolver(resolverAddress).configureDeployerACL(vaultAddress);  
+        IAddressResolver(resolverAddress).importVaultAddress(vaultAddress, names, destinations);
+    }
+
     /**
      * @notice Converts a uint256 value to a string.
      * @param _i The uint256 value to convert.
@@ -133,7 +179,7 @@ library Utils {
      * @param source The string to convert.
      * @return result The bytes32 representation of the string.
      */
-    function stringToBytes32(string memory source) public pure returns (bytes32 result) {
+    function stringToBytes32(string memory source) internal pure returns (bytes32 result) {
         bytes memory tempEmptyStringTest = bytes(source);
         if (tempEmptyStringTest.length == 0) {
             return 0x0;
@@ -158,7 +204,7 @@ library Utils {
      * @param tickSpacing The tick spacing of the pool.
      * @return The nearest usable tick.
      */
-    function nearestUsableTick(int24 tick, int24 tickSpacing) public pure returns (int24) {
+    function nearestUsableTick(int24 tick, int24 tickSpacing) internal pure returns (int24) {
         require(tickSpacing > 0, "Invalid tick spacing");
         require(tick >= MIN_TICK && tick <= MAX_TICK, "Out of range");
 
