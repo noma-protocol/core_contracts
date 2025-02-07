@@ -3,20 +3,69 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import "../../src/controllers/supply/AdaptiveSupply.sol";
+import {ModelHelper} from  "../../src/model/Helper.sol";
+import {BaseVault} from "../../src/vault/BaseVault.sol";
+
+interface IDOManager {
+    function vault() external view returns (BaseVault);
+    function buyTokens(uint256 price, uint256 amount, address receiver) external;
+    function sellTokens(uint256 price, uint256 amount, address receiver) external;
+    function modelHelper() external view returns (address);
+}
+
+struct ContractAddressesJson {
+    address IDOHelper;
+    address ModelHelper;
+    address Proxy;
+}
 
 contract AdaptiveMintTest is Test {
     AdaptiveSupply adaptiveMint;
-    address vault = 0x1b26D84372D1F8699a3a71801B4CA757B95C9929;
+    
+    address payable idoManager;
+    address nomaToken;
+    address modelHelperContract;
+    address vaultAddress;
 
     function setUp() public {
         adaptiveMint = new AdaptiveSupply();
+
+        // Define the file path
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/deploy_helper/out/out.json");
+
+        // Read the JSON file
+        string memory json = vm.readFile(path);
+
+        string memory networkId = "1337";
+        // Parse the data for network ID `1337`
+        bytes memory data = vm.parseJson(json, string.concat(string("."), networkId));
+
+        // Decode the data into the ContractAddresses struct
+        ContractAddressesJson memory addresses = abi.decode(data, (ContractAddressesJson));
+        
+        // Log parsed addresses for verification
+        console2.log("Model Helper Address:", addresses.ModelHelper);
+
+        // Extract addresses from JSON
+        idoManager = payable(addresses.IDOHelper);
+        nomaToken = addresses.Proxy;
+        modelHelperContract = addresses.ModelHelper;
+        
+        IDOManager managerContract = IDOManager(idoManager);
+        require(address(managerContract) != address(0), "Manager contract address is zero");
+        
+        ModelHelper modelHelper = ModelHelper(modelHelperContract);
+        vaultAddress = address(managerContract.vault());
+
+        console.log("Vault address is: ", vaultAddress);          
     }
 
     function testLowVolatility() public returns (uint256) {
         uint256 deltaSupply = 1_000 ether; // Example delta supply
         uint256 timeElapsed = 7 days;      // Example time elapsed
 
-        vm.prank(vault);
+        vm.prank(vaultAddress);
         uint256 mintAmount = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 2e18, 1e18);
 
         emit log_named_uint("Mint Amount (Low Volatility)", mintAmount);
@@ -29,7 +78,7 @@ contract AdaptiveMintTest is Test {
         uint256 deltaSupply = 1_000 ether; // Example delta supply
         uint256 timeElapsed = 7 days;      // Example time elapsed
 
-        vm.prank(vault);
+        vm.prank(vaultAddress);
         uint256 mintAmount = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 4e18, 1e18);
 
         uint256 toMintLowVolatility = testLowVolatility();
@@ -46,7 +95,7 @@ contract AdaptiveMintTest is Test {
         uint256 deltaSupply = 1_000 ether; // Example delta supply
         uint256 timeElapsed = 1 days;      // Example time elapsed
 
-        vm.prank(vault);
+        vm.prank(vaultAddress);
         uint256 mintAmount = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 6e18, 1e18);
 
         uint256 toMintNormalVolatility = testNormalVolatility();
@@ -63,7 +112,7 @@ contract AdaptiveMintTest is Test {
         uint256 deltaSupply = 1_000 ether; // Example delta supply
         uint256 timeElapsed = 12 hours;    // Example time elapsed
 
-        vm.prank(vault);
+        vm.prank(vaultAddress);
         uint256 mintAmount = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 10e18, 1e18);
 
         uint256 toMintMediumVolatility = testMediumVolatility();
@@ -78,13 +127,13 @@ contract AdaptiveMintTest is Test {
         uint256 deltaSupply = 1_000 ether; // Example delta supply
         uint256 timeElapsed = 14 days;     // Example time elapsed
 
-        vm.prank(vault);
+        vm.prank(vaultAddress);
         uint256 lowMint = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 2e18, 1e18);
-        vm.prank(vault);
+        vm.prank(vaultAddress);
         uint256 normalMint = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed - 2 days, 4e18, 1e18);
-        vm.prank(vault);
+        vm.prank(vaultAddress);
         uint256 mediumMint = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed - 3 days, 6e18, 1e18);
-        vm.prank(vault);
+        vm.prank(vaultAddress);
         uint256 highMint = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed - 1 weeks, 10e18, 1e18);
         
         emit log_named_uint("Mint Amount (Low Volatility)", lowMint);

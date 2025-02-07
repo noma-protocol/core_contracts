@@ -7,6 +7,7 @@ import { TestResolver } from "./resolver/Resolver.sol";
 import { DeployerFactory } from "../src/factory/DeployerFactory.sol";
 import { ExtFactory } from "../src/factory/ExtFactory.sol";
 import { EtchVault } from "../src/vault/deploy/EtchVault.sol";
+import { TokenFactory } from "../src/factory/TokenFactory.sol";
 
 import { 
     VaultUpgrade, 
@@ -17,7 +18,8 @@ import {
 import { VaultFinalize } from "../src/vault/init/VaultFinalize.sol";
 
 import { 
-    VaultDeployParams, 
+    VaultDeployParams,
+    PresaleUserParams, 
     VaultDescription, 
     ProtocolParameters 
 } from "../src/types/Types.sol";
@@ -25,6 +27,7 @@ import {
 import "../src/libraries/Utils.sol";
 import { ModelHelper } from "../src/model/Helper.sol";
 import { AdaptiveSupply } from "../src/controllers/supply/AdaptiveSupply.sol";
+import { PresaleFactory } from "../src/factory/PresaleFactory.sol";
 
 struct ContractInfo {
     string name;
@@ -42,7 +45,8 @@ contract NomaFactoryTest is Test {
     VaultUpgrade vaultUpgrade;
     ModelHelper modelHelper;
     AdaptiveSupply adaptiveSupply;
-    
+    TokenFactory tokenFactory;
+
     // Constants
     address WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
     address private uniswapFactory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
@@ -66,12 +70,27 @@ contract NomaFactoryTest is Test {
             ContractInfo("Resolver", address(resolver))
         );  
 
+        // Presale Factory
+        PresaleFactory presaleFactory = new PresaleFactory(address(resolver));
+
+        expectedAddressesInResolver.push(
+            ContractInfo("PresaleFactory", address(presaleFactory))
+        );
+
+        // Adaptive Supply
         adaptiveSupply = new AdaptiveSupply();
 
         expectedAddressesInResolver.push(
             ContractInfo("AdaptiveSupply", address(adaptiveSupply))
         );
 
+        // Token Factory
+        tokenFactory = new TokenFactory(address(resolver));
+
+        expectedAddressesInResolver.push(
+            ContractInfo("TokenFactory", address(tokenFactory))
+        );
+        
         // Deployer contracts factory
         DeployerFactory deploymentFactory = new DeployerFactory(address(resolver));
         // External contracts factory
@@ -83,7 +102,8 @@ contract NomaFactoryTest is Test {
             uniswapFactory,
             address(resolver),
             address(deploymentFactory),
-            address(extFactory)
+            address(extFactory),
+            address(presaleFactory)
         );
 
         expectedAddressesInResolver.push(
@@ -135,7 +155,9 @@ contract NomaFactoryTest is Test {
             100,        // lowBalanceThresholdFactor
             100,        // highBalanceThresholdFactor
             5e15,       // inflationFee
-            27          // loanFee
+            27,         // loanFee
+            0.01e18,    // deployFee (ETH)
+            25e16       // presalePremium (25%)
         );
 
         vm.prank(deployer);
@@ -150,16 +172,28 @@ contract NomaFactoryTest is Test {
                 18,           // Decimals
                 100e18,       // Total supply
                 1e18,         // IDO Price
+                0,
                 WETH,         // Token1 address
-                3000          // Uniswap V3 Fee tier
+                3000,         // Uniswap V3 Fee tier
+                0             // Presale
             );
 
         // 1. Expect revert using custom error signature
         vm.expectRevert(abi.encodeWithSignature("AddressNotFound(string)", "not a reserve token"));
         
+        PresaleUserParams memory presaleParams =
+        PresaleUserParams(
+            100e18, // softCap
+            1e18,   // initialPrice
+            90 days // deadline
+        );
+
+        // 1. Call the function
         vm.prank(deployer);
-        // 2. Call the function
-        nomaFactory.deployVault(vaultDeployParams);
+        nomaFactory.deployVault(
+            presaleParams,
+            vaultDeployParams
+        );
     }
 
     function testCreateVaultShouldSucceed() public {
@@ -177,13 +211,25 @@ contract NomaFactoryTest is Test {
                 18,           // Decimals
                 100e18,       // Total supply
                 1e18,         // IDO Price
+                0,
                 WETH,         // Token1 address
-                3000          // Uniswap V3 Fee tier
+                3000,         // Uniswap V3 Fee tier
+                0             // Presale
             );
+
+        PresaleUserParams memory presaleParams =
+        PresaleUserParams(
+            100e18, // softCap
+            1e18,   // initialPrice
+            90 days // deadline
+        );
 
         // 1. Call the function
         vm.prank(deployer);
-        nomaFactory.deployVault(vaultDeployParams);
+        nomaFactory.deployVault(
+            presaleParams,
+            vaultDeployParams
+        );
 
     }
 
@@ -202,14 +248,26 @@ contract NomaFactoryTest is Test {
                 18,           // Decimals
                 100e18,       // Total supply
                 1e18,         // IDO Price
+                0,
                 WETH,         // Token1 address
-                3000          // Uniswap V3 Fee tier
+                3000,         // Uniswap V3 Fee tier
+                0             // Presale
             );
+
+        PresaleUserParams memory presaleParams =
+        PresaleUserParams(
+            100e18, // softCap
+            1e18,   // initialPrice
+            90 days // deadline
+        );
 
         // 1. Call the function
         vm.prank(deployer);
-        nomaFactory.deployVault(vaultDeployParams);
-        
+        nomaFactory.deployVault(
+            presaleParams,
+            vaultDeployParams
+        );
+
         vm.prank(deployer);
         nomaFactory.setPermissionlessDeploy(true);
 
@@ -220,15 +278,20 @@ contract NomaFactoryTest is Test {
                 18,           // Decimals
                 100e18,       // Total supply
                 1e18,         // IDO Price
+                0,
                 WETH,         // Token1 address
-                3000          // Uniswap V3 Fee tier
+                3000,         // Uniswap V3 Fee tier
+                0             // Presale
             );
 
         vm.expectRevert(abi.encodeWithSignature("TokenAlreadyExistsError()"));
 
         // 1. Call the function
         vm.prank(user);
-        nomaFactory.deployVault(vaultDeployParams);
+        nomaFactory.deployVault(
+            presaleParams,
+            vaultDeployParams
+        );
 
     }
 
@@ -247,7 +310,9 @@ contract NomaFactoryTest is Test {
             100,        // lowBalanceThresholdFactor
             100,        // highBalanceThresholdFactor
             5e15,       // inflationFee
-            27          // loanFee
+            27,         // loanFee
+            0.01e18,    // deployFee (ETH)
+            25e16       // presalePremium (25%)
         );
 
         vm.prank(deployer);
@@ -279,14 +344,26 @@ contract NomaFactoryTest is Test {
                 18,           // Decimals
                 100e18,       // Total supply
                 1e18,         // IDO Price
+                0,
                 WETH,         // Token1 address
-                3000          // Uniswap V3 Fee tier
+                3000,         // Uniswap V3 Fee tier
+                0             // Presale
             );
 
         vm.expectRevert(abi.encodeWithSignature("NotAuthorityError()"));
 
+        PresaleUserParams memory presaleParams =
+        PresaleUserParams(
+            100e18, // softCap
+            1e18,   // initialPrice
+            90 days // deadline
+        );
+
         // 1. Call the function
-        nomaFactory.deployVault(vaultDeployParams);
+        nomaFactory.deployVault(
+            presaleParams,
+            vaultDeployParams
+        );
     }
 
     function testPermissionlessDeployEnabled() public {
@@ -304,15 +381,27 @@ contract NomaFactoryTest is Test {
                 18,           // Decimals
                 100e18,       // Total supply
                 1e18,         // IDO Price
+                0,
                 WETH,         // Token1 address
-                3000          // Uniswap V3 Fee tier
+                3000,         // Uniswap V3 Fee tier
+                0             // Presale
             );
 
         vm.prank(deployer);
         nomaFactory.setPermissionlessDeploy(true);
 
+        PresaleUserParams memory presaleParams =
+        PresaleUserParams(
+            100e18, // softCap
+            1e18,   // initialPrice
+            90 days // deadline
+        );
+
         // 1. Call the function
-        nomaFactory.deployVault(vaultDeployParams);
+        nomaFactory.deployVault(
+            presaleParams,
+            vaultDeployParams
+        );
     }
 
     function testEnumerateVaults() public {
@@ -329,17 +418,28 @@ contract NomaFactoryTest is Test {
                 18,           // Decimals
                 100e18,       // Total supply
                 1e18,         // IDO Price
+                0,
                 WETH,         // Token1 address
-                3000          // Uniswap V3 Fee tier
+                3000,         // Uniswap V3 Fee tier
+                0             // Presale
             );
 
         vm.prank(deployer);
         nomaFactory.setPermissionlessDeploy(true);
 
+        PresaleUserParams memory presaleParams =
+        PresaleUserParams(
+            100e18, // softCap
+            1e18,   // initialPrice
+            90 days // deadline
+        );
+
         // 1. Call the function
         vm.prank(deployer);
-        nomaFactory.deployVault(vaultDeployParams);
-
+        nomaFactory.deployVault(
+            presaleParams,
+            vaultDeployParams
+        );
         // Check deployers
         address[] memory deployersList = nomaFactory.getDeployers();
 
@@ -361,13 +461,18 @@ contract NomaFactoryTest is Test {
                 18,           // Decimals
                 100e18,       // Total supply
                 1e18,         // IDO Price
+                0,
                 WETH,         // Token1 address
-                3000          // Uniswap V3 Fee tier
+                3000,         // Uniswap V3 Fee tier
+                0             // Presale
             );
 
         // 1. Call the function
         vm.prank(user);
-        nomaFactory.deployVault(vaultDeployParams);
+        nomaFactory.deployVault(
+            presaleParams,
+            vaultDeployParams
+        );
 
         // Check deployers
         deployersList = nomaFactory.getDeployers();
@@ -399,8 +504,10 @@ contract NomaFactoryTest is Test {
             18,                 // Decimals
             100e18,             // Total supply
             1e18,               // IDO Price
+            0,
             WETH,               // Token1 address
-            3000                // Uniswap V3 Fee tier
+            3000,               // Uniswap V3 Fee tier
+            0                   // Presale
         );
 
         // Vault 2 parameters
@@ -410,21 +517,43 @@ contract NomaFactoryTest is Test {
             18,                 // Decimals
             200e18,             // Total supply
             2e18,               // IDO Price
+            0,
             WETH,               // Token1 address
-            3000                // Uniswap V3 Fee tier
+            3000,               // Uniswap V3 Fee tier
+            0                   // Presale
         );
 
         // Set permissionless deploy to allow multiple vaults
         vm.prank(deployer);
         nomaFactory.setPermissionlessDeploy(true);
 
-        // Deploy Vault 1
+        PresaleUserParams memory presaleParams1 =
+        PresaleUserParams(
+            100e18, // softCap
+            1e18,   // initialPrice
+            90 days // deadline
+        );
+
+        // 1. Call the function
         vm.prank(deployer);
-        nomaFactory.deployVault(vault1Params);
+        nomaFactory.deployVault(
+            presaleParams1,
+            vault1Params
+        );
 
         // Deploy Vault 2
+        PresaleUserParams memory presaleParams2 =
+        PresaleUserParams(
+            100e18, // softCap
+            1e18,   // initialPrice
+            90 days // deadline
+        );
+
         vm.prank(deployer);
-        nomaFactory.deployVault(vault2Params);
+        nomaFactory.deployVault(
+            presaleParams2,
+            vault2Params
+        );
 
         // Retrieve deployer's vaults
         address[] memory vaults = nomaFactory.getVaults(deployer);
