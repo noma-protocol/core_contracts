@@ -64,7 +64,7 @@ library DeployHelper {
         );
 
         // Set the upper tick as 3 tickSpacing steps above the lower tick
-        int24 upperTick = lowerTick + tickSpacing * 3;
+        int24 upperTick = lowerTick + tickSpacing;
 
         // Compute the liquidity amount based on the provided token0 amount
         uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
@@ -91,7 +91,9 @@ library DeployHelper {
                 string(
                     abi.encodePacked(
                         "deployFloor: liquidity is 0, spot price: ", 
-                        Utils._uint2str(uint256(sqrtRatioX96))
+                        Utils._uint2str(uint256(
+                            Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, decimals)
+                        ))
                     )
                 )
             );             
