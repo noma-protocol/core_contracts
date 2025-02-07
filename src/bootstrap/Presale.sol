@@ -62,8 +62,8 @@ contract Presale is pAsset, Ownable {
     /// @notice Tracks referral earnings using referral codes.
     mapping(bytes32 => uint256) public referralEarnings;
 
-    /// @notice Referral percentage (3%).
-    uint256 public constant referralPercentage = 3;
+    /// @notice Referral percentage 
+    uint256 public referralPercentage;
 
     /// @notice Tracks all contributors.
     address[] public contributors;
