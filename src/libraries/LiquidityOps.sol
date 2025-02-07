@@ -394,6 +394,7 @@ library LiquidityOps {
                 modelHelper: addresses.modelHelper,
                 vault: addresses.vault,
                 deployer: addresses.deployer,
+                presaleContract: addresses.presaleContract,
                 adaptiveSupplyController: addresses.adaptiveSupplyController
             }),
             LiquidityInternalPars({
@@ -417,6 +418,7 @@ library LiquidityOps {
                 modelHelper: addresses.modelHelper,
                 vault: addresses.vault,
                 deployer: addresses.deployer,
+                presaleContract: addresses.presaleContract,
                 adaptiveSupplyController: addresses.adaptiveSupplyController
             }),
             LiquidityInternalPars({
@@ -474,6 +476,7 @@ library LiquidityOps {
                 modelHelper: addresses.modelHelper,
                 vault: addresses.vault,
                 deployer: addresses.deployer,
+                presaleContract: addresses.presaleContract,
                 adaptiveSupplyController: addresses.adaptiveSupplyController
             }),
             LiquidityInternalPars({
