@@ -38,6 +38,7 @@ struct VaultStorage {
     address deployerContract;
     address modelHelper;
     address stakingContract;
+    address presaleContract;
     address proxyAddress;
     address adaptiveSupplyController;
 
