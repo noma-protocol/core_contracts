@@ -8,6 +8,7 @@ import {DecimalMath} from "../libraries/DecimalMath.sol";
 import {Uniswap} from "../libraries/Uniswap.sol";
 import {LiquidityDeployer} from "../libraries/LiquidityDeployer.sol";
 import {IVault} from "../interfaces/IVault.sol";
+import {Utils} from "../libraries/Utils.sol";
 
 import {
     LiquidityPosition, 
@@ -25,6 +26,7 @@ interface IERC20 {
 }
 
 interface INomaFactory {
+    function deferredDeploy(address deployer) external;
     function mintTokens(address to, uint256 amount) external;
     function burnFor(address from, uint256 amount) external;
     function teamMultiSig() external view returns (address);
@@ -41,6 +43,7 @@ error InsufficientCollateral();
 error CantRollLoan();
 error NoLiquidity();
 error OnlyVault();
+error NotAuthorized();
 
 /**
  * @title LendingVault
@@ -293,6 +296,21 @@ contract LendingVault is BaseVault {
         );
     }
 
+    function afterPresale() public  {
+        if (msg.sender != _v.presaleContract) revert NotAuthorized();
+
+        address deployer = _v.resolver.requireAndGetAddress(
+            Utils.stringToBytes32("Deployer"), 
+            "no Deployer"
+        );
+
+        INomaFactory(
+            _v.factory
+        ).deferredDeploy(
+            deployer
+        );
+    }
+
     /**
      * @notice Retrieves the current liquidity positions.
      * @return positions The current liquidity positions.
@@ -368,7 +386,7 @@ contract LendingVault is BaseVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure override returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](14);
+        bytes4[] memory selectors = new bytes4[](15);
         selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,uint256)")));    
         selectors[1] = bytes4(keccak256(bytes("paybackLoan(address)")));
         selectors[2] = bytes4(keccak256(bytes("rollLoan(address,uint256)")));
@@ -383,6 +401,7 @@ contract LendingVault is BaseVault {
         selectors[11] = bytes4(keccak256(bytes("burnTokens(uint256)")));
         selectors[12] = bytes4(keccak256(bytes("pool()")));
         selectors[13] = bytes4(keccak256(bytes("getAccumulatedFees()")));
+        selectors[14] = bytes4(keccak256(bytes("afterPresale()")));
         return selectors;
     }
 }
