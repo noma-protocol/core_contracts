@@ -11,6 +11,7 @@ import {DecimalMath} from "../libraries/DecimalMath.sol";
 
 import {Underlying} from "../libraries/Underlying.sol";
 import {IVault} from "../interfaces/IVault.sol";
+import {Utils} from "../libraries/Utils.sol";
 
 import {
     LiquidityPosition,
@@ -202,6 +203,17 @@ contract ModelHelper {
                 ERC20(address(IUniswapV3Pool(pool).token0())).balanceOf(stakingContract) :
                 0;
 
+        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
+
+        uint256 feesPosition0Token0 = Underlying
+        .computeFeesEarned(
+            positions[0], 
+            vault, 
+            pool, 
+            true, 
+            TickMath.getTickAtSqrtRatio(sqrtRatioX96)
+        );
+
         return (
             (totalSupply) - 
             (
@@ -209,9 +221,11 @@ contract ModelHelper {
                 amount0CurrentAnchor + 
                 amount0CurrentDiscovery + 
                 protocolUnusedBalanceToken0 + 
-                staked
+                staked + 
+                feesPosition0Token0
             )
         );
+
     } 
 
     /**
