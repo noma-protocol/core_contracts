@@ -62,6 +62,7 @@ error InvalidSymbol();
 error ZeroAddressError();
 error InvalidTickSpacing();
 error TokenAlreadyExistsError();
+error InvalidParameters();
 
 /**
  * @title NomaFactory
@@ -299,10 +300,10 @@ contract NomaFactory {
                     vaultAddress: vaultAddress,
                     pool: pool,
                     softCap: presaleParams.softCap,
-                    initialPrice: vaultDeployParams.IDOPrice + (vaultDeployParams.IDOPrice * getProtocolParameters().presalePremium / 100),
+                    initialPrice: _calculatePresalePremium(vaultDeployParams.IDOPrice),
                     deadline: presaleParams.deadline,
-                    name: vaultDeployParams.name,
-                    symbol: vaultDeployParams.symbol,
+                    name: string(abi.encodePacked(vaultDeployParams.name, " Pre Asset")),
+                    symbol: string(abi.encodePacked("p-", vaultDeployParams.symbol)),
                     decimals: vaultDeployParams.decimals,
                     tickSpacing: tickSpacing,
                     floorPercentage: getProtocolParameters().floorPercentage,
@@ -348,6 +349,12 @@ contract NomaFactory {
 
         Deployer(_deployerContract).finalize();
         delete deferredDeployParams[msg.sender];        
+    }
+
+    function _calculatePresalePremium(uint256 _idoPrice) internal view returns (uint256) {
+        if (getProtocolParameters().presalePremium == 0) revert InvalidParameters();
+        uint256 presalePrice =_idoPrice + (_idoPrice * getProtocolParameters().presalePremium / 100);         
+        return presalePrice;
     }
 
     /**
