@@ -101,7 +101,6 @@ struct VaultDeployParams {
 
 struct PresaleUserParams {
     uint256 softCap;
-    uint256 initialPrice;
     uint256 deadline;
 }
 
@@ -122,9 +121,11 @@ struct PresaleDeployParams {
 
 struct LivePresaleParams {
     uint256 softCap;
+    uint256 hardCap;
     uint256 initialPrice;
     uint256 deadline;
     uint256 launchSupply;
+    address deployer;
 }
 
 struct PresaleProtocolParams {

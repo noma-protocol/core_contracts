@@ -40,6 +40,8 @@ contract Presale is pAsset, Ownable {
 
     uint256 public hardCap;
 
+    uint256 private totalRaised;
+
     /// @notice Initial price of the token in ETH.
     uint256 public initialPrice;
 
@@ -67,6 +69,8 @@ contract Presale is pAsset, Ownable {
 
     /// @notice Tracks all contributors.
     address[] public contributors;
+
+    address public deployer;
 
     /// @notice Tracks if an address has already been added as a contributor.
     mapping(address => bool) public isContributor;
@@ -99,39 +103,51 @@ contract Presale is pAsset, Ownable {
     error NoContributionsToWithdraw();
     error CallbackCaller();
     error InvalidParameters();
-
+    error InvalidHardCap();
+    error InvalidSoftCap();
+    
     constructor(
         PresaleDeployParams memory params,
-        PresaleProtocolParams memory protocolParams
+        PresaleProtocolParams memory _protocolParams
     ) 
     pAsset(params.name, params.symbol, params.decimals) 
     Ownable(params.deployer) {
-
+        
+        deployer = params.deployer;
         vaultAddress = params.vaultAddress;
         pool = IUniswapV3Pool(params.pool);
         softCap = params.softCap;
         initialPrice = params.initialPrice;
-        deadline = params.deadline;
+        deadline = block.timestamp + params.deadline;
         tickSpacing = params.tickSpacing;
         launchSupply = params.totalSupply;
         floorPercentage = params.floorPercentage;
-        protocolParams = protocolParams;
-        referralPercentage = protocolParams.referralPercentage;
-        hardCap = ((launchSupply * floorPercentage) / 100) / ((initialPrice * 80 / 100) / 1e18);
-        
-        uint256 token0Decimals = IERC20Metadata(pool.token0()).decimals();
-        uint256 floorToken1Amount = ((launchSupply * floorPercentage / 100) / initialPrice) * 10 ** token0Decimals;
+        protocolParams = _protocolParams;
+        referralPercentage = _protocolParams.referralPercentage;
 
-        if (softCap > (floorToken1Amount * protocolParams.maxSoftCap)) revert InvalidParameters();
-        if (softCap < (floorToken1Amount * 5/100)) revert InvalidParameters();
+        uint256 launchSupplyDecimals = IERC20Metadata(pool.token0()).decimals(); 
+        uint256 initialPriceDecimals = 18; 
+
+        uint256 normalizedLaunchSupply = launchSupply * (10 ** (18 - launchSupplyDecimals));
+        uint256 normalizedInitialPrice = initialPrice * (10 ** (18 - initialPriceDecimals));
+
+        hardCap = (
+            (
+                normalizedLaunchSupply * normalizedInitialPrice
+            ) / 1e18
+        ) * params.floorPercentage / 100;
+
+        if (softCap > hardCap * _protocolParams.maxSoftCap / 100) revert InvalidParameters();
+        if (softCap < hardCap * 5 / 100) revert InvalidSoftCap();
+        if (softCap > hardCap) revert InvalidHardCap();
 
         tokenInfo = TokenInfo({
             token0: pool.token0(),
             token1: pool.token1()
         });
 
-        MIN_CONTRIBUTION = hardCap / protocolParams.minContributionRatio;
-        MAX_CONTRIBUTION = hardCap / protocolParams.maxContributionRatio;
+        MIN_CONTRIBUTION = hardCap / _protocolParams.minContributionRatio;
+        MAX_CONTRIBUTION = hardCap / _protocolParams.maxContributionRatio;
     }
 
     /**
@@ -157,7 +173,7 @@ contract Presale is pAsset, Ownable {
      * @param referralCode Referral code used for this deposit (optional).
      */
     function deposit(bytes32 referralCode) external payable {
-        // if (block.timestamp > deadline) revert PresaleEnded();
+        if (hasExpired()) revert PresaleEnded();
         if (finalized) revert AlreadyFinalized();
 
         // if (msg.value < MIN_CONTRIBUTION || msg.value > MAX_CONTRIBUTION) revert InvalidParameters();
@@ -168,6 +184,7 @@ contract Presale is pAsset, Ownable {
 
         // Track contributions
         contributions[msg.sender] += msg.value;
+        totalRaised += msg.value;
 
         // Mint p-assets based on ETH deposited at the presale price
         uint256 amountToMint = (msg.value * 1e18) / initialPrice;
@@ -193,10 +210,11 @@ contract Presale is pAsset, Ownable {
      */
     function finalize() external {
         if (finalized) revert AlreadyFinalized();
-        // if (block.timestamp < deadline) revert PresaleOngoing();
+        if (!hasExpired()) revert PresaleOngoing();
+        if (protocolParams.presalePercentage == 0) revert InvalidParameters();
 
         uint256 totalAmount = address(this).balance;
-        uint256 amount = totalAmount - (totalAmount * protocolParams.presalePercentage);
+        uint256 amount = totalAmount - (totalAmount * protocolParams.presalePercentage / 100);
 
         if (amount < softCap) revert SoftCapNotMet();
 
@@ -211,7 +229,7 @@ contract Presale is pAsset, Ownable {
 
         uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, 18);
 
-        // Slippage due to floor tick width (0.5%)
+        // Slippage due to floor tick width (0.1%)
         uint256 purchasePrice = spotPrice + (spotPrice * 5/1000);
 
         Uniswap.swap(
@@ -224,12 +242,14 @@ contract Presale is pAsset, Ownable {
                 tickSpacing, 
                 decimals
             ),
-            amount - (amount * protocolParams.presalePercentage),
+            amount,
             false,
             true
         );
 
         finalized = true;
+
+        _withdrawExcessEth();
 
         emit Finalized();
     }
@@ -269,8 +289,8 @@ contract Presale is pAsset, Ownable {
 
         address token0 = pool.token0();
 
-        // Account for slippage due to floor tick width (0.5%)
-        uint256 minAmountOut = (balance * 995) / 1000; 
+        // Account for slippage due to floor tick width (max 1.5%)
+        uint256 minAmountOut = (balance * 985) / 1000; 
 
         // Get the available balance of token0 in the contract
         uint256 availableBalance = IERC20(token0).balanceOf(address(this));
@@ -310,15 +330,24 @@ contract Presale is pAsset, Ownable {
      * @notice Allows the owner to withdraw excess ETH and tokens after finalization.
      */
     function withdrawExcess() external onlyOwner {
+        _withdrawExcessEth();
+        _withdrawExcessTokens();
+    }
+
+    function _withdrawExcessEth() internal {
         if (!finalized) revert NotFinalized();
 
         uint256 balance = address(this).balance;
         payable(owner()).transfer(balance);
+    }
+
+    function _withdrawExcessTokens() internal {
+        if (!finalized) revert NotFinalized();
 
         address token0 = pool.token0();
         uint256 token0Balance = IERC20(token0).balanceOf(address(this));
         if (token0Balance > 0) {
-            IERC20(token0).safeTransfer(owner(), token0Balance);
+            IERC20(token0).safeTransfer(vaultAddress, token0Balance);
         }
     }
 
@@ -338,7 +367,7 @@ contract Presale is pAsset, Ownable {
      * @return Total ETH raised.
      */
     function getTotalRaised() external view returns (uint256) {
-        return address(this).balance;
+        return totalRaised;
     }
 
     /**
@@ -381,16 +410,28 @@ contract Presale is pAsset, Ownable {
         return count;
     }
 
+    function getTimeLeft() external view returns (uint256) {
+        if (block.timestamp > deadline) return 0;
+        return deadline - block.timestamp;
+    }  
+
+    function hasExpired() public view returns (bool) {
+        return block.timestamp > deadline;
+    }
+
+    function getCurrentTimestamp() external view returns (uint256) {
+        return block.timestamp;
+    }
+
     function getPresaleParams() external view returns (LivePresaleParams memory) {
         return LivePresaleParams({
             softCap: softCap,
+            hardCap: hardCap,
             initialPrice: initialPrice,
             deadline: deadline,
-            launchSupply: launchSupply
+            launchSupply: launchSupply,
+            deployer: deployer
         });
     }
-    modifier onlyInternalCalls() {
-        require(msg.sender == address(this), "Only internal calls allowed");
-        _;
-    }
+    
 }
