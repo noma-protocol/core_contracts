@@ -184,7 +184,6 @@ contract NomaFactoryTest is Test {
         PresaleUserParams memory presaleParams =
         PresaleUserParams(
             100e18, // softCap
-            1e18,   // initialPrice
             90 days // deadline
         );
 
@@ -220,7 +219,6 @@ contract NomaFactoryTest is Test {
         PresaleUserParams memory presaleParams =
         PresaleUserParams(
             100e18, // softCap
-            1e18,   // initialPrice
             90 days // deadline
         );
 
@@ -257,7 +255,6 @@ contract NomaFactoryTest is Test {
         PresaleUserParams memory presaleParams =
         PresaleUserParams(
             100e18, // softCap
-            1e18,   // initialPrice
             90 days // deadline
         );
 
@@ -355,7 +352,6 @@ contract NomaFactoryTest is Test {
         PresaleUserParams memory presaleParams =
         PresaleUserParams(
             100e18, // softCap
-            1e18,   // initialPrice
             90 days // deadline
         );
 
@@ -393,7 +389,6 @@ contract NomaFactoryTest is Test {
         PresaleUserParams memory presaleParams =
         PresaleUserParams(
             100e18, // softCap
-            1e18,   // initialPrice
             90 days // deadline
         );
 
@@ -430,7 +425,6 @@ contract NomaFactoryTest is Test {
         PresaleUserParams memory presaleParams =
         PresaleUserParams(
             100e18, // softCap
-            1e18,   // initialPrice
             90 days // deadline
         );
 
@@ -530,7 +524,6 @@ contract NomaFactoryTest is Test {
         PresaleUserParams memory presaleParams1 =
         PresaleUserParams(
             100e18, // softCap
-            1e18,   // initialPrice
             90 days // deadline
         );
 
@@ -545,7 +538,6 @@ contract NomaFactoryTest is Test {
         PresaleUserParams memory presaleParams2 =
         PresaleUserParams(
             100e18, // softCap
-            1e18,   // initialPrice
             90 days // deadline
         );
 
