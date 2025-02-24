@@ -38,6 +38,7 @@ error InsufficientLoanAmount();
 error InvalidDuration();
 error InsufficientFloorBalance();
 error NoActiveLoan();
+error ActiveLoan();
 error LoanExpired();
 error InsufficientCollateral();
 error CantRollLoan();
@@ -85,6 +86,7 @@ contract LendingVault is BaseVault {
     function borrowFromFloor(address who, uint256 borrowAmount, uint256 duration) public onlyInternalCalls {
         if (borrowAmount == 0) revert InsufficientLoanAmount();
         if (duration < 30 days || duration > 365 days) revert InvalidDuration();
+        if (_v.loanPositions[who].borrowAmount > 0) revert ActiveLoan(); 
 
         (uint256 collateralAmount,) = _getTotalCollateral(borrowAmount);
         if (collateralAmount == 0) revert InsufficientCollateral();
