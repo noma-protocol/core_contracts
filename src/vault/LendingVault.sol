@@ -325,6 +325,42 @@ contract LendingVault is BaseVault {
             _v.discoveryPosition
         ];
     }
+    
+    /**
+    * @notice Retrieves the active loan details for a specific user.
+    * @param who The address of the borrower.
+    * @return borrowAmount The amount borrowed.
+    * @return collateralAmount The collateral amount locked.
+    * @return fees The total loan fees.
+    * @return expiry The loan expiry timestamp.
+    * @return duration The total loan duration.
+    */
+    function getActiveLoan(address who)
+        public
+        view
+        returns (
+            uint256 borrowAmount,
+            uint256 collateralAmount,
+            uint256 fees,
+            uint256 expiry,
+            uint256 duration
+        )
+    {
+        LoanPosition storage loan = _v.loanPositions[who];
+
+        if (loan.borrowAmount == 0) {
+            revert NoActiveLoan(); // ❌ Revert if no active loan is found
+        }
+
+        return (
+            loan.borrowAmount,
+            loan.collateralAmount,
+            loan.fees,
+            loan.expiry,
+            loan.duration
+        );
+    }
+
 
     /**
      * @notice Retrieves the address of the team multisig.
