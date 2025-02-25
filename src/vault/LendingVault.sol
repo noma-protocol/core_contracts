@@ -139,6 +139,26 @@ contract LendingVault is BaseVault {
         IERC20(_v.pool.token1()).transferFrom(who, address(this), loan.borrowAmount);
         IERC20(_v.pool.token0()).transfer(who, loan.collateralAmount);
 
+        // Collect fees from the Uniswap pool
+        (,,, uint256 floorToken1Balance) = IModelHelper(modelHelper())
+            .getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
+
+        // Redeploy floor liquidity
+        LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
+        Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick);      
+        LiquidityDeployer.reDeployFloor(
+            address(_v.pool), 
+            floorToken1Balance + loan.borrowAmount, 
+            positions
+        );            
+
+        // Update the vault's liquidity positions
+        IVault(address(this)).updatePositions([_v.floorPosition, _v.anchorPosition, _v.discoveryPosition]);
+
+        // Enforce insolvency invariant
+         IModelHelper(modelHelper())
+        .enforceSolvencyInvariant(address(this));     
+        
         delete _v.loanPositions[who];
         _removeLoanAddress(who);
     }
@@ -349,7 +369,7 @@ contract LendingVault is BaseVault {
         LoanPosition storage loan = _v.loanPositions[who];
 
         if (loan.borrowAmount == 0) {
-            revert NoActiveLoan(); // ❌ Revert if no active loan is found
+            return (0, 0, 0, 0, 0);
         }
 
         return (
@@ -424,7 +444,7 @@ contract LendingVault is BaseVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure override returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](15);
+        bytes4[] memory selectors = new bytes4[](16);
         selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,uint256)")));    
         selectors[1] = bytes4(keccak256(bytes("paybackLoan(address)")));
         selectors[2] = bytes4(keccak256(bytes("rollLoan(address,uint256)")));
@@ -440,6 +460,7 @@ contract LendingVault is BaseVault {
         selectors[12] = bytes4(keccak256(bytes("pool()")));
         selectors[13] = bytes4(keccak256(bytes("getAccumulatedFees()")));
         selectors[14] = bytes4(keccak256(bytes("afterPresale()")));
+        selectors[15] = bytes4(keccak256(bytes("getActiveLoan(address)")));
         return selectors;
     }
 }
