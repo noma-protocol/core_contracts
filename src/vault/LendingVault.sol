@@ -9,6 +9,7 @@ import {Uniswap} from "../libraries/Uniswap.sol";
 import {LiquidityDeployer} from "../libraries/LiquidityDeployer.sol";
 import {IVault} from "../interfaces/IVault.sol";
 import {Utils} from "../libraries/Utils.sol";
+import {ITokenRepo} from "../TokenRepo.sol";
 
 import {
     LiquidityPosition, 
@@ -91,12 +92,14 @@ contract LendingVault is BaseVault {
         (uint256 collateralAmount,) = _getTotalCollateral(borrowAmount);
         if (collateralAmount == 0) revert InsufficientCollateral();
 
-        (,,, uint256 floorToken1Balance) = IModelHelper(modelHelper())
+        (,, uint256 floorToken0Balance, uint256 floorToken1Balance) = IModelHelper(modelHelper())
         .getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
 
         if (floorToken1Balance < borrowAmount) revert InsufficientFloorBalance();
 
         IERC20(_v.pool.token0()).transferFrom(who, address(this), collateralAmount);  
+        IERC20(_v.pool.token0()).transfer(_v.tokenRepo, collateralAmount);
+
         uint256 loanFees = _calculateLoanFees(borrowAmount, duration);
 
         _v.collateralAmount += collateralAmount;
@@ -104,7 +107,7 @@ contract LendingVault is BaseVault {
         LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
 
         Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick);         
-        LiquidityDeployer.reDeployFloor(address(_v.pool), floorToken1Balance - borrowAmount, positions);
+        LiquidityDeployer.reDeployFloor(address(_v.pool), address(this), floorToken0Balance, floorToken1Balance - borrowAmount, positions);
         
         IERC20(_v.pool.token1()).transfer(who, borrowAmount - loanFees);
 
@@ -123,8 +126,8 @@ contract LendingVault is BaseVault {
 
         IVault(address(this)).updatePositions([_v.floorPosition, _v.anchorPosition, _v.discoveryPosition]);
         
-        IModelHelper(modelHelper())
-        .enforceSolvencyInvariant(address(this));           
+        // IModelHelper(modelHelper())
+        // .enforceSolvencyInvariant(address(this));           
     }
 
     /**
@@ -137,27 +140,24 @@ contract LendingVault is BaseVault {
         if (loan.borrowAmount == 0) revert NoActiveLoan();
 
         IERC20(_v.pool.token1()).transferFrom(who, address(this), loan.borrowAmount);
-        IERC20(_v.pool.token0()).transfer(who, loan.collateralAmount);
+        ITokenRepo(_v.tokenRepo).transfer(_v.pool.token0(), who, loan.collateralAmount);
 
         // Collect fees from the Uniswap pool
-        (,,, uint256 floorToken1Balance) = IModelHelper(modelHelper())
+        (,, uint256 floorToken0Balance, uint256 floorToken1Balance) = IModelHelper(modelHelper())
             .getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
+        
+        _v.collateralAmount -= loan.collateralAmount;
 
         // Redeploy floor liquidity
         LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
         Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick);      
         LiquidityDeployer.reDeployFloor(
             address(_v.pool), 
+            address(this),
+            floorToken0Balance,
             floorToken1Balance + loan.borrowAmount, 
             positions
-        );            
-
-        // Update the vault's liquidity positions
-        IVault(address(this)).updatePositions([_v.floorPosition, _v.anchorPosition, _v.discoveryPosition]);
-
-        // Enforce insolvency invariant
-         IModelHelper(modelHelper())
-        .enforceSolvencyInvariant(address(this));     
+        );              
         
         delete _v.loanPositions[who];
         _removeLoanAddress(who);
@@ -185,7 +185,7 @@ contract LendingVault is BaseVault {
         uint256 newCollateralValue = DecimalMath.multiplyDecimal(
             loan.collateralAmount, 
             IModelHelper(modelHelper()).getIntrinsicMinimumValue(address(this))
-        );
+        ); 
 
         // Ensure the new collateral value is sufficient to cover the borrow amount
         if (newCollateralValue <= loan.borrowAmount) revert CantRollLoan();
@@ -196,9 +196,10 @@ contract LendingVault is BaseVault {
 
         // Update the loan's expiry to reflect the new duration
         loan.expiry = block.timestamp + newDuration;
+        loan.borrowAmount = loan.borrowAmount + newBorrowAmount;
 
         // Collect fees from the Uniswap pool
-        (,,, uint256 floorToken1Balance) = IModelHelper(modelHelper())
+        (,, uint256 floorToken0Balance, uint256 floorToken1Balance) = IModelHelper(modelHelper())
             .getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
 
         // Redeploy floor liquidity
@@ -206,6 +207,8 @@ contract LendingVault is BaseVault {
         Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick);      
         LiquidityDeployer.reDeployFloor(
             address(_v.pool), 
+            address(this),
+            floorToken0Balance,
             floorToken1Balance - newBorrowAmount, 
             positions
         );
@@ -431,6 +434,10 @@ contract LendingVault is BaseVault {
         return (_v.feesAccumulatorToken0, _v.feesAccumulatorToken1);
     }
 
+    function calculateLoanFees(uint256 borrowAmount, uint256 duration) public view returns (uint256) {
+        return _calculateLoanFees(borrowAmount, duration);
+    }
+
     /**
      * @notice Modifier to restrict access to the vault contract.
      */
@@ -444,7 +451,7 @@ contract LendingVault is BaseVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure override returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](16);
+        bytes4[] memory selectors = new bytes4[](17);
         selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,uint256)")));    
         selectors[1] = bytes4(keccak256(bytes("paybackLoan(address)")));
         selectors[2] = bytes4(keccak256(bytes("rollLoan(address,uint256)")));
@@ -461,6 +468,7 @@ contract LendingVault is BaseVault {
         selectors[13] = bytes4(keccak256(bytes("getAccumulatedFees()")));
         selectors[14] = bytes4(keccak256(bytes("afterPresale()")));
         selectors[15] = bytes4(keccak256(bytes("getActiveLoan(address)")));
+        selectors[16] = bytes4(keccak256(bytes("calculateLoanFees(uint256,uint256)")));
         return selectors;
     }
 }

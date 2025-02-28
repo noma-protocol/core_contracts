@@ -146,7 +146,10 @@ library LiquidityDeployer {
             upperTick,
             anchorPosition.tickSpacing,
             LiquidityType.Discovery,
-            AmountsToMint({amount0: balanceToken0, amount1: 0})
+            AmountsToMint({
+                amount0: balanceToken0, 
+                amount1: 0
+            })
         );
 
         newPosition.price = upperDiscoveryPrice;
@@ -249,7 +252,7 @@ library LiquidityDeployer {
     function _deployPosition(
         address pool,
         address receiver,
-        int24 lowerTick,
+        int24 lowerTick, 
         int24 upperTick,
         int24 tickSpacing,
         LiquidityType liquidityType,
@@ -294,7 +297,9 @@ library LiquidityDeployer {
                 string(
                     abi.encodePacked(
                         "_deployPosition(2): liquidity is 0 : ", 
-                        Utils._uint2str(uint256(liquidity))
+                        Utils._uint2str(uint256(liquidity)),
+                        "Liquidity type",
+                        Utils._uint2str(uint256(liquidityType)),
                     )
                 )
             );
@@ -318,6 +323,8 @@ library LiquidityDeployer {
      */
     function reDeployFloor(
         address pool,
+        address vault,
+        uint256 amount0ToDeploy,
         uint256 amount1ToDeploy,
         LiquidityPosition[3] memory positions
     ) internal returns (LiquidityPosition memory newPosition) {
@@ -329,13 +336,13 @@ library LiquidityDeployer {
         // Deploying the new liquidity position
         newPosition = _deployPosition(
             pool, 
-            address(this), 
+            vault, 
             positions[0].lowerTick,
             positions[0].upperTick,
             positions[0].tickSpacing,
             LiquidityType.Floor, 
             AmountsToMint({
-                amount0: 0,
+                amount0: amount0ToDeploy,
                 amount1: amount1ToDeploy
             })
         );
@@ -346,7 +353,7 @@ library LiquidityDeployer {
             positions[2]
         ];
 
-        IVault(address(this))
+        IVault(vault)
         .updatePositions(
             newPositions
         );            
