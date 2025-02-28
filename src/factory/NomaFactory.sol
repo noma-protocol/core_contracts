@@ -20,6 +20,7 @@ import { MockNomaToken } from "../token/MockNomaToken.sol";
 import { Deployer } from "../Deployer.sol";
 
 import {
+    VaultInitParams,
     PresaleUserParams,
     PresaleDeployParams,
     VaultDeployParams,
@@ -84,7 +85,6 @@ contract NomaFactory {
     address private teamMultisigAddress;
 
     uint256 private totalVaults;
-    
     bool private permissionlessDeployEnabled;    
 
     ProtocolParameters private protocolParameters;
@@ -172,7 +172,7 @@ contract NomaFactory {
             )
         ).preDeployVault(address(resolver));
 
-        (data.sNoma, data.stakingContract) = IExtFactory(extFactory)
+        (data.sNoma, data.stakingContract, data.tokenRepo) = IExtFactory(extFactory)
             .deployAll(
                 address(this),
                 data.vaultAddress,
@@ -211,6 +211,7 @@ contract NomaFactory {
             data.stakingContract,
             address(data.pool),
             data.vaultAddress,
+            data.tokenRepo,
             data.vaultDeployParams,
             data.presaleParams
         );
@@ -223,7 +224,8 @@ contract NomaFactory {
             token1: data.vaultDeployParams.token1,
             deployer: msg.sender,
             vault: data.vaultAddress,
-            presaleContract: data.presaleContract
+            presaleContract: data.presaleContract,
+            stakingContract: data.stakingContract
         });
 
         vaultsRepository[data.vaultAddress] = vaultDesc;
@@ -251,6 +253,7 @@ contract NomaFactory {
         address stakingContract,
         address pool,
         address vaultAddress,
+        address tokenRepo,
         VaultDeployParams memory vaultDeployParams,
         PresaleUserParams memory presaleParams
     ) internal returns (address) {
@@ -260,20 +263,24 @@ contract NomaFactory {
             address(pool), 
             vaultAddress,
             stakingContract,
+            tokenRepo,
             vaultDeployParams, 
             presaleParams
         );
 
         if (vaultDeployParams.presale == 1) {
             _initializeVault(
-                vaultAddress,
-                msg.sender,
-                deployer, 
-                pool, 
-                stakingContract,
-                presaleContract,
-                proxy,
-                getProtocolParameters()
+                VaultInitParams({
+                    vaultAddress: vaultAddress,
+                    owner: msg.sender,
+                    deployer: address(deployer),
+                    pool: pool,
+                    stakingContract: stakingContract,
+                    presaleContract: presaleContract,
+                    token0: proxy,
+                    tokenRepo: tokenRepo,
+                    protocolParameters: getProtocolParameters()
+                })
             );
         }
         
@@ -284,6 +291,7 @@ contract NomaFactory {
         address pool,
         address vaultAddress,
         address stakingContract,
+        address tokenRepo,
         VaultDeployParams memory vaultDeployParams,
         PresaleUserParams memory presaleParams
     ) internal returns (address presaleAddress) {
@@ -316,14 +324,17 @@ contract NomaFactory {
 
         } else {
             _initializeVault(
-                vaultAddress,
-                msg.sender,
-                address(deployer), 
-                pool, 
-                stakingContract,
-                presaleAddress,
-                IUniswapV3Pool(pool).token0(),
-                getProtocolParameters()
+                VaultInitParams({
+                    vaultAddress: vaultAddress,
+                    owner: msg.sender,
+                    deployer: address(deployer),
+                    pool: pool,
+                    stakingContract: stakingContract,
+                    presaleContract: presaleAddress,
+                    token0: IUniswapV3Pool(pool).token0(),
+                    tokenRepo: tokenRepo,
+                    protocolParameters: getProtocolParameters()
+                })
             );
             _deployLiquidity(
                 vaultDeployParams.IDOPrice, 
@@ -420,41 +431,27 @@ contract NomaFactory {
             _liquidityParams.floorBips[1], 
             totalSupply * _liquidityParams.anchorPercentage / 100
         );
-        deployer.deployDiscovery(IDOPrice * _liquidityParams.idoPriceMultiplier);
+        deployer.deployDiscovery(IDOPrice * _liquidityParams.idoPriceMultiplier, false);
     }
+
 
     /**
     * @notice Initializes the vault with the provided parameters.
-    * @param _vault The address of the vault to initialize.
-    * @param _owner The address of the vault owner.
-    * @param _deployer The address of the deployer contract.
-    * @param _pool The address of the associated Uniswap V3 pool.
-    * @param _stakingContract The address of the staking contract.
-    * @param _token0 The address of the primary token (token0).
-    * @param _params The liquidity structure parameters.
-    * @dev This internal function initializes the vault by setting its parameters and linking it with the necessary contracts.
     */
     function _initializeVault(
-        address _vault,
-        address _owner,
-        address _deployer,
-        address _pool,
-        address _stakingContract,
-        address _presaleContract,
-        address _token0,
-        ProtocolParameters memory _params
+        VaultInitParams memory _params
     ) internal {
-        BaseVault vault = BaseVault(_vault);
+        BaseVault vault = BaseVault(_params.vaultAddress);
 
         vault.initialize(
             address(this),
-            _owner,
-            _deployer,
-            _pool,
-            _stakingContract,
-            _token0,
-            _presaleContract,
-            _params
+            _params.owner,
+            _params.deployer,
+            _params.pool,
+            _params.stakingContract,
+            _params.presaleContract,
+            _params.tokenRepo,
+            _params.protocolParameters
         );
     }
 

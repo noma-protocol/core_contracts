@@ -99,6 +99,38 @@ struct VaultDeployParams {
     uint8  presale;
 }
 
+/// @notice Description of a vault.
+/// @param tokenName Name of the vault token.
+/// @param tokenSymbol Symbol of the vault token.
+/// @param tokenDecimals Number of decimals for the token.
+/// @param token0 Address of token0.
+/// @param token1 Address of token1.
+/// @param deployer Address of the deployer.
+/// @param vault Address of the vault.
+struct VaultDescription {
+    string tokenName;
+    string tokenSymbol;
+    uint8 tokenDecimals;
+    address token0;
+    address token1;
+    address deployer;
+    address vault;
+    address presaleContract;
+    address stakingContract;
+}
+
+struct VaultInitParams {
+    address vaultAddress;
+    address owner;
+    address deployer;
+    address pool;
+    address stakingContract;
+    address presaleContract;
+    address token0;
+    address tokenRepo;
+    ProtocolParameters protocolParameters;
+}
+
 struct PresaleUserParams {
     uint256 softCap;
     uint256 deadline;
@@ -150,25 +182,6 @@ struct DeployLiquidityParameters {
     int24 tickSpacing;
     int24 lowerTick;
     int24 upperTick;
-}
-
-/// @notice Description of a vault.
-/// @param tokenName Name of the vault token.
-/// @param tokenSymbol Symbol of the vault token.
-/// @param tokenDecimals Number of decimals for the token.
-/// @param token0 Address of token0.
-/// @param token1 Address of token1.
-/// @param deployer Address of the deployer.
-/// @param vault Address of the vault.
-struct VaultDescription {
-    string tokenName;
-    string tokenSymbol;
-    uint8 tokenDecimals;
-    address token0;
-    address token1;
-    address deployer;
-    address vault;
-    address presaleContract;
 }
 
 /// @notice Parameters used before a shift operation.
@@ -300,4 +313,5 @@ struct DeploymentData {
     address sNoma;
     address stakingContract;
     address presaleContract;
+    address tokenRepo;
 }
