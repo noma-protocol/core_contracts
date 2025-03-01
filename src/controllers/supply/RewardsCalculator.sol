@@ -8,32 +8,63 @@ import {Math} from "openzeppelin/contracts/utils/math/Math.sol";
 /// @notice A contract to calculate rewards based on supply, time, and price factors.
 contract RewardsCalculator {
 
-    /// @notice Calculates the rewards based on reward parameters, time elapsed, and token decimals.
-    /// @dev This function computes rewards using the formula: (totalSupply * (spotPrice / IMV)) / sqrt(timeElapsed).
-    /// @param params The reward parameters including total supply, spot price, and IMV.
-    /// @param timeElapsed The time elapsed since the last reward calculation.
-    /// @param token The token address to determine decimals (currently unused in the function).
-    /// @return The calculated reward amount.
-    /// @custom:require totalSupply > 0, "Total supply must be greater than zero"
-    /// @custom:require imv > 0, "IMV must be greater than zero"
-    /// @custom:require timeElapsed > 0, "Time elapsed must be greater than zero"
+    /**
+     * @dev Calculates how much ETH from `excessEth` should be used
+     *      based on the ratio of total staked to circulating supply,
+     *      with a tolerance band around 50%, and the final fraction
+     *      clamped to [20%, 80%].
+     */
     function calculateRewards(
-        RewardParams memory params,
-        uint256 timeElapsed,
-        address token // Token address to determine decimals
+        RewardParams memory params
     ) public pure returns (uint256) {
-        require(params.totalSupply > 0, "Total supply must be greater than zero");
-        require(params.imv > 0, "IMV must be greater than zero");
-        require(timeElapsed > 0, "Time elapsed must be greater than zero");
+        require(params.circulating > 0, "Circulating supply cannot be zero");
 
-        // Calculate the ratio of spot price to IMV
-        uint256 priceRatio = params.spotPrice / params.imv;
+        // stakedRatio = (totalStaked / circulatingSupply), scaled by 1e18
+        uint256 stakedRatio = (params.totalStaked * 1e18) / params.circulating;
 
-        // Scale the total supply by the price ratio
-        uint256 totalSupplyScaled = params.totalSupply * priceRatio;
+        // Constants in 1e18 scaling
+        // 50%: 0.50 -> 5e17
+        // tolerance: 0.02 -> 2e16
+        uint256 half = 5e17;       // 0.50
+        uint256 tolerance = 2e16;  // 0.02
 
-        // Compute the reward amount using the scaled total supply and square root of time elapsed
-        uint256 tMint = totalSupplyScaled / Math.sqrt(timeElapsed);
-        return tMint;
+        // We'll clamp the final fraction p(R) to [0.20, 0.80]
+        // 20% -> 2e17
+        // 80% -> 8e17
+        uint256 minFraction = 2e17; // 0.20
+        uint256 maxFraction = 8e17; // 0.80
+
+        // Lower bound = 0.48 -> 4.8e17
+        // Upper bound = 0.52 -> 5.2e17
+        uint256 lowerBound = half - tolerance; // 4.8e17
+        uint256 upperBound = half + tolerance; // 5.2e17
+
+        // fraction is in 1e18 scaling
+        uint256 fraction;
+
+        if (stakedRatio < lowerBound) {
+            // fraction = 0.50 + ((0.48) - stakedRatio)
+            fraction = half + (lowerBound - stakedRatio);
+        } else if (stakedRatio > upperBound) {
+            // fraction = 0.50 - (stakedRatio - 0.52)
+            fraction = half - (stakedRatio - upperBound);
+        } else {
+            // If in [0.48, 0.52], fraction = 0.50
+            fraction = half;
+        }
+
+        // --- Clamp fraction to [0.20, 0.80] ---
+        if (fraction < minFraction) {
+            fraction = minFraction;
+        } else if (fraction > maxFraction) {
+            fraction = maxFraction;
+        }
+
+        // Convert fraction (1e18 scale) to actual ETH used
+        uint256 usedEth = (params.ethAmount * fraction) / 1e18;
+
+        return usedEth;
     }
 }
+
+
