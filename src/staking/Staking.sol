@@ -26,20 +26,6 @@ contract Staking {
         uint256 distribute; // amount
     }
 
-    /**
-     * @notice Struct representing a user's claim.
-     * @param deposit The amount deposited by the user.
-     * @param gons The staked balance in gons.
-     * @param expiry The timestamp when the warmup period ends.
-     * @param lock Whether the claim is locked to prevent malicious delays.
-     */
-    struct Claim {
-        uint256 deposit; // if forfeiting
-        uint256 gons;    // staked balance
-        uint256 expiry;  // end of warmup period
-        bool lock;       // prevents malicious delays for claim
-    }
-
     // State variables
     IERC20 public NOMA; // The NOMA token contract.
     IsNomaToken public sNOMA; // The staked NOMA token contract.
@@ -54,7 +40,8 @@ contract Staking {
     uint256 public totalRewards; // Total rewards distributed.
     uint256 public totalEpochs; // Total number of epochs.
 
-    mapping(address => Claim) public infos; // Mapping of user addresses to their claims.
+    // Mapping to track staked amounts per user
+    mapping(address => uint256) private stakedBalances;
 
     // Custom errors
     error StakingNotEnabled();
@@ -62,6 +49,7 @@ contract Staking {
     error NotEnoughBalance();
     error InvalidReward();
     error OnlyVault();
+    error CustomError();
 
     // Events
     event Staked(address indexed user, uint256 amount);
@@ -95,15 +83,15 @@ contract Staking {
     }
 
     /**
-     * @notice Allows a user to stake NOMA tokens.
-     * @param _to The address to which the staked tokens will be credited.
-     * @param _amount The amount of NOMA tokens to stake.
-     */
+    * @notice Allows a user to stake NOMA tokens.
+    * @param _to The address to which the staked tokens will be credited.
+    * @param _amount The amount of NOMA tokens to stake.
+    */
     function stake(
         address _to,
         uint256 _amount
     ) external {
-        if (_amount == 0 || _to == address(0)) {
+        if (_amount == 0) {
             revert InvalidParameters();
         }
 
@@ -111,16 +99,19 @@ contract Staking {
             revert StakingNotEnabled();
         }
 
-        NOMA.safeTransferFrom(_to, address(this), _amount);
-        sNOMA.mint(_to, _amount);
+        NOMA.transferFrom(msg.sender, address(this), _amount);
+        sNOMA.mint(msg.sender, _amount);
 
-        emit Staked(_to, _amount);
+        // Track the originally staked amount
+        stakedBalances[msg.sender] += _amount;
+
+        emit Staked(msg.sender, _amount);
     }
 
     /**
-     * @notice Allows a user to unstake their NOMA tokens.
-     * @param _from The address from which the staked tokens will be withdrawn.
-     */
+    * @notice Allows a user to unstake their NOMA tokens.
+    * @param _from The address from which the staked tokens will be withdrawn.
+    */
     function unstake(
         address _from
     ) external {
@@ -145,8 +136,16 @@ contract Staking {
         sNOMA.burnFor(_from, balance);
         NOMA.safeTransfer(_from, balance);
 
+        // Reduce the original staked amount
+        if (stakedBalances[_from] >= balance) {
+            stakedBalances[_from] -= balance;
+        } else {
+            stakedBalances[_from] = 0; // Avoid underflow
+        }
+
         emit Unstaked(_from, balance);
-    }  
+    }
+
 
     /**
      * @notice Notifies the contract of a new reward amount and starts a new epoch.
@@ -189,6 +188,15 @@ contract Staking {
         totalEpochs++;
     
         emit NotifiedReward(_reward);
+    }
+
+    /**
+    * @notice Returns the originally staked amount of NOMA for a user.
+    * @param _user The address of the staker.
+    * @return The originally staked amount of NOMA.
+    */
+    function stakedBalance(address _user) external view returns (uint256) {
+        return stakedBalances[_user];
     }
 
     /**
