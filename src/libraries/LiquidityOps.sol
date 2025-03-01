@@ -15,6 +15,8 @@ import {Underlying} from "./Underlying.sol";
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
 import {IDeployer} from "../interfaces/IDeployer.sol";
 
+import {IVault} from "../interfaces/IVault.sol";
+
 import {
     LiquidityPosition, 
     LiquidityType, 
@@ -25,20 +27,6 @@ import {
     ProtocolParameters,
     LiquidityInternalPars
 } from "../types/Types.sol";
-
-/**
- * @title IVault
- * @notice Interface for the Vault contract.
- */
-interface IVault {
-    function updatePositions(LiquidityPosition[3] memory newPositions) external;
-    function setFees(uint256 _feesAccumulatedToken0, uint256 _feesAccumulatedToken1) external;
-    function mintTokens(address to, uint256 amount) external;
-    function burnTokens(uint256 amount) external;
-    function getProtocolParameters() external view returns (ProtocolParameters memory _params);
-    function getTimeSinceLastMint() external view returns (uint256);
-    function teamMultiSig() external view returns (address);
-}
 
 /**
  * @title IAdaptiveSupply
