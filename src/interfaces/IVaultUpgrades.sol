@@ -51,7 +51,11 @@ interface IExtFactory {
         address deployerAddress,
         address vaultAddress,
         address token0
-    ) external returns (address auxiliaryContract1, address auxiliaryContract2);
+    ) external returns (
+        address auxiliaryContract1, 
+        address auxiliaryContract2, 
+        address auxiliaryContract3
+    );
 }
 
 /**

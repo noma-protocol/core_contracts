@@ -116,4 +116,10 @@ interface IVault {
     function mintTokens(address to, uint256 amount) external;
 
     function burnTokens(uint256 amount) external;
+
+    function setFees(uint256 _feesAccumulatedToken0, uint256 _feesAccumulatedToken1) external;
+
+    function getTimeSinceLastMint() external view returns (uint256);
+
+    function teamMultiSig() external view returns (address);
 }
