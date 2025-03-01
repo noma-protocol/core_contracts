@@ -87,7 +87,6 @@ contract BaseVault {
      * @param _deployer The address of the deployer contract.
      * @param _pool The address of the Uniswap V3 pool.
      * @param _stakingContract The address of the staking contract.
-     * @param _proxyAddress The address of the proxy contract.
      * @param _params The protocol parameters.
      */
     function initialize(
@@ -96,8 +95,8 @@ contract BaseVault {
         address _deployer,
         address _pool, 
         address _stakingContract,
-        address _proxyAddress,
         address _presaleContract,
+        address _tokenRepo,
         ProtocolParameters memory _params
     ) public onlyFactory {
         LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
@@ -112,11 +111,12 @@ contract BaseVault {
         _v.tokenInfo.token0 = _v.pool.token0();
         _v.tokenInfo.token1 = _v.pool.token1();
         _v.initialized = false;
-        _v.stakingEnabled = false;
+        _v.stakingEnabled = true;
         _v.loanFee = _params.loanFee;
         _v.stakingContract = _stakingContract;
         _v.presaleContract = _presaleContract;
-        _v.proxyAddress = _proxyAddress;
+        _v.collateralAmount = 0;
+        _v.tokenRepo = _tokenRepo;
         _v.deployerContract = _deployer;
         _v.protocolParameters = _params;
         _v.manager = _owner;
