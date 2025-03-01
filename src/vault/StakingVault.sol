@@ -16,6 +16,8 @@ import {Utils} from "../libraries/Utils.sol";
 import {Uniswap} from "../libraries/Uniswap.sol";
 import {IVault} from "../interfaces/IVault.sol";
 import {TickMath} from 'v3-core/libraries/TickMath.sol';
+import {DecimalMath} from "../libraries/DecimalMath.sol";
+import {LiquidityDeployer} from "../libraries/LiquidityDeployer.sol";
 
 import {
     LiquidityPosition, 
@@ -30,7 +32,7 @@ interface IStakingRewards {
 }
 
 interface IRewardsCalculator {
-    function calculateRewards(RewardParams memory params, uint256 timeElapsed, address token0) external pure returns (uint256);
+    function calculateRewards(RewardParams memory params) external pure returns (uint256);
 }
 
 // Custom errors
@@ -79,34 +81,29 @@ contract StakingVault is BaseVault {
             false
         );
 
+        uint256 totalStaked = IERC20(_v.tokenInfo.token0).balanceOf(_v.stakingContract);
+
         uint256 intrinsicMinimumValue = IModelHelper(modelHelper())
         .getIntrinsicMinimumValue(address(this));
 
         uint256 circulatingSupply = IModelHelper(modelHelper()).getCirculatingSupply(addresses.pool, address(this));
-        uint256 totalSupply = IERC20(IUniswapV3Pool(addresses.pool).token0()).totalSupply();
 
-        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(addresses.pool).slot0();
-
-        uint256 toMint = IRewardsCalculator(rewardsCalculator()).
+        uint256 toMintEth = 
+        IRewardsCalculator(rewardsCalculator()).
         calculateRewards(
             RewardParams(
                 excessReservesToken1,
-                intrinsicMinimumValue,
-                Conversions.sqrtPriceX96ToPrice(
-                    sqrtRatioX96, 
-                    IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).decimals()
-                ),
                 circulatingSupply,
-                totalSupply,
-                10e8 // sensitivity for r TODO remove hardcoded
-            ),
-            block.timestamp - _v.timeLastMinted,
-            IUniswapV3Pool(addresses.pool).token0()
-        );
-                
+                totalStaked
+            )
+        ); 
+
+        uint256 toMint = DecimalMath.divideDecimal(toMintEth, intrinsicMinimumValue);
+
         if (toMint > 0) {        
-            IERC20(_v.tokenInfo.token0).approve(_v.stakingContract, toMint);
-            IVault(address(this)).mintTokens(_v.stakingContract, toMint);
+            // IERC20(_v.tokenInfo.token0).approve(_v.stakingContract, toMint);
+            IVault(address(this)).mintTokens(address(this), toMint);
+            IERC20(_v.tokenInfo.token0).transfer(_v.stakingContract, toMint);
             // Update total minted (NOMA)
             _v.totalMinted += toMint;
 
@@ -114,61 +111,21 @@ contract StakingVault is BaseVault {
             IStakingRewards(_v.stakingContract).notifyRewardAmount(toMint);  
 
             // Send tokens to Floor
-            _sendToken1ToFloor(positions, addresses, toMint);
+            (,, uint256 floorToken0Balance, uint256 floorToken1Balance) = IModelHelper(modelHelper())
+            .getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
+            
+            Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick);         
+            LiquidityDeployer.reDeployFloor(
+                address(_v.pool), 
+                address(this), 
+                floorToken0Balance, 
+                floorToken1Balance + toMintEth, 
+                positions
+            );
+
         } else {
             revert NoStakingRewards();
         }
-    }
-
-    /**
-     * @notice Sends token1 to the floor position.
-     * @param positions The current liquidity positions.
-     * @param addresses The protocol addresses.
-     * @param toMint The amount of tokens to mint.
-     */
-    function _sendToken1ToFloor(
-        LiquidityPosition[3] memory positions, 
-        ProtocolAddresses memory addresses,
-        uint256 toMint
-    ) internal {
-
-        (,,, uint256 floorToken1Balance) = IModelHelper(addresses.modelHelper)
-        .getUnderlyingBalances(
-            addresses.pool, 
-            address(this), 
-            LiquidityType.Floor
-        );
-
-        (
-            uint256 circulatingSupply,,,
-        ) = LiquidityOps.getVaultData(addresses);
-
-        uint256 newFloorPrice = IDeployer(addresses.deployer)
-        .computeNewFloorPrice(
-            toMint,
-            floorToken1Balance,
-            circulatingSupply,
-            positions
-        );
-
-        uint256 currentFloorPrice = Conversions
-        .sqrtPriceX96ToPrice(
-            Conversions
-            .tickToSqrtPriceX96(
-                positions[0].upperTick
-            ), 
-        IERC20Metadata(address(IUniswapV3Pool(addresses.pool).token0())).decimals());
-        
-        // Bump floor if necessary
-        if (newFloorPrice > currentFloorPrice) {
-            _shiftPositions(
-                positions, 
-                addresses, 
-                newFloorPrice, 
-                toMint, 
-                floorToken1Balance
-            );
-        }  
     }
 
     /**
@@ -206,50 +163,6 @@ contract StakingVault is BaseVault {
     }
 
     /**
-     * @notice Shifts the liquidity positions to adjust for new rewards.
-     * @param positions The current liquidity positions.
-     * @param addresses The protocol addresses.
-     * @param newFloorPrice The new floor price.
-     * @param toMint The amount of tokens to mint.
-     * @param floorToken1Balance The balance of token1 in the floor position.
-     */
-    function _shiftPositions(
-        LiquidityPosition[3] memory positions, 
-        ProtocolAddresses memory addresses,
-        uint256 newFloorPrice,
-        uint256 toMint,
-        uint256 floorToken1Balance
-    ) internal {
-        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(addresses.pool).slot0();
-
-        ( , uint256 anchorToken1Balance, 
-            uint256 discoveryToken1Balance,
-        ) = LiquidityOps.getVaultData(addresses);
-
-        // Collect all liquidity
-        _collectLiquidity(positions, addresses);
-
-        // TODO check this
-        if (floorToken1Balance + toMint > floorToken1Balance) {
-            _transferExcessBalance(addresses, floorToken1Balance + toMint);
-        }
-
-        _deployNewPositions(
-            positions, 
-            addresses, 
-            newFloorPrice, 
-            toMint, 
-            floorToken1Balance, 
-            anchorToken1Balance, 
-            discoveryToken1Balance, 
-            sqrtRatioX96
-        );
-
-        IModelHelper(modelHelper())
-            .enforceSolvencyInvariant(address(this));   
-    }
-
-    /**
      * @notice Transfers excess balance to the deployer.
      * @param addresses The protocol addresses.
      * @param totalAmount The total amount to transfer.
@@ -257,167 +170,6 @@ contract StakingVault is BaseVault {
     function _transferExcessBalance(ProtocolAddresses memory addresses, uint256 totalAmount) internal {
         IERC20 token1 = IERC20(IUniswapV3Pool(addresses.pool).token1());
         token1.safeTransfer(addresses.deployer, totalAmount);
-    }
-
-    /**
-     * @notice Deploys new liquidity positions.
-     * @param positions The current liquidity positions.
-     * @param addresses The protocol addresses.
-     * @param newFloorPrice The new floor price.
-     * @param toMint The amount of tokens to mint.
-     * @param floorToken1Balance The balance of token1 in the floor position.
-     * @param anchorToken1Balance The balance of token1 in the anchor position.
-     * @param discoveryToken1Balance The balance of token1 in the discovery position.
-     * @param sqrtRatioX96 The current sqrt price of the pool.
-     */
-    function _deployNewPositions(
-        LiquidityPosition[3] memory positions, 
-        ProtocolAddresses memory addresses,
-        uint256 newFloorPrice,
-        uint256 toMint,
-        uint256 floorToken1Balance,
-        uint256 anchorToken1Balance,
-        uint256 discoveryToken1Balance,
-        uint160 sqrtRatioX96
-    ) internal {
-        positions[0] = _shiftFloorPosition(
-            positions[0],
-            addresses,
-            newFloorPrice,
-            floorToken1Balance,
-            toMint
-        );
-
-        positions[1] = _deployAnchorPosition(
-            positions[0].upperTick,
-            positions[0].tickSpacing,
-            addresses,
-            anchorToken1Balance,
-            discoveryToken1Balance,
-            toMint,
-            sqrtRatioX96
-        );
-
-        positions[2] = _deployDiscoveryPosition(
-            positions[1].upperTick,
-            positions[1].tickSpacing,
-            addresses,
-            discoveryToken1Balance,
-            sqrtRatioX96
-        );
-
-        IVault(address(this)).updatePositions(positions);  
-    }
-
-    /**
-     * @notice Shifts the floor position to a new price.
-     * @param floorPosition The current floor position.
-     * @param addresses The protocol addresses.
-     * @param newFloorPrice The new floor price.
-     * @param floorToken1Balance The balance of token1 in the floor position.
-     * @param toMint The amount of tokens to mint.
-     * @return The new floor position.
-     */
-    function _shiftFloorPosition(
-        LiquidityPosition memory floorPosition,
-        ProtocolAddresses memory addresses,
-        uint256 newFloorPrice,
-        uint256 floorToken1Balance,
-        uint256 toMint
-    ) internal returns (LiquidityPosition memory) {
-        uint8 decimals = IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).decimals();
-        uint256 price = Conversions.sqrtPriceX96ToPrice(
-            Conversions.tickToSqrtPriceX96(floorPosition.upperTick),
-            decimals
-        );
-
-        return IDeployer(addresses.deployer).shiftFloor(
-            addresses.pool,
-            address(this),
-            price,
-            newFloorPrice,
-            floorToken1Balance + toMint,
-            floorToken1Balance,
-            floorPosition
-        );
-    }
-
-    /**
-     * @notice Deploys a new anchor position.
-     * @param upperTick The upper tick of the floor position.
-     * @param tickSpacing The tick spacing of the pool.
-     * @param addresses The protocol addresses.
-     * @param anchorToken1Balance The balance of token1 in the anchor position.
-     * @param discoveryToken1Balance The balance of token1 in the discovery position.
-     * @param toMint The amount of tokens to mint.
-     * @param sqrtRatioX96 The current sqrt price of the pool.
-     * @return The new anchor position.
-     */
-    function _deployAnchorPosition(
-        int24 upperTick,
-        int24 tickSpacing,
-        ProtocolAddresses memory addresses,
-        uint256 anchorToken1Balance,
-        uint256 discoveryToken1Balance,
-        uint256 toMint,
-        uint160 sqrtRatioX96
-    ) internal returns (LiquidityPosition memory) {
-        return LiquidityOps.reDeploy(
-            addresses,
-            LiquidityInternalPars({
-                lowerTick: upperTick,
-                upperTick: Utils.nearestUsableTick(
-                    TickMath.getTickAtSqrtRatio(sqrtRatioX96),
-                    tickSpacing
-                ),
-                amount1ToDeploy: (anchorToken1Balance + discoveryToken1Balance) - toMint,
-                liquidityType: LiquidityType.Anchor
-            }),
-            true
-        );
-    }
-
-    /**
-     * @notice Deploys a new discovery position.
-     * @param anchorUpperTick The upper tick of the anchor position.
-     * @param tickSpacing The tick spacing of the pool.
-     * @param addresses The protocol addresses.
-     * @param discoveryToken1Balance The balance of token1 in the discovery position.
-     * @param sqrtRatioX96 The current sqrt price of the pool.
-     * @return The new discovery position.
-     */
-    function _deployDiscoveryPosition(
-        int24 anchorUpperTick,
-        int24 tickSpacing,
-        ProtocolAddresses memory addresses,
-        uint256 discoveryToken1Balance,
-        uint160 sqrtRatioX96
-    ) internal returns (LiquidityPosition memory) {
-        uint8 decimals = IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).decimals();
-        int24 discoveryLowerTick = Utils.nearestUsableTick(
-            Utils.addBipsToTick(
-                anchorUpperTick,
-                IVault(address(this)).getProtocolParameters().discoveryBips,
-                decimals,
-                tickSpacing
-            ),
-            tickSpacing
-        );
-
-        return LiquidityOps.reDeploy(
-            addresses,
-            LiquidityInternalPars({
-                lowerTick: discoveryLowerTick,
-                upperTick: Utils.nearestUsableTick(
-                    TickMath.getTickAtSqrtRatio(sqrtRatioX96) * 
-                    int8(IVault(address(this)).getProtocolParameters().idoPriceMultiplier),
-                    tickSpacing
-                ),
-                amount1ToDeploy: discoveryToken1Balance,
-                liquidityType: LiquidityType.Discovery
-            }),
-            true
-        );
     }
 
     /**
