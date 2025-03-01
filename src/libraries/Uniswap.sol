@@ -140,10 +140,9 @@ library Uniswap {
         uint256 amountToSwap, 
         bool zeroForOne, 
         bool isLimitOrder
-    ) internal {
-        
+    ) internal returns (int256 amount0, int256 amount1) {
         uint256 balanceBeforeSwap = IERC20Metadata(zeroForOne ? token1 : token0).balanceOf(receiver);
-        uint160 slippagePrice = zeroForOne ? basePrice - (basePrice * 5/100) : basePrice + (basePrice * 5/100);
+        uint160 slippagePrice = zeroForOne ? basePrice - (basePrice * 5 / 100) : basePrice + (basePrice * 5 / 100);
 
         try IUniswapV3Pool(pool).swap(
             receiver, 
@@ -151,7 +150,12 @@ library Uniswap {
             int256(amountToSwap), 
             isLimitOrder ? basePrice : slippagePrice,
             ""
-        ) {
+        ) returns (int256 _amount0, int256 _amount1) {
+            // Capture the return values
+            amount0 = _amount0;
+            amount1 = _amount1;
+
+            // Check if tokens were exchanged
             uint256 balanceAfterSwap = IERC20Metadata(zeroForOne ? token1 : token0).balanceOf(receiver);
             if (balanceBeforeSwap == balanceAfterSwap) {
                 revert NoTokensExchanged();
