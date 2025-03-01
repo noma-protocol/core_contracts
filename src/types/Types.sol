@@ -254,11 +254,8 @@ struct LoanPosition {
 /// @param kr Sensitivity for r adjustment.
 struct RewardParams {
     uint256 ethAmount;   // Amount of ETH provided 
-    uint256 imv;         // Token price in ETH 
-    uint256 spotPrice;   // Spot price in ETH 
     uint256 circulating; // Circulating supply
-    uint256 totalSupply; // Total supply 
-    uint256 kr;          // Sensitivity for r adjustment (e.g., 10e18)
+    uint256 totalStaked; // Total staked
 }
 
 /// @notice Parameters for configuring the protocol.
