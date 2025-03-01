@@ -41,6 +41,7 @@ struct VaultStorage {
     address presaleContract;
     address proxyAddress;
     address adaptiveSupplyController;
+    address tokenRepo;
 
     // Liquidity positions
     LiquidityPosition  floorPosition;

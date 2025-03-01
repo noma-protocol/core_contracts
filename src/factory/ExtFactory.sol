@@ -5,6 +5,7 @@ import { GonsToken } from "../staking/Gons.sol";
 import { Staking } from "../staking/Staking.sol";
 import { IAddressResolver }  from "../interfaces/IAddressResolver.sol";
 import { Utils } from "../libraries/Utils.sol";
+import { TokenRepo } from "../TokenRepo.sol";
 
 /**
  * @title ExtFactory
@@ -30,6 +31,8 @@ contract ExtFactory {
     /// @notice Instance of the deployed `GonsToken` contract.
     GonsToken public gonsToken;
 
+    TokenRepo public tokenRepo;
+
     /**
      * @notice Constructs the `ExtFactory` contract.
      * @dev Sets the address resolver for contract address resolution.
@@ -53,7 +56,7 @@ contract ExtFactory {
         address deployerAddress,
         address vaultAddress,
         address token0
-    ) public onlyFactory returns (address gonsTokenAddress, address stakingContractAddress) {
+    ) public onlyFactory returns (address gonsTokenAddress, address stakingContractAddress, address tokenRepoAddress) {
 
         // Deploy GonsToken contract
         gonsToken = new GonsToken(deployerAddress);
@@ -61,10 +64,13 @@ contract ExtFactory {
         // Deploy Staking contract
         stakingContract = new Staking(token0, address(gonsToken), vaultAddress);
 
+        // Deploy Token Repo contract
+        tokenRepo = new TokenRepo(vaultAddress);
+
         emit DeployerCreated(address(stakingContract));
 
         // Return addresses of the deployed contracts
-        return (address(gonsToken), address(stakingContract));
+        return (address(gonsToken), address(stakingContract), address(tokenRepo));
     }    
 
     /**
