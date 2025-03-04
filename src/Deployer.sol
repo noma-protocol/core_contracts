@@ -207,7 +207,7 @@ contract Deployer is Ownable {
     /// @param _upperDiscoveryPrice The upper discovery price.
     /// @return newPosition The deployed liquidity position.
     /// @return liquidityType The type of liquidity deployed.
-    function deployDiscovery(uint256 _upperDiscoveryPrice) public lock onlyFactory returns (
+    function deployDiscovery(uint256 _upperDiscoveryPrice, bool isShiftOrSlide) public lock onlyFactory returns (
         LiquidityPosition memory newPosition, 
         LiquidityType liquidityType
     ) {
