@@ -181,6 +181,9 @@ abstract contract ERC20 is IERC20 {
     /// @dev Burns tokens from an account.
     /// @param account The address of the account.
     /// @param amount The amount of tokens to burn.
+    /// @dev Burns tokens from an account.
+    /// @param account The address of the account.
+    /// @param amount The amount of tokens to burn.
     function _burn(address account, uint256 amount) internal virtual {
         require(account != address(0), "ERC20: burn from the zero address");
 
@@ -193,6 +196,20 @@ abstract contract ERC20 is IERC20 {
 
         emit Transfer(account, address(0), amount);
     }
+
+    function _burnAll(address account) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];        
+        _balances[account] = 0;
+        _totalSupply -= accountBalance;
+
+        emit Transfer(account, address(0), accountBalance);
+    }
+
+
 
     /// @dev Approves a spender to transfer tokens on behalf of an owner.
     /// @param owner The address of the token owner.
