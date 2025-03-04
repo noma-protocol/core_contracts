@@ -8,6 +8,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * @notice Interface for the sNomaToken, extending the standard ERC20 interface with additional functionalities.
  */
 interface IsNomaToken is IERC20 {
+
+    function initialize(address _stakingContract) external;
+    
     /**
      * @notice Adjusts the total supply of the token by a specified amount.
      * @param supplyDelta The amount by which to adjust the total supply. Positive values increase the supply, negative values decrease it.
@@ -33,9 +36,10 @@ interface IsNomaToken is IERC20 {
     /**
      * @notice Burns a specified amount of tokens from a given address.
      * @param from The address from which the tokens will be burned.
-     * @param value The amount of tokens to burn.
-     * @return A boolean value indicating whether the operation succeeded.
      * @dev This function reduces the total supply by permanently destroying the specified amount of tokens from the specified address.
      */
-    function burnFor(address from, uint256 value) external returns (bool);
+    function burnFor(address from) external;
+
+    function rebaseIndex() external view returns (uint256);
+
 }
