@@ -5,7 +5,8 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IsNomaToken} from "../interfaces/IsNomaToken.sol";
 import {IVault} from "../interfaces/IVault.sol";
-
+import {Utils} from "../libraries/Utils.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 /**
  * @title Staking
  * @notice A contract for staking NOMA tokens and earning rewards.
@@ -39,6 +40,7 @@ contract Staking {
     
     uint256 public totalRewards; // Total rewards distributed.
     uint256 public totalEpochs; // Total number of epochs.
+    uint256 public totalStaked; // Total amount of NOMA staked.
 
     // Mapping to track staked amounts per user
     mapping(address => uint256) private stakedBalances;
@@ -71,6 +73,8 @@ contract Staking {
         sNOMA = IsNomaToken(_sNoma);
         vault = _vault;
         
+        sNOMA.initialize(address(this));
+
         // Initialize first epoch with distribute 0
         epoch = Epoch({
             number: 1,
@@ -78,6 +82,7 @@ contract Staking {
             distribute: 0
         });
 
+        totalStaked = 0;
         epochs[totalEpochs] = epoch;
         totalEpochs++;
     }
@@ -87,10 +92,7 @@ contract Staking {
     * @param _to The address to which the staked tokens will be credited.
     * @param _amount The amount of NOMA tokens to stake.
     */
-    function stake(
-        address _to,
-        uint256 _amount
-    ) external {
+    function stake(address _to, uint256 _amount) external {
         if (_amount == 0) {
             revert InvalidParameters();
         }
@@ -99,15 +101,20 @@ contract Staking {
             revert StakingNotEnabled();
         }
 
+        // Transfer NOMA tokens from the user to the staking contract
         NOMA.transferFrom(msg.sender, address(this), _amount);
-        sNOMA.mint(msg.sender, _amount);
+
+        // Mint rebase-adjusted sNOMA to the staker
+        sNOMA.mint(_to, (_amount * 1e18) / sNOMA.rebaseIndex());
 
         // Track the originally staked amount
         stakedBalances[msg.sender] += _amount;
+        totalStaked += _amount;
 
         emit Staked(msg.sender, _amount);
     }
 
+    
     /**
     * @notice Allows a user to unstake their NOMA tokens.
     * @param _from The address from which the staked tokens will be withdrawn.
@@ -123,25 +130,29 @@ contract Staking {
             revert StakingNotEnabled();
         }
         
-        uint256 balance = sNOMA.balanceOf(_from);
+        uint256 balance = Math.min(sNOMA.balanceOf(_from), NOMA.balanceOf(address(this)));
 
         if (balance == 0) {
             revert NotEnoughBalance();
         }
 
         if (NOMA.balanceOf(address(this)) < balance) {
+            revert(
+                string(
+                    abi.encodePacked(
+                        "unstake : ", 
+                        Utils._uint2str(uint256(NOMA.balanceOf(address(this))))
+                    )
+                )
+            );
             revert NotEnoughBalance();
         }
 
-        sNOMA.burnFor(_from, balance);
+        sNOMA.burnFor(_from);
         NOMA.safeTransfer(_from, balance);
 
-        // Reduce the original staked amount
-        if (stakedBalances[_from] >= balance) {
-            stakedBalances[_from] -= balance;
-        } else {
-            stakedBalances[_from] = 0; // Avoid underflow
-        }
+        totalStaked -= stakedBalances[_from];
+        stakedBalances[_from] = 0;
 
         emit Unstaked(_from, balance);
     }
