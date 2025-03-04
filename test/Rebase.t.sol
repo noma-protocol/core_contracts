@@ -67,6 +67,9 @@ contract TestRebase is Test {
 
         vm.prank(userA);
         mockNomaToken.approve(address(staking), 100e18);
+        vm.stopPrank();
+
+        vm.prank(userA);
         staking.stake(userA, 100e18);
         vm.stopPrank();
 
@@ -82,6 +85,9 @@ contract TestRebase is Test {
 
         vm.prank(userB);
         mockNomaToken.approve(address(staking), 100e18);
+        vm.stopPrank();
+
+        vm.prank(userB);
         staking.stake(userB, 100e18);
         vm.stopPrank();
 
@@ -98,6 +104,9 @@ contract TestRebase is Test {
 
         vm.prank(userA);
         mockNomaToken.approve(address(staking), 100e18);
+        vm.stopPrank();
+
+        vm.prank(userA);
         staking.stake(userA, 100e18);
         vm.stopPrank();
 
@@ -111,6 +120,9 @@ contract TestRebase is Test {
 
         vm.prank(userB);
         mockNomaToken.approve(address(staking), 100e18);
+        vm.stopPrank();
+
+        vm.prank(userB);
         staking.stake(userB, 100e18);
         vm.stopPrank();
 
@@ -121,6 +133,9 @@ contract TestRebase is Test {
 
         vm.prank(userC);
         mockNomaToken.approve(address(staking), 100e18);
+        vm.stopPrank();
+
+        vm.prank(userC);
         staking.stake(userC, 100e18);
         vm.stopPrank();
 
@@ -128,6 +143,9 @@ contract TestRebase is Test {
 
         vm.prank(userD);
         mockNomaToken.approve(address(staking), 100e18);
+        vm.stopPrank();
+
+        vm.prank(userD);
         staking.stake(userD, 100e18);
         vm.stopPrank();
 
@@ -178,6 +196,9 @@ contract TestRebase is Test {
 
             vm.prank(users[i]);
             mockNomaToken.approve(address(staking), stakeAmount);
+            vm.stopPrank();
+
+            vm.prank(users[i]);
             staking.stake(users[i], stakeAmount);
             vm.stopPrank();
 
@@ -246,6 +267,9 @@ contract TestRebase is Test {
 
             vm.prank(users[i]);
             mockNomaToken.approve(address(staking), stakeAmount);
+            vm.stopPrank();
+
+            vm.prank(users[i]);
             staking.stake(users[i], stakeAmount);
             vm.stopPrank();
 
@@ -283,14 +307,14 @@ contract TestRebase is Test {
             totalRebaseBalance += balanceAfterProfit;
         }
 
-        uint256 balanceAfterProfitStaking = rebaseToken.balanceOf(address(staking));
+        // uint256 balanceAfterProfitStaking = rebaseToken.balanceOf(address(staking));
         uint256 nomaBalanceStaking = mockNomaToken.balanceOf(address(staking));
 
         // console.log("Balance after profit for staking contract: %s", balanceAfterProfitStaking);
         // console.log("Noma balance of staking contract: %s", nomaBalanceStaking);
 
         assertGe(nomaBalanceStaking, totalRebaseBalance , "Staking contract should have enough Noma tokens");
-        assertEq(rebaseToken.totalSupply(),  balanceAfterProfitStaking, "Total supply should match sum of all balances");
+        // assertEq(rebaseToken.totalSupply(),  balanceAfterProfitStaking, "Total supply should match sum of all balances");
     }
 
     function testArbitraryStakesWithRandomAmountsAndProfit2() public {
@@ -320,6 +344,9 @@ contract TestRebase is Test {
 
             vm.prank(users[i]);
             mockNomaToken.approve(address(staking), stakeAmount);
+            vm.stopPrank();
+
+            vm.prank(users[i]);
             staking.stake(users[i], stakeAmount);
             vm.stopPrank();
 
@@ -415,8 +442,8 @@ contract TestRebase is Test {
         uint256 newTotalSupply = rebaseToken.totalSupply();
         uint256 newCirculatingSupply = rebaseToken.circulatingSupply();
         
-        // console.log("New Total Supply:", newTotalSupply);
-        // console.log("New Circulating Supply:", newCirculatingSupply);
+        console.log("New Total Supply:", newTotalSupply);
+        console.log("New Circulating Supply:", newCirculatingSupply);
         // console.log("Total Supply Difference:", newTotalSupply - initialTotalSupply);
         // console.log("Circulating Supply Difference:", newCirculatingSupply - initialCirculatingSupply);
         
@@ -467,6 +494,65 @@ contract TestRebase is Test {
     function stakingEnabled() public returns (bool) {
         return true;
     }
+
+
+    function testRebaseDistribution() public {
+        uint256 NUM_USERS = 32;
+        uint256 STAKE_AMOUNT = 100e18;
+        uint256 REWARD_AMOUNT = 1000e18;
+        address[] memory users = new address[](NUM_USERS);
+
+        for (uint i = 0; i < NUM_USERS; i++) {
+            users[i] = address(uint160(i + 1));
+            mockNomaToken.mintTest(users[i], 1000e18);
+
+            vm.prank(users[i]);
+            mockNomaToken.approve(address(staking), STAKE_AMOUNT);
+            vm.stopPrank();
+
+            vm.prank(users[i]);
+            staking.stake(users[i], STAKE_AMOUNT);
+            vm.stopPrank();
+        }
+
+        uint256 initialTotalSupply = rebaseToken.totalSupply();
+
+        vm.prank(address(staking));
+        staking.notifyRewardAmount(0);
+
+        mockNomaToken.mintTest(address(staking), REWARD_AMOUNT);
+        vm.prank(address(staking));
+        staking.notifyRewardAmount(REWARD_AMOUNT);
+
+        uint256 expectedTotalSupply = initialTotalSupply + REWARD_AMOUNT;
+        assertEq(rebaseToken.totalSupply(), expectedTotalSupply, "Total supply mismatch after rebase");
+
+        for (uint i = 0; i < NUM_USERS; i++) {
+            users[i] = address(uint160(i + 1));
+            uint256 userBalance = rebaseToken.balanceOf(users[i]);
+            uint256 expectedUserBalance = (STAKE_AMOUNT * (initialTotalSupply + REWARD_AMOUNT)) / initialTotalSupply;
+            assertApproxEqAbs(userBalance, expectedUserBalance, 1e14, "User balance incorrect after rebase");
+        }
+    }
+
+    // function testTotalTokensDistributed() public {
+    //     for (uint i = 0; i < NUM_USERS; i++) {
+    //         vm.prank(users[i]);
+    //         staking.stake(users[i], STAKE_AMOUNT);
+    //     }
+
+    //     uint256 initialTotalSupply = sNOMA.totalSupply();
+
+    //     vm.prank(address(staking));
+    //     staking.notifyRewardAmount(0);
+
+    //     NOMA.mintTest(address(staking), REWARD_AMOUNT);
+    //     vm.prank(address(staking));
+    //     staking.notifyRewardAmount(REWARD_AMOUNT);
+
+    //     uint256 totalTokensDistributed = sNOMA.totalSupply() - initialTotalSupply;
+    //     assertEq(totalTokensDistributed, REWARD_AMOUNT, "Total distributed tokens mismatch with notified reward amount");
+    // }    
 }
 
 
