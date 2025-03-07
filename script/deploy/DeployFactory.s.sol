@@ -52,8 +52,8 @@ contract DeployFactory is Script {
     address deployer = vm.envAddress("DEPLOYER");
 
     // Constants
-    address WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
-    address private uniswapFactory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
+    address WETH = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+    address private uniswapFactory = 0xdB1d10011AD0Ff90774D0C6Bb92e5C5c8b4461F7;
 
     ContractInfo[] private expectedAddressesInResolver;
 
