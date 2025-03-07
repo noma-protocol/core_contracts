@@ -85,7 +85,7 @@ contract ExtFactory {
      */
     modifier onlyFactory() {
         address factory = resolver.requireAndGetAddress(
-            Utils.stringToBytes32("NomaFactory"), 
+            Utils.stringToBytes32("OikosFactory"), 
             "no factory"
         );        
         if (msg.sender != factory) {

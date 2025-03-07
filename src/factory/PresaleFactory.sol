@@ -29,7 +29,7 @@ contract PresaleFactory {
 
     function factory() public view returns (address) {
         return  resolver.requireAndGetAddress(
-            "NomaFactory",
+            "OikosFactory",
             "No factory"
         );
     }

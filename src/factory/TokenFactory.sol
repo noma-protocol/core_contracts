@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import { NomaToken } from "../token/NomaToken.sol";
+import { OikosToken } from "../token/OikosToken.sol";
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
 
 import {
@@ -33,14 +33,14 @@ contract TokenFactory {
         resolver = IAddressResolver(_resolver);
     }
 
-    function deployNomaToken(VaultDeployParams memory vaultDeployParams) public onlyFactory 
-    returns (NomaToken, ERC1967Proxy, bytes32) {
-        // Deploy the Noma token
+    function deployOikosToken(VaultDeployParams memory vaultDeployParams) public onlyFactory 
+    returns (OikosToken, ERC1967Proxy, bytes32) {
+        // Deploy the Oikos token
         (
-            NomaToken nomaToken, 
+            OikosToken nomaToken, 
             ERC1967Proxy proxy, 
             bytes32 tokenHash
-        ) = _deployNomaToken(
+        ) = _deployOikosToken(
             vaultDeployParams.name,
             vaultDeployParams.symbol,
             vaultDeployParams.token1,
@@ -51,26 +51,26 @@ contract TokenFactory {
     }
 
     /**
-    * @notice Deploys a new Noma token with the specified parameters.
+    * @notice Deploys a new Oikos token with the specified parameters.
     * @param name The name of the token.
     * @param symbol The symbol of the token.
     * @param _token1 The address of the paired token (token1).
     * @param totalSupply The total supply of the token.
-    * @return nomaToken The address of the newly deployed NomaToken.
+    * @return nomaToken The address of the newly deployed OikosToken.
     * @dev This internal function ensures the token does not already exist, generates a unique address using a salt, and initializes the token.
     * It reverts if the token address is invalid or if the token already exists.
     */
-    function _deployNomaToken(
+    function _deployOikosToken(
         string memory name,
         string memory symbol,
         address _token1,
         uint256 totalSupply
-    ) internal returns  (NomaToken, ERC1967Proxy, bytes32) {
+    ) internal returns  (OikosToken, ERC1967Proxy, bytes32) {
         bytes32 tokenHash = keccak256(abi.encodePacked(name, symbol));
 
         uint256 nonce = uint256(tokenHash);
 
-        NomaToken _nomaToken;
+        OikosToken _nomaToken;
         ERC1967Proxy proxy ;
 
         // Encode the initialize function call
@@ -84,7 +84,7 @@ contract TokenFactory {
         );
 
         do {
-            _nomaToken = new NomaToken{salt: bytes32(nonce)}();
+            _nomaToken = new OikosToken{salt: bytes32(nonce)}();
             // Deploy the proxy contract
             proxy = new ERC1967Proxy{salt: bytes32(nonce)}(
                 address(_nomaToken),
@@ -104,7 +104,7 @@ contract TokenFactory {
 
     function factory() public view returns (address) {
         return resolver.requireAndGetAddress(
-            "NomaFactory",
+            "OikosFactory",
             "No factory"
         );
     }

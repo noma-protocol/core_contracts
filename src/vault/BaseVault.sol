@@ -283,7 +283,7 @@ contract BaseVault {
         IAddressResolver resolver = _getResolver();
         return resolver
             .requireAndGetAddress(
-                Utils.stringToBytes32("NomaFactory"), 
+                Utils.stringToBytes32("OikosFactory"), 
                 "no Factory"
             );
     }
