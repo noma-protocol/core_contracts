@@ -7,7 +7,7 @@ import {stdJson} from "forge-std/StdJson.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../src/interfaces/IVault.sol";
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
-import {NomaToken} from  "../src/token/NomaToken.sol";
+import {OikosToken} from  "../src/token/OikosToken.sol";
 import {ModelHelper} from  "../src/model/Helper.sol";
 import {BaseVault} from  "../src/vault/BaseVault.sol";
 import {LendingVault} from  "../src/vault/LendingVault.sol";
@@ -50,7 +50,7 @@ contract LendingVaultTest is Test {
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address deployer = vm.envAddress("DEPLOYER");
 
-    NomaToken private noma;
+    OikosToken private noma;
     ModelHelper private modelHelper;
 
     address WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
@@ -85,7 +85,7 @@ contract LendingVaultTest is Test {
         IDOManager managerContract = IDOManager(idoManager);
         require(address(managerContract) != address(0), "Manager contract address is zero");
 
-        noma = NomaToken(nomaToken);
+        noma = OikosToken(nomaToken);
         require(address(noma) != address(0), "Noma token address is zero");
         
         modelHelper = ModelHelper(modelHelperContract);
