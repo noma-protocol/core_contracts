@@ -1,6 +1,6 @@
-## Noma Protocol core contracts
+## Oikos protocol core contracts
 
-This is the Noma protocol core contracts repository. Noma is a next-generation DeFi protocol, read more on our official [website](https://noma.money). 
+This is the Oikos protocol core contracts repository. Oikos is a next-generation DeFi protocol, read more on our official [website](https://oikos.cash). 
 
 Built with [Foundry](https://github.com/foundry-rs/foundry) ❤️
 
@@ -14,10 +14,10 @@ foo@bar:~/core_contracts$ ./install_deps.sh
 
 ## Testing
 
-1) Use anvil to fork the Arbitrum mainnet blockchain. Replace the fork-url with your rpc node. Do not forget the mnemonic phrase.
+1) Use anvil to fork the Binance Smart Chain mainnet blockchain. Replace the fork-url with your rpc node. Do not forget the mnemonic phrase.
 
 ```console
-foo@bar:~/core_contracts$ anvil --balance 10000000000 --fork-url https://arb-mainnet.g.alchemy.com/v2/DeadBeefDeadBeefDeadBeef \
+foo@bar:~/core_contracts$ anvil --balance 10000000000 --fork-url https://bnb-mainnet.g.alchemy.com/v2/deadbeefdeadbeefdeadbeef \
 --accounts 2 -m "example some mnemonic phrase generated randomly you wish to use  goes here" --chain-id=1337 --port 8545
 ```
 
