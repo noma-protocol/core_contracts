@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
-import { NomaFactory } from  "../../src/factory/NomaFactory.sol";
+import { OikosFactory } from  "../../src/factory/OikosFactory.sol";
 import { VaultDeployParams, PresaleUserParams, VaultDescription, ProtocolParameters } from "../../src/types/Types.sol";
 import { IDOHelper } from "../../test/IDO_Helper/IDOHelper.sol";
 
@@ -22,7 +22,7 @@ contract DeployVault is Script {
 
     // Constants
     address WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
-    address private nomaFactoryAddress;
+    address private oikosFactoryAddress;
     address private modelHelper;
 
     IDOHelper private idoManager;
@@ -50,9 +50,9 @@ contract DeployVault is Script {
 
         // Extract addresses from JSON
         modelHelper = addresses.ModelHelper;
-        nomaFactoryAddress = addresses.Factory;
+        oikosFactoryAddress = addresses.Factory;
 
-        NomaFactory nomaFactory = NomaFactory(nomaFactoryAddress);
+        OikosFactory oikosFactory = OikosFactory(oikosFactoryAddress);
 
         VaultDeployParams memory vaultDeployParams = 
         VaultDeployParams(
@@ -74,7 +74,7 @@ contract DeployVault is Script {
         );
 
         (address vault, address pool, address proxy) = 
-        nomaFactory
+        oikosFactory
         .deployVault(
             presaleParams,
             vaultDeployParams
