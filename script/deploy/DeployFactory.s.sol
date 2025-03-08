@@ -19,13 +19,14 @@ import {
 import { VaultFinalize } from "../../src/vault/init/VaultFinalize.sol";
 import { EtchVault } from "../../src/vault/deploy/EtchVault.sol";
 import { Staking } from "../../src/staking/Staking.sol";
-import { GonsToken } from "../../src/staking/Gons.sol";
+import { GonsToken } from "../../src/token/Gons.sol";
 import { DeployerFactory } from "../../src/factory/DeployerFactory.sol"; 
 import { ExtFactory } from "../../src/factory/ExtFactory.sol";
 import { AdaptiveSupply } from "../../src/controllers/supply/AdaptiveSupply.sol";
 import { RewardsCalculator } from "../../src/controllers/supply/RewardsCalculator.sol";
 import { PresaleFactory } from "../../src/factory/PresaleFactory.sol";
 import { TokenFactory } from "../../src/factory/TokenFactory.sol";
+import { ExchangeHelper } from "../../src/ExchangeHelper.sol";
 
 interface IWETH {
     function mintTo(address to, uint256 amount) external;
@@ -64,6 +65,7 @@ contract DeployFactory is Script {
     AdaptiveSupply private adaptiveSupply;
     RewardsCalculator private rewardsCalculator;
     TokenFactory private tokenFactory;
+    ExchangeHelper private exchangeHelper;
 
     function run() public {  
 
@@ -76,6 +78,11 @@ contract DeployFactory is Script {
         // Model Helper
         modelHelper = new ModelHelper();
         
+        // Exchange Helper
+        exchangeHelper = new ExchangeHelper();
+
+        console.log("Exchange Helper address: ", address(exchangeHelper));
+
         expectedAddressesInResolver.push(
             ContractInfo("ModelHelper", address(modelHelper))
         );
@@ -153,12 +160,13 @@ contract DeployFactory is Script {
 
         PresaleProtocolParams memory _presaleParams =
         PresaleProtocolParams(
-            60e16,      // Max soft cap (60%)
+            60,         // Max soft cap (60%)
             100,        // Min contribution ratio 
             25,         // Max contribution ratio 
-            20e16,      // Percentage of funds kept from presale (20%)
+            20,         // Percentage of funds kept from presale (20%)
             30 days,    // Min deadline
-            90 days     // Max deadline
+            90 days,    // Max deadline
+            3           // Referral bonus (3%)
         );
 
         nomaFactory.setProtocolParameters(_params);
