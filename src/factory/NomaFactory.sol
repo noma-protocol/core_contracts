@@ -16,7 +16,7 @@ import { Conversions } from "../libraries/Conversions.sol";
 import { Utils } from "../libraries/Utils.sol";
 
 import { BaseVault } from "../vault/BaseVault.sol";
-import { MockNomaToken } from "../token/MockNomaToken.sol";
+import { NomaToken } from "../token/NomaToken.sol";
 import { Deployer } from "../Deployer.sol";
 
 import {
@@ -53,7 +53,7 @@ interface IPresaleFactory {
 }
 
 interface ITokenFactory {
-    function deployNomaToken(VaultDeployParams memory vaultDeployParams) external returns (MockNomaToken, ERC1967Proxy, bytes32);
+    function deployNomaToken(VaultDeployParams memory vaultDeployParams) external returns (NomaToken, ERC1967Proxy, bytes32);
 }
 
 error OnlyVaultsError();
@@ -138,7 +138,7 @@ contract NomaFactory {
         bytes32 tokenHash = keccak256(abi.encodePacked(vaultDeployParams.name, vaultDeployParams.symbol));
         if (deployedTokenHashes[tokenHash]) revert TokenAlreadyExistsError();
 
-        (MockNomaToken nomaToken, ERC1967Proxy proxy, ) =
+        (NomaToken nomaToken, ERC1967Proxy proxy, ) =
         ITokenFactory(tokenFactory())
             .deployNomaToken(vaultDeployParams);
         
@@ -226,7 +226,7 @@ contract NomaFactory {
             vault: data.vaultAddress,
             presaleContract: data.presaleContract,
             stakingContract: data.stakingContract
-        });
+        }); 
 
         vaultsRepository[data.vaultAddress] = vaultDesc;
         _vaults[msg.sender].add(data.vaultAddress);

@@ -10,14 +10,14 @@ import {Deployer} from "../src/Deployer.sol";
 import {BaseVault} from  "../src/vault/BaseVault.sol";
 import {ExtVault} from  "../src/vault/ExtVault.sol";
 import {LendingVault} from  "../src/vault/LendingVault.sol";
-import {MockNomaToken} from  "../src/token/MockNomaToken.sol";
+import {NomaToken} from  "../src/token/NomaToken.sol";
 import {ModelHelper} from  "../src/model/Helper.sol";
 import {Underlying } from  "../src/libraries/Underlying.sol";
 import {LiquidityType, LiquidityPosition} from "../src/types/Types.sol";
 import {DecimalMath} from "../src/libraries/DecimalMath.sol";
 import {Conversions} from "../src/libraries/Conversions.sol";
 import {Utils} from "../src/libraries/Utils.sol";
-import "../src/staking/Gons.sol";
+import "../src/token/Gons.sol";
 import "../src/staking/Staking.sol";
 
 interface IWETH {
@@ -50,7 +50,7 @@ contract Invariants is Test {
     address modelHelperContract;
     address vaultAddress;
 
-    MockNomaToken private NOMA;
+    NomaToken private NOMA;
     GonsToken sNOMA;
 
     ModelHelper private modelHelper;
@@ -82,7 +82,7 @@ contract Invariants is Test {
         IDOManager managerContract = IDOManager(idoManager);
         require(address(managerContract) != address(0), "Manager contract address is zero");
 
-        NOMA = MockNomaToken(nomaToken);
+        NOMA = NomaToken(nomaToken);
         require(address(NOMA) != address(0), "Noma token address is zero");
 
         // sNOMA = GonsToken(sNomaToken);

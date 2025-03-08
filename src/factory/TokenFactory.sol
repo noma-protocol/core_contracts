@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import { MockNomaToken } from "../token/MockNomaToken.sol";
+import { NomaToken } from "../token/NomaToken.sol";
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
 
 import {
@@ -34,10 +34,10 @@ contract TokenFactory {
     }
 
     function deployNomaToken(VaultDeployParams memory vaultDeployParams) public onlyFactory 
-    returns (MockNomaToken, ERC1967Proxy, bytes32) {
+    returns (NomaToken, ERC1967Proxy, bytes32) {
         // Deploy the Noma token
         (
-            MockNomaToken nomaToken, 
+            NomaToken nomaToken, 
             ERC1967Proxy proxy, 
             bytes32 tokenHash
         ) = _deployNomaToken(
@@ -56,7 +56,7 @@ contract TokenFactory {
     * @param symbol The symbol of the token.
     * @param _token1 The address of the paired token (token1).
     * @param totalSupply The total supply of the token.
-    * @return nomaToken The address of the newly deployed MockNomaToken.
+    * @return nomaToken The address of the newly deployed NomaToken.
     * @dev This internal function ensures the token does not already exist, generates a unique address using a salt, and initializes the token.
     * It reverts if the token address is invalid or if the token already exists.
     */
@@ -65,12 +65,12 @@ contract TokenFactory {
         string memory symbol,
         address _token1,
         uint256 totalSupply
-    ) internal returns  (MockNomaToken, ERC1967Proxy, bytes32) {
+    ) internal returns  (NomaToken, ERC1967Proxy, bytes32) {
         bytes32 tokenHash = keccak256(abi.encodePacked(name, symbol));
 
         uint256 nonce = uint256(tokenHash);
 
-        MockNomaToken _nomaToken;
+        NomaToken _nomaToken;
         ERC1967Proxy proxy ;
 
         // Encode the initialize function call
@@ -84,7 +84,7 @@ contract TokenFactory {
         );
 
         do {
-            _nomaToken = new MockNomaToken{salt: bytes32(nonce)}();
+            _nomaToken = new NomaToken{salt: bytes32(nonce)}();
             // Deploy the proxy contract
             proxy = new ERC1967Proxy{salt: bytes32(nonce)}(
                 address(_nomaToken),

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { GonsToken } from "../staking/Gons.sol";
+import { GonsToken } from "../token/Gons.sol";
 import { Staking } from "../staking/Staking.sol";
 import { IAddressResolver }  from "../interfaces/IAddressResolver.sol";
 import { Utils } from "../libraries/Utils.sol";

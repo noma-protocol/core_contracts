@@ -7,7 +7,7 @@ contract TestGons is ERC20Permit {
     using SafeMath for uint256;
 
     uint256 private constant MAX_UINT256 = type(uint256).max;
-    uint256 private constant INITIAL_FRAGMENTS_SUPPLY = 1_000 * 10**18;
+    uint256 private constant INITIAL_FRAGMENTS_SUPPLY = 3.025 * 10 **6 * 10**18;
     uint256 private constant TOTAL_GONS = MAX_UINT256 - (MAX_UINT256 % INITIAL_FRAGMENTS_SUPPLY);
     uint256 private constant MAX_SUPPLY = ~uint128(0);
     
@@ -25,6 +25,7 @@ contract TestGons is ERC20Permit {
     constructor () ERC20("Staked Gons", "sGons", 18)  ERC20Permit("Gons") {
         _totalSupply = INITIAL_FRAGMENTS_SUPPLY;
         _gonsPerFragment = TOTAL_GONS.div(_totalSupply);
+
     }
 
     function setIndex(uint256 _index) external {
@@ -69,21 +70,40 @@ contract TestGons is ERC20Permit {
         return true;
     }
 
-    function transferFrom(
-        address from,
-        address to,
-        uint256 value
-    ) public override(ERC20) returns (bool) {
+    function transferFrom(address from, address to, uint256 value)
+        public
+        override
+        returns (bool)
+    {
         _allowedValue[from][msg.sender] = _allowedValue[from][msg.sender].sub(value);
-        emit Approval(from, msg.sender, _allowedValue[from][msg.sender]);
 
-        uint256 gonValue = gonsForBalance(value);
+        uint256 gonValue = value.mul(_gonsPerFragment);
         _gonBalances[from] = _gonBalances[from].sub(gonValue);
         _gonBalances[to] = _gonBalances[to].add(gonValue);
 
-        require(balanceOf(from) >= debtBalances[from], "Debt: cannot transfer amount");
         emit Transfer(from, to, value);
         return true;
+    }
+
+    /**
+     * @dev Mints new tokens and assigns them to the specified address.
+     * @param to The address that will receive the minted tokens.
+     * @param amount The amount of tokens to mint.
+     */
+    function mint(address to, uint256 amount) external {
+        require(to != address(0), "ERC20: mint to the zero address");
+
+        uint256 gonAmount = amount.mul(_gonsPerFragment);
+        _totalSupply = _totalSupply.add(amount);
+        _gonBalances[to] = _gonBalances[to].add(gonAmount);
+
+        if (_totalSupply > MAX_SUPPLY) {
+            _totalSupply = MAX_SUPPLY;
+        }
+
+        _gonsPerFragment = TOTAL_GONS.div(_totalSupply);
+
+        emit Transfer(address(0), to, amount);
     }
 
     function approve(address spender, uint256 value) public override(ERC20) returns (bool) {
@@ -118,7 +138,7 @@ contract TestGons is ERC20Permit {
         return gons / _gonsPerFragment;
     }    
 
-    function index() public view returns (uint256) {
+    function rebaseIndex() public view returns (uint256) {
         return balanceForGons(INDEX);
     }
 

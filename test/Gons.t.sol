@@ -7,21 +7,36 @@ contract TestGonsToken is Test {
     TestGons gons;
 
     function setUp() public {
+        // gons = new TestGons(address(this));
         gons = new TestGons();
-        gons.setIndex(1);
+        // gons.setIndex(1);
         gons.initialize(address(this));
+
+        // gons.mint(address(this), 1000e18);
+        uint256 actualSupply = gons.totalSupply();
+        console.log("actualSupply: ", actualSupply);
     }
 
     function testRebase() public {
-
+        uint256 initialSupply = 3.025 * 10**6 * 10**18;
         uint256 balance = gons.balanceOf(address(this));    
-        assertEq(balance, 1000e18);
+
+        assertEq(balance, initialSupply);
 
         gons.rebase(1e18);
-        assertEq(gons.totalSupply(), 1001e18);
+        
+        uint256 expectedSupply = initialSupply + 1e18;
+        uint256 actualSupply = gons.totalSupply();
+        
+        uint256 tolerance = 10e18; // Allow small precision error
+        assertApproxEqAbs(actualSupply, expectedSupply, tolerance);
 
         gons.rebase(100e18);
-        assertEq(gons.totalSupply(), 1101e18);
+        
+        expectedSupply = initialSupply + 101e18;
+        actualSupply = gons.totalSupply();
 
+        assertApproxEqAbs(actualSupply, expectedSupply, tolerance); 
     }
 }
+

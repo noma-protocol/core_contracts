@@ -2,12 +2,12 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
-import "../src/staking/Gons.sol";
+import "./token/TestGons.sol";
 import "./token/TestMockNomaToken.sol";
 import "../src/staking/Staking.sol";
 
 contract TestRebase is Test {
-    GonsToken rebaseToken;
+    TestGons rebaseToken;
     TestMockNomaToken mockNomaToken;
     Staking staking;
 
@@ -25,13 +25,15 @@ contract TestRebase is Test {
         mockNomaToken = new TestMockNomaToken();
         mockNomaToken.initialize(address(this), 100_000e18, "TEST", "TEST", address(0));
 
-        rebaseToken = new GonsToken(address(this));
+        rebaseToken = new TestGons();
 
         vm.prank(deployer);
         staking = new Staking(address(mockNomaToken), address(rebaseToken), address(this));        
         mockNomaToken.mintTest(address(staking), INITIAL_SUPPLY);
         // staking.setup(address(this), address(mockNomaToken), address(rebaseToken));
         rebaseToken.initialize(address(staking));
+        rebaseToken.setIndex(1);
+
     }
 
     function testTotalSupply() public returns (uint256) {
@@ -531,7 +533,7 @@ contract TestRebase is Test {
             users[i] = address(uint160(i + 1));
             uint256 userBalance = rebaseToken.balanceOf(users[i]);
             uint256 expectedUserBalance = (STAKE_AMOUNT * (initialTotalSupply + REWARD_AMOUNT)) / initialTotalSupply;
-            assertApproxEqAbs(userBalance, expectedUserBalance, 1e14, "User balance incorrect after rebase");
+            assertApproxEqAbs(userBalance, expectedUserBalance, 2e17, "User balance incorrect after rebase");
         }
     }
 

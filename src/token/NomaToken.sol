@@ -9,11 +9,11 @@ import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
 import {Utils} from "../libraries/Utils.sol";
 
 /**
- * @title MockNomaToken
- * @notice A mock implementation of the Noma token for testing purposes.
+ * @title NomaToken
+ * @notice Noma token contract.
  * @dev This contract is upgradeable and uses the UUPS proxy pattern.
  */
-contract MockNomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
+contract NomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
 
     // State variables
     IAddressResolver public resolver; // The address resolver contract.
