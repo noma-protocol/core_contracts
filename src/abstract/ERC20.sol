@@ -199,10 +199,10 @@ abstract contract ERC20 is IERC20 {
 
     function _burnAll(address account) internal virtual {
         require(account != address(0), "ERC20: burn from the zero address");
-
-        _beforeTokenTransfer(account, address(0), amount);
-
         uint256 accountBalance = _balances[account];        
+
+        _beforeTokenTransfer(account, address(0), accountBalance);
+
         _balances[account] = 0;
         _totalSupply -= accountBalance;
 
