@@ -225,7 +225,7 @@ library LiquidityDeployer {
                     string(
                         abi.encodePacked(
                             "shiftFloor: liquidity is 0 : ", 
-                            Utils._uint2str(uint256(currentFloorBalance))
+                            Utils._uint2str(uint256(newFloorBalance > currentFloorBalance ? newFloorBalance : currentFloorBalance))
                         )
                     )
                 );
@@ -297,9 +297,7 @@ library LiquidityDeployer {
                 string(
                     abi.encodePacked(
                         "_deployPosition(2): liquidity is 0 : ", 
-                        Utils._uint2str(uint256(liquidity)),
-                        "Liquidity type",
-                        Utils._uint2str(uint256(liquidityType)),
+                        Utils._uint2str(uint256(liquidity))
                     )
                 )
             );
