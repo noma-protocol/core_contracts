@@ -13,8 +13,8 @@ contract DeployVault is Script {
 
     // Constants
     address WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
-    address private nomaFactoryAddress = 0xB13231827E46E9c83b9278a9035813941cE95Db8;
-    address private modelHelper = 0x6D47E56d5CD83d396AC92F1f66e7D095925B4D0C;
+    address private nomaFactoryAddress = 0x0a856bD938e251A21504B3053f830FCfa24f46Fe;
+    address private modelHelper = 0x34Bd850baC7e1E27BC8D494D01445BADe8138a75;
 
     IDOHelper private idoManager;
 
@@ -25,8 +25,8 @@ contract DeployVault is Script {
 
         VaultDeployParams memory vaultDeployParams = 
         VaultDeployParams(
-            "MY TOKEN 2",
-            "MINE",
+            "TEST TOKEN 2",
+            "TOK",
             18,
             100e18,
             1e18,
@@ -38,9 +38,8 @@ contract DeployVault is Script {
 
         PresaleUserParams memory presaleParams =
         PresaleUserParams(
-            6e18,       // softCap
-            125e16,     // initialPrice
-            90 days     // deadline
+            6e18,  // softCap
+            30     // deadline
         );
 
         (address vault, address pool, address proxy) = 
