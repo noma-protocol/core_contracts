@@ -92,7 +92,7 @@ contract Staking {
     * @param _to The address to which the staked tokens will be credited.
     * @param _amount The amount of NOMA tokens to stake.
     */
-    function stake(address _to, uint256 _amount) external {
+    function stake(address _to, uint256 _amount) public {
         if (_amount == 0) {
             revert InvalidParameters();
         }
@@ -105,8 +105,8 @@ contract Staking {
         NOMA.transferFrom(msg.sender, address(this), _amount);
 
         // Mint rebase-adjusted sNOMA to the staker
-        sNOMA.mint(_to, (_amount * 1e18) / sNOMA.rebaseIndex());
-
+        // sNOMA.mint(_to, (_amount * 1e18) / sNOMA.rebaseIndex());
+        sNOMA.mint(_to, _amount);
         // Track the originally staked amount
         stakedBalances[msg.sender] += _amount;
         totalStaked += _amount;
