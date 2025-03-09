@@ -17,7 +17,7 @@ contract PresaleFactory {
         PresaleDeployParams memory params,
         PresaleProtocolParams memory protocolParams
         
-    ) public onlyFactory returns (address) {
+    ) external onlyFactory returns (address) {
 
         Presale presale = new Presale(
             params,

@@ -46,7 +46,7 @@ contract DeployerFactory {
      * @return deployerAddress The address of the newly deployed `Deployer` contract.
      * @custom:require Only callable by the factory contract.
      */
-    function deployDeployer(address _owner, address _resolver) public onlyFactory returns (address deployerAddress) {
+    function deployDeployer(address _owner, address _resolver) external onlyFactory returns (address deployerAddress) {
         deployer = new Deployer(_owner, _resolver);
         deployerAddress = address(deployer);
 

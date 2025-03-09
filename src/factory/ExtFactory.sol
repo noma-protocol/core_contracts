@@ -31,6 +31,7 @@ contract ExtFactory {
     /// @notice Instance of the deployed `GonsToken` contract.
     GonsToken public gonsToken;
 
+    /// @notice Instance of the deployed `TokenRepo` contract.
     TokenRepo public tokenRepo;
 
     /**
@@ -56,7 +57,11 @@ contract ExtFactory {
         address deployerAddress,
         address vaultAddress,
         address token0
-    ) public onlyFactory returns (address gonsTokenAddress, address stakingContractAddress, address tokenRepoAddress) {
+    ) external onlyFactory returns (
+        address gonsTokenAddress, 
+        address stakingContractAddress, 
+        address tokenRepoAddress
+    ) {
 
         // Deploy GonsToken contract
         gonsToken = new GonsToken(address(this));
