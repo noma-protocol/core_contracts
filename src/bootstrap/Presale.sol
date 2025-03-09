@@ -13,7 +13,6 @@ import {TokenInfo} from "../types/Types.sol";
 import {IWETH} from "../interfaces/IWETH.sol";
 import {Utils} from "../libraries/Utils.sol";
 import {DecimalMath} from "../libraries/DecimalMath.sol";
-
 import {PresaleDeployParams, PresaleProtocolParams, LivePresaleParams} from "../types/Types.sol";
 
 interface IVault {
@@ -210,13 +209,13 @@ contract Presale is pAsset, Ownable {
      */
     function finalize() external {
         if (finalized) revert AlreadyFinalized();
-        if (!hasExpired()) revert PresaleOngoing();
+        // if (!hasExpired()) revert PresaleOngoing();
         if (protocolParams.presalePercentage == 0) revert InvalidParameters();
 
         uint256 totalAmount = address(this).balance;
         uint256 amount = totalAmount - (totalAmount * protocolParams.presalePercentage / 100);
 
-        if (amount < softCap) revert SoftCapNotMet();
+        if (amount < (softCap - (softCap * protocolParams.presalePercentage / 100))) revert SoftCapNotMet();
 
         // Deploy liquidity to the vault
         IVault(vaultAddress).afterPresale();
@@ -280,7 +279,7 @@ contract Presale is pAsset, Ownable {
         if (!finalized) revert NotFinalized();
 
         // Check if pAsset balance is greater than 0
-        uint256 balance = balanceOf[msg.sender];
+        uint256 balance = balanceOf(msg.sender);
 
         if (balance == 0) revert NoContributionsToWithdraw();
 

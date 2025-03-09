@@ -2,7 +2,8 @@
 pragma solidity ^0.8.0;
 
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
-import {ERC20} from "solmate/tokens/ERC20.sol";
+import {IERC20} from "openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Conversions} from "../src/libraries/Conversions.sol";
 import {Uniswap} from "../src/libraries/Uniswap.sol";
 import {Utils} from "../src/libraries/Utils.sol";
@@ -55,7 +56,7 @@ contract ExchangeHelper {
             token1: IUniswapV3Pool(pool).token1()
         });
         poolAddress = pool;
-        uint8 decimals = ERC20(tokenInfo.token0).decimals();
+        uint8 decimals = IERC20Metadata(tokenInfo.token0).decimals();
 
         // --- Record the initial WETH balance to avoid refunding extra ---
         uint256 initialWETHBalance = IWETH(WETH).balanceOf(address(this));
@@ -108,8 +109,8 @@ contract ExchangeHelper {
             token1: IUniswapV3Pool(pool).token1()
         });    
         poolAddress = pool;    
-        ERC20(tokenInfo.token0).transferFrom(msg.sender, address(this), amount);
-        uint8 decimals = ERC20(tokenInfo.token0).decimals();
+        IERC20(tokenInfo.token0).transferFrom(msg.sender, address(this), amount);
+        uint8 decimals = IERC20Metadata(tokenInfo.token0).decimals();
         Uniswap.swap(
             pool,
             receiver,
@@ -141,8 +142,8 @@ contract ExchangeHelper {
             token1: IUniswapV3Pool(pool).token1()
         });    
         poolAddress = pool;    
-        ERC20(tokenInfo.token0).transferFrom(msg.sender, address(this), amount);
-        uint8 decimals = ERC20(tokenInfo.token0).decimals();
+        IERC20(tokenInfo.token0).transferFrom(msg.sender, address(this), amount);
+        uint8 decimals = IERC20Metadata(tokenInfo.token0).decimals();
         Uniswap.swap(
             pool,
             receiver,
@@ -171,9 +172,9 @@ contract ExchangeHelper {
         require(msg.sender == poolAddress, "ExchangeHelper: Callback caller not pool");
 
         if (amount0Delta > 0) {
-            ERC20(tokenInfo.token0).transfer(msg.sender, uint256(amount0Delta));
+            IERC20(tokenInfo.token0).transfer(msg.sender, uint256(amount0Delta));
         } else if (amount1Delta > 0) {
-            ERC20(tokenInfo.token1).transfer(msg.sender, uint256(amount1Delta));
+            IERC20(tokenInfo.token1).transfer(msg.sender, uint256(amount1Delta));
         }
 
         // Reset token info and pool address
