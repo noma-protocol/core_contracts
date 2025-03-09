@@ -245,10 +245,8 @@ contract LendingVault is BaseVault {
      */
     function _seizeCollateral(address who) internal {
         LoanPosition storage loan = _v.loanPositions[who];
-        uint256 collateralAmount = loan.collateralAmount;
-        IERC20(_v.pool.token0()).transfer(address(this), collateralAmount);
-        _v.collateralAmount -= collateralAmount;
-        // TODO send collateral to vault
+        _v.collateralAmount -= loan.collateralAmount;
+        ITokenRepo(_v.tokenRepo).transfer(_v.pool.token0(), address(this), loan.collateralAmount);
     }
 
     /**
