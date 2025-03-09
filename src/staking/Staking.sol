@@ -148,7 +148,7 @@ contract Staking {
             revert NotEnoughBalance();
         }
 
-        sNOMA.burnFor(_from);
+        sNOMA.burn(sNOMA.balanceOf(_from), _from);
         NOMA.safeTransfer(_from, balance);
 
         totalStaked -= stakedBalances[_from];
