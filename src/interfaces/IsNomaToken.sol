@@ -34,12 +34,10 @@ interface IsNomaToken is IERC20 {
     function mint(address _recipient, uint256 _amount) external;
 
     /**
-     * @notice Burns a specified amount of tokens from a given address.
-     * @param from The address from which the tokens will be burned.
-     * @dev This function reduces the total supply by permanently destroying the specified amount of tokens from the specified address.
+     * @notice Burns a specified amount of tokens from a sender address.
+     * @param amount The amount of tokens to burn.
+     * @param from The address from which to burn tokens.
+     * @dev This function allows for the destruction of tokens, decreasing the total supply.
      */
-    function burnFor(address from) external;
-
-    function rebaseIndex() external view returns (uint256);
-
+    function burn(uint256 amount, address from) external;
 }
