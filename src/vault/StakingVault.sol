@@ -101,9 +101,9 @@ contract StakingVault is BaseVault {
         uint256 toMint = DecimalMath.divideDecimal(toMintEth, intrinsicMinimumValue);
 
         if (toMint > 0) {        
-            // IERC20(_v.tokenInfo.token0).approve(_v.stakingContract, toMint);
             IVault(address(this)).mintTokens(address(this), toMint);
             IERC20(_v.tokenInfo.token0).transfer(_v.stakingContract, toMint);
+
             // Update total minted (NOMA)
             _v.totalMinted += toMint;
 
