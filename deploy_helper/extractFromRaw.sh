@@ -8,7 +8,7 @@ fi
 RAW_TMP="$(dirname "$0")/raw.tmp"
 DEPLOYMENT_FILE="$(dirname "$0")/out/deployment.json"
 OUT_FILE="$(dirname "$0")/out/out.json"
-DAPP_PATH="../dApp/src"
+DAPP_PATH="../noma-home/src/assets/"
 
 # Fetch network ID from the RPC URL
 NETWORK_ID=$(curl -s -X POST -H "Content-Type: application/json" \
