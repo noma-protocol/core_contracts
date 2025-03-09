@@ -59,7 +59,7 @@ contract ExtFactory {
     ) public onlyFactory returns (address gonsTokenAddress, address stakingContractAddress, address tokenRepoAddress) {
 
         // Deploy GonsToken contract
-        gonsToken = new GonsToken(deployerAddress);
+        gonsToken = new GonsToken(address(this));
 
         // Deploy Staking contract
         stakingContract = new Staking(token0, address(gonsToken), vaultAddress);
