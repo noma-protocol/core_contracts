@@ -11,7 +11,8 @@ import { BaseVault } from "../../src/vault/BaseVault.sol";
 import {
     LiquidityPosition, 
     LiquidityType, 
-    TokenInfo
+    TokenInfo,
+    SwapParams
 } from "../../src/types/Types.sol";
 
 import {Uniswap} from "../../src/libraries/Uniswap.sol";
@@ -46,30 +47,47 @@ contract IDOHelper {
     // Test function
     function buyTokens(uint256 price, uint256 amount, address receiver) public {
         uint8 decimals = ERC20(tokenInfo.token0).decimals();
+        // Swap Params
+        SwapParams memory swapParams = SwapParams({
+            poolAddress: address(pool),
+            receiver: receiver,
+            token0: tokenInfo.token0,
+            token1: tokenInfo.token1,
+            basePriceX96: Conversions.priceToSqrtPriceX96(
+                int256(price), 
+                tickSpacing, 
+                decimals
+            ),
+            amountToSwap: amount,
+            zeroForOne: false,
+            isLimitOrder: false
+        });
+        
         Uniswap.swap(
-            address(pool),
-            receiver,
-            tokenInfo.token0,
-            tokenInfo.token1,
-            Conversions.priceToSqrtPriceX96(int256(price), tickSpacing, decimals),
-            amount,
-            false,
-            false
-        );        
+            swapParams
+        );       
     }
  
     function sellTokens(uint256 price, uint256 amount, address receiver) public {
         uint8 decimals = ERC20(tokenInfo.token0).decimals();
+        SwapParams memory swapParams = SwapParams({
+            poolAddress: address(pool),
+            receiver: receiver,
+            token0: tokenInfo.token0,
+            token1: tokenInfo.token1,
+            basePriceX96: Conversions.priceToSqrtPriceX96(
+                int256(price), 
+                tickSpacing, 
+                decimals
+            ),
+            amountToSwap: amount,
+            zeroForOne: true,
+            isLimitOrder: false
+        });
+
         Uniswap.swap(
-            address(pool),
-            receiver,
-            tokenInfo.token0,
-            tokenInfo.token1,
-            Conversions.priceToSqrtPriceX96(int256(price), tickSpacing, decimals),
-            amount,
-            true,
-            false
-        ); 
+            swapParams
+        );
         uint256 balanceAfter = ERC20(tokenInfo.token0).balanceOf(address(this));
         ERC20(tokenInfo.token0).transfer(receiver, balanceAfter);               
     }

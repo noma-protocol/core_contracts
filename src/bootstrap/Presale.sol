@@ -13,7 +13,7 @@ import {TokenInfo} from "../types/Types.sol";
 import {IWETH} from "../interfaces/IWETH.sol";
 import {Utils} from "../libraries/Utils.sol";
 import {DecimalMath} from "../libraries/DecimalMath.sol";
-import {PresaleDeployParams, PresaleProtocolParams, LivePresaleParams} from "../types/Types.sol";
+import {PresaleDeployParams, PresaleProtocolParams, LivePresaleParams, SwapParams} from "../types/Types.sol";
 
 interface IVault {
     function afterPresale() external;
@@ -209,7 +209,7 @@ contract Presale is pAsset, Ownable {
      */
     function finalize() external {
         if (finalized) revert AlreadyFinalized();
-        // if (!hasExpired()) revert PresaleOngoing();
+        if (!hasExpired()) revert PresaleOngoing();
         if (protocolParams.presalePercentage == 0) revert InvalidParameters();
 
         uint256 totalAmount = address(this).balance;
@@ -225,29 +225,33 @@ contract Presale is pAsset, Ownable {
 
         uint8 decimals = IERC20Metadata(tokenInfo.token0).decimals();
         (uint160 sqrtRatioX96,,,,,,) = pool.slot0();
-
         uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, 18);
 
         // Slippage due to floor tick width (0.1%)
         uint256 purchasePrice = spotPrice + (spotPrice * 5/1000);
 
-        Uniswap.swap(
-            address(pool),
-            address(this),
-            tokenInfo.token0,
-            tokenInfo.token1,
-            Conversions.priceToSqrtPriceX96(
+        SwapParams memory swapParams = SwapParams({
+            poolAddress: address(pool),
+            receiver: address(this),
+            token0: tokenInfo.token0,
+            token1: tokenInfo.token1,
+            basePriceX96: Conversions.priceToSqrtPriceX96(
                 int256(purchasePrice), 
                 tickSpacing, 
                 decimals
             ),
-            amount,
-            false,
-            true
+            amountToSwap: amount,
+            zeroForOne: false,
+            isLimitOrder: true
+        });
+
+        Uniswap.swap(
+            swapParams
         );
 
         finalized = true;
-
+        
+        _payReferrals();
         _withdrawExcessEth();
 
         emit Finalized();
@@ -256,7 +260,7 @@ contract Presale is pAsset, Ownable {
     /**
      * @notice Pays out referral fees after finalization.
      */
-    function payReferrals() external {
+    function _payReferrals() internal {
         if (!finalized) revert NotFinalized();
 
         for (uint256 i = 0; i < contributors.length; i++) {

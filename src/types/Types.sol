@@ -312,3 +312,15 @@ struct DeploymentData {
     address presaleContract;
     address tokenRepo;
 }
+
+// @notice Parameters for swapping tokens.
+struct SwapParams {
+    address poolAddress;
+    address receiver;
+    address token0;
+    address token1;
+    uint160 basePriceX96; 
+    uint256 amountToSwap; 
+    bool zeroForOne; 
+    bool isLimitOrder;
+}

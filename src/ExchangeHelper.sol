@@ -9,7 +9,8 @@ import {Uniswap} from "../src/libraries/Uniswap.sol";
 import {Utils} from "../src/libraries/Utils.sol";
 
 import {
-    TokenInfo
+    TokenInfo,
+    SwapParams
 } from "../src/types/Types.sol";
 
 interface IWETH {
@@ -64,21 +65,28 @@ contract ExchangeHelper {
         // Deposit ETH into WETH (this increases the balance by msg.value)
         IWETH(WETH).deposit{value: msg.value}();
 
-        // Perform the swap using the newly deposited WETH
-        (int256 amount0, int256 amount1) = Uniswap.swap(
-            pool,
-            receiver,
-            tokenInfo.token0,
-            tokenInfo.token1,
-            Conversions.priceToSqrtPriceX96(
+        // Swap Params
+        SwapParams memory swapParams = SwapParams({
+            poolAddress: address(pool),
+            receiver: receiver,
+            token0: tokenInfo.token0,
+            token1: tokenInfo.token1,
+            basePriceX96: Conversions.priceToSqrtPriceX96(
                 int256(price), 
                 tickSpacing, 
                 decimals
             ),
-            msg.value,
-            false,
-            isLimitOrder
+            amountToSwap: msg.value,
+            zeroForOne: false,
+            isLimitOrder: isLimitOrder
+        });
+        
+        // Perform the swap using the newly deposited WETH
+        (int256 amount0, int256 amount1) = Uniswap
+        .swap(
+            swapParams
         );
+
 
         // Ensure the swap was successful and tokens were received.
         // (amount0 should be negative, meaning token0 was sold)
@@ -91,7 +99,7 @@ contract ExchangeHelper {
             // Withdraw the excess WETH into ETH
             IWETH(WETH).withdraw(refundAmount);
             // Refund the caller with the excess ETH
-            payable(msg.sender).transfer(refundAmount);
+            payable(receiver).transfer(refundAmount);
         }
     }
 
@@ -111,21 +119,29 @@ contract ExchangeHelper {
         poolAddress = pool;    
         IERC20(tokenInfo.token0).transferFrom(msg.sender, address(this), amount);
         uint8 decimals = IERC20Metadata(tokenInfo.token0).decimals();
-        Uniswap.swap(
-            pool,
-            receiver,
-            tokenInfo.token0,
-            tokenInfo.token1,
-            Conversions
-            .priceToSqrtPriceX96(
+
+        // Swap Params
+        SwapParams memory swapParams = SwapParams({
+            poolAddress: address(pool),
+            receiver: receiver,
+            token0: tokenInfo.token0,
+            token1: tokenInfo.token1,
+            basePriceX96: Conversions.priceToSqrtPriceX96(
                 int256(price), 
                 tickSpacing, 
                 decimals
             ),
-            amount,
-            false,
-            isLimitOrder
-        );         
+            amountToSwap: amount,
+            zeroForOne: false,
+            isLimitOrder: isLimitOrder
+        });
+        
+        // Perform the swap using the newly deposited WETH
+        (int256 amount0, int256 amount1) = Uniswap
+        .swap(
+            swapParams
+        );       
+       
     }
 
     
@@ -144,21 +160,23 @@ contract ExchangeHelper {
         poolAddress = pool;    
         IERC20(tokenInfo.token0).transferFrom(msg.sender, address(this), amount);
         uint8 decimals = IERC20Metadata(tokenInfo.token0).decimals();
-        Uniswap.swap(
-            pool,
-            receiver,
-            tokenInfo.token0,
-            tokenInfo.token1,
-            Conversions
-            .priceToSqrtPriceX96(
+
+        // Swap Params
+        SwapParams memory swapParams = SwapParams({
+            poolAddress: address(pool),
+            receiver: receiver,
+            token0: tokenInfo.token0,
+            token1: tokenInfo.token1,
+            basePriceX96: Conversions.priceToSqrtPriceX96(
                 int256(price), 
                 tickSpacing, 
                 decimals
             ),
-            amount,
-            true,
-            isLimitOrder
-        );         
+            amountToSwap: amount,
+            zeroForOne: true,
+            isLimitOrder: isLimitOrder
+        });
+       
     }
 
     /**

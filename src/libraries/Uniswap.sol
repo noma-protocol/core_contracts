@@ -3,7 +3,8 @@ pragma solidity ^0.8.0;
 
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {LiquidityType} from "../types/Types.sol";
+import {LiquidityType, SwapParams} from "../types/Types.sol";
+import {Conversions} from "./Conversions.sol";
 
 // Custom errors
 error ZeroLiquidty();
@@ -122,33 +123,26 @@ library Uniswap {
 
     /**
      * @notice Executes a swap in a Uniswap V3 pool.
-     * @param pool The address of the Uniswap V3 pool.
-     * @param receiver The address that will receive the swapped tokens.
-     * @param token0 The address of token0 in the pool.
-     * @param token1 The address of token1 in the pool.
-     * @param basePrice The base price for the swap.
-     * @param amountToSwap The amount of tokens to swap.
-     * @param zeroForOne Whether the swap is token0 for token1 (true) or token1 for token0 (false).
-     * @param isLimitOrder Whether the swap is a limit order (true) or not (false).
      */
     function swap(
-        address pool,
-        address receiver,
-        address token0,
-        address token1,
-        uint160 basePrice, 
-        uint256 amountToSwap, 
-        bool zeroForOne, 
-        bool isLimitOrder
+        SwapParams memory params
     ) internal returns (int256 amount0, int256 amount1) {
-        uint256 balanceBeforeSwap = IERC20Metadata(zeroForOne ? token1 : token0).balanceOf(receiver);
-        uint160 slippagePrice = zeroForOne ? basePrice - (basePrice * 5 / 100) : basePrice + (basePrice * 5 / 100);
+        uint256 balanceBeforeSwap = IERC20Metadata(params.zeroForOne ? params.token1 : params.token0).balanceOf(params.receiver);
+        // immutables
+        int24  tickSpacing   = IUniswapV3Pool(params.poolAddress).tickSpacing(); 
+        // Convert basePriceX96 before slippage calculation
+        uint256 basePrice = Conversions.sqrtPriceX96ToPrice(params.basePriceX96, IERC20Metadata(params.zeroForOne ? params.token1 : params.token0).decimals());
+        uint160 slippagePrice = Conversions.priceToSqrtPriceX96(
+            int256(params.zeroForOne ? basePrice - (basePrice * 5 / 100) : basePrice + (basePrice * 5 / 100)), 
+            tickSpacing, 
+            IERC20Metadata(params.zeroForOne ? params.token1 : params.token0).decimals()
+        );
 
-        try IUniswapV3Pool(pool).swap(
-            receiver, 
-            zeroForOne, 
-            int256(amountToSwap), 
-            isLimitOrder ? basePrice : slippagePrice,
+        try IUniswapV3Pool(params.poolAddress).swap(
+            params.receiver, 
+            params.zeroForOne, 
+            int256(params.amountToSwap), 
+            params.isLimitOrder ? params.basePriceX96 : slippagePrice,
             ""
         ) returns (int256 _amount0, int256 _amount1) {
             // Capture the return values
@@ -156,7 +150,7 @@ library Uniswap {
             amount1 = _amount1;
 
             // Check if tokens were exchanged
-            uint256 balanceAfterSwap = IERC20Metadata(zeroForOne ? token1 : token0).balanceOf(receiver);
+            uint256 balanceAfterSwap = IERC20Metadata(params.zeroForOne ? params.token1 : params.token0).balanceOf(params.receiver);
             if (balanceBeforeSwap == balanceAfterSwap) {
                 revert NoTokensExchanged();
             }
