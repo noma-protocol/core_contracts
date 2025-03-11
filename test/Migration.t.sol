@@ -141,10 +141,10 @@ contract MigrationTest is Test {
 
     function test_setBalances_onlyOwner() public {
         // --- Declare and populate holders & balances here too ---
-        address[] memory holders = new address[](2);
+        address[] memory holders = new address[](1);
         holders[0] = HOLDER1;
 
-        uint256[] memory balances = new uint256[](2);
+        uint256[] memory balances = new uint256[](1);
         balances[0] = BAL1 * 2;
         // ---------------------------------------------------------
 
@@ -164,5 +164,62 @@ contract MigrationTest is Test {
 
         migration.recoverERC20(address(token));
         assertEq(token.balanceOf(address(this)), before + 5e18);
+    }
+
+    /// @notice Verify consistent withdrawals across three holders on a 50% IMV increase
+    function test_multipleHolders_consistentWithdrawals() public {
+        // Define a third holder and its balance
+        address HOLDER3 = address(0x4);
+        uint256 BAL3 = 3_000;
+        uint256 TOTAL3 = BAL1 + BAL2 + BAL3;
+
+        // Deploy a fresh Migration with three holders
+        address[] memory holders3 = new address[](3);
+        holders3[0] = HOLDER1;
+        holders3[1] = HOLDER2;
+        holders3[2] = HOLDER3;
+
+        uint256[] memory balances3 = new uint256[](3);
+        balances3[0] = BAL1;
+        balances3[1] = BAL2;
+        balances3[2] = BAL3;
+
+        Migration migration3 = new Migration(
+            address(helper),
+            address(token),
+            VAULT,
+            INITIAL_IMV,
+            DURATION,
+            holders3,
+            balances3
+        );
+        token.mint(address(migration3), TOTAL3);
+
+        // Bump IMV by 50%
+        helper.setIMV((INITIAL_IMV * 150) / 100);
+
+        // First non‑first withdraw (HOLDER2) also auto‑withdraws HOLDER1
+        vm.prank(HOLDER2);
+        migration3.withdraw();
+
+        uint256 expected2 = (BAL2 * 50) / 100;
+        assertEq(token.balanceOf(HOLDER1), BAL1);
+        assertEq(token.balanceOf(HOLDER2), expected2);
+
+        // Next non‑first withdraw (HOLDER3)
+        vm.prank(HOLDER3);
+        migration3.withdraw();
+
+        uint256 expected3 = (BAL3 * 50) / 100;
+        assertEq(token.balanceOf(HOLDER3), expected3, "H3 correct share");
+
+        // Total withdrawn should equal sum of all three
+        uint256 sum = BAL1 + expected2 + expected3;
+        assertEq(migration3.totalWithdrawn(), sum, "totalWithdrawn matches");
+
+        // Ensure firstHolder cannot withdraw again
+        vm.prank(HOLDER1);
+        vm.expectRevert(abi.encodeWithSignature("NothingToWithdraw()"));
+        migration3.withdraw();
     }
 }
