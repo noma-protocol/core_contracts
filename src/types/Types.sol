@@ -324,3 +324,13 @@ struct SwapParams {
     bool zeroForOne; 
     bool isLimitOrder;
 }
+
+// @notice Migration contract information.
+struct MigrationInfo {
+    uint256 initialIMV;
+    uint256 currentIMV;
+    uint256 migrationStartTime;
+    uint256 migrationEndTime;
+    bool migrationCompleted;
+    uint256 withdrawnAmount;
+}
