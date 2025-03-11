@@ -26,7 +26,7 @@ interface IERC20 {
     function mint(address receiver, uint256 amount) external;
 }
 
-interface INomaFactory {
+interface IOikosFactory {
     function deferredDeploy(address deployer) external;
     function mintTokens(address to, uint256 amount) external;
     function burnFor(address from, uint256 amount) external;
@@ -296,7 +296,7 @@ contract LendingVault is BaseVault {
         
         _v.timeLastMinted = block.timestamp;
 
-        INomaFactory(_v.factory)
+        IOikosFactory(_v.factory)
         .mintTokens(
             to,
             amount
@@ -312,7 +312,7 @@ contract LendingVault is BaseVault {
     ) public onlyInternalCalls {
 
         IERC20(_v.pool.token0()).approve(address(_v.factory), amount);
-        INomaFactory(_v.factory)
+        IOikosFactory(_v.factory)
         .burnFor(
             address(this),
             amount
@@ -327,7 +327,7 @@ contract LendingVault is BaseVault {
             "no Deployer"
         );
 
-        INomaFactory(
+        IOikosFactory(
             _v.factory
         ).deferredDeploy(
             deployer
@@ -388,7 +388,7 @@ contract LendingVault is BaseVault {
      * @return The address of the team multisig.
      */
     function teamMultiSig() public view returns (address) {
-        return INomaFactory(_v.factory).teamMultiSig();
+        return IOikosFactory(_v.factory).teamMultiSig();
     }
 
     /**

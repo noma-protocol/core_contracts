@@ -70,12 +70,12 @@ contract TokenFactory {
 
         uint256 nonce = uint256(tokenHash);
 
-        OikosToken _nomaToken;
+        OikosToken _oikosToken;
         ERC1967Proxy proxy ;
 
         // Encode the initialize function call
         bytes memory data = abi.encodeWithSelector(
-            _nomaToken.initialize.selector,
+            _oikosToken.initialize.selector,
             msg.sender,       // Deployer address
             totalSupply,     // Initial supply
             name,            // Token name
@@ -84,10 +84,10 @@ contract TokenFactory {
         );
 
         do {
-            _nomaToken = new OikosToken{salt: bytes32(nonce)}();
+            _oikosToken = new OikosToken{salt: bytes32(nonce)}();
             // Deploy the proxy contract
             proxy = new ERC1967Proxy{salt: bytes32(nonce)}(
-                address(_nomaToken),
+                address(_oikosToken),
                 data
             );
             nonce++;
@@ -99,7 +99,7 @@ contract TokenFactory {
         require(totalSupplyFromContract == totalSupply, "wrong parameters");
 
         require(address(proxy) != address(0), "Token deploy failed");
-        return (_nomaToken, proxy, tokenHash);
+        return (_oikosToken, proxy, tokenHash);
     }
 
     function factory() public view returns (address) {

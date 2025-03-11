@@ -114,11 +114,11 @@ contract OikosToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPS
      * @notice Returns the address of the OikosFactory contract.
      * @return The address of the OikosFactory contract.
      */
-    function nomaFactory() public view returns (address) {
+    function oikosFactory() public view returns (address) {
         return resolver
         .requireAndGetAddress(
             Utils.stringToBytes32("OikosFactory"), 
-            "no nomaFactory"
+            "no OikosFactory"
         );
     }    
 
@@ -126,7 +126,7 @@ contract OikosToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPS
      * @notice Modifier to restrict access to the OikosFactory contract.
      */
     modifier onlyFactory() {
-        if (msg.sender != nomaFactory()) revert OnlyFactory();
+        if (msg.sender != oikosFactory()) revert OnlyFactory();
         _;
     }
 }
