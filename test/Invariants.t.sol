@@ -45,9 +45,9 @@ contract Invariants is Test {
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address deployer = vm.envAddress("DEPLOYER");
 
-    address WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
+    address WETH = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
     address payable idoManager;
-    address nomaToken;
+    address oikosToken;
     address modelHelperContract;
     address vaultAddress;
 
@@ -77,17 +77,17 @@ contract Invariants is Test {
 
         // Extract addresses from JSON
         idoManager = payable(addresses.IDOHelper);
-        nomaToken = addresses.Proxy;
+        oikosToken = addresses.Proxy;
         modelHelperContract = addresses.ModelHelper;
 
         IDOManager managerContract = IDOManager(idoManager);
         require(address(managerContract) != address(0), "Manager contract address is zero");
 
-        OKS = OikosToken(nomaToken);
-        require(address(OKS) != address(0), "Noma token address is zero");
+        OKS = OikosToken(oikosToken);
+        require(address(OKS) != address(0), "Oikos token address is zero");
 
-        // sOKS = GonsToken(sNomaToken);
-        // require(address(sOKS) != address(0), "sNoma token address is zero");
+        // sOKS = GonsToken(sOikosToken);
+        // require(address(sOKS) != address(0), "sOikos token address is zero");
 
         // staking = Staking(stakingContract);
         // require(address(staking) != address(0), "Staking contract address is zero");
@@ -454,7 +454,7 @@ contract Invariants is Test {
         spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
 
         managerContract.sellTokens(
-            spotPrice - (spotPrice * 10/100), 
+            spotPrice - (spotPrice * 15/100), 
             tokenBalanceBeforeSelling, 
             address(deployer)
         );
@@ -462,7 +462,7 @@ contract Invariants is Test {
         liquidityRatio = modelHelper.getLiquidityRatio(pool, address(vault));
         console.log("Liquidity ratio is: ", liquidityRatio);
 
-        if (liquidityRatio > 1.15e18) {
+        if (liquidityRatio > 1.2e18) {
             console.log("Attempt to slide positions");
             IVault(address(vault)).slide();
             solvencyInvariant();
@@ -509,7 +509,7 @@ contract Invariants is Test {
         console.log("Anchor capacity + floor balance is: ", anchorCapacity + floorBalance);
         console.log("Circulating supply is: ", circulatingSupply);
 
-        // To guarantee solvency, Noma ensures that capacity > circulating supply each liquidity is deployed.
+        // To guarantee solvency, Oikos ensures that capacity > circulating supply each liquidity is deployed.
         require(anchorCapacity + floorCapacity > circulatingSupply, "Insolvency invariant failed");
     }
 

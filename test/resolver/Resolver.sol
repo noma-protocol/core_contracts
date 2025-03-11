@@ -85,7 +85,7 @@ contract TestResolver is Ownable {
     }
 
     modifier onlyFactoryOrManager() {
-        if (msg.sender != repository["NomaFactory"] && msg.sender != owner()) {
+        if (msg.sender != repository["OikosFactory"] && msg.sender != owner()) {
             revert OnlyFactoryOrManagerAllowed();
         }
         _;

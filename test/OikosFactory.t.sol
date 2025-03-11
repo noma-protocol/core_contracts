@@ -48,8 +48,8 @@ contract OikosFactoryTest is Test {
     TokenFactory tokenFactory;
 
     // Constants
-    address WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
-    address private uniswapFactory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
+    address WETH = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+    address private uniswapFactory = 0xdB1d10011AD0Ff90774D0C6Bb92e5C5c8b4461F7;
 
     ContractInfo[] private expectedAddressesInResolver;
 
@@ -167,8 +167,8 @@ contract OikosFactoryTest is Test {
     function testCreateVaultShouldRevert() public {
         VaultDeployParams memory vaultDeployParams = 
             VaultDeployParams(
-                "Noma Token", // Name
-                "NOMA",       // Symbol
+                "Oikos Token", // Name
+                "OKS",       // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
                 1e18,         // IDO Price
@@ -198,15 +198,15 @@ contract OikosFactoryTest is Test {
     function testCreateVaultShouldSucceed() public {
 
         expectedAddressesInResolver.push(
-            ContractInfo("WETH", WETH)
+            ContractInfo("WBNB", WETH)
         );
 
         configureResolver();    
 
         VaultDeployParams memory vaultDeployParams = 
             VaultDeployParams(
-                "Noma Token", // Name
-                "NOMA",       // Symbol
+                "Oikos Token", // Name
+                "OKS",       // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
                 1e18,         // IDO Price
@@ -234,23 +234,23 @@ contract OikosFactoryTest is Test {
     function testCreateDuplicateVault() public {
 
         expectedAddressesInResolver.push(
-            ContractInfo("WETH", WETH)
+            ContractInfo("WBNB", WETH)
         );
 
         configureResolver();    
 
         VaultDeployParams memory vaultDeployParams = 
-            VaultDeployParams(
-                "Noma Token", // Name
-                "NOMA",       // Symbol
-                18,           // Decimals
-                100e18,       // Total supply
-                1e18,         // IDO Price
-                0,
-                WETH,         // Token1 address
-                3000,         // Uniswap V3 Fee tier
-                0             // Presale
-            );
+        VaultDeployParams(
+            "Oikos Token", // Name
+            "OKS",         // Symbol
+            18,            // Decimals
+            100e18,        // Total supply
+            1e18,          // IDO Price
+            0,
+            WETH,          // Token1 address
+            3000,          // Uniswap V3 Fee tier
+            0              // Presale
+        );
 
         PresaleUserParams memory presaleParams =
         PresaleUserParams(
@@ -270,8 +270,8 @@ contract OikosFactoryTest is Test {
 
         vaultDeployParams = 
             VaultDeployParams(
-                "Noma Token", // Name
-                "NOMA",       // Symbol
+                "Oikos Token", // Name
+                "OKS",        // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
                 1e18,         // IDO Price
@@ -329,15 +329,15 @@ contract OikosFactoryTest is Test {
     function testPermissionlessDeployNotEnabled() public {
 
         expectedAddressesInResolver.push(
-            ContractInfo("WETH", WETH)
+            ContractInfo("WBNB", WETH)
         );
 
         configureResolver();    
 
         VaultDeployParams memory vaultDeployParams = 
             VaultDeployParams(
-                "Noma Token", // Name
-                "NOMA",       // Symbol
+                "Oikos Token", // Name
+                "OKS",       // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
                 1e18,         // IDO Price
@@ -365,15 +365,15 @@ contract OikosFactoryTest is Test {
     function testPermissionlessDeployEnabled() public {
 
         expectedAddressesInResolver.push(
-            ContractInfo("WETH", WETH)
+            ContractInfo("WBNB", WETH)
         );
 
         configureResolver();    
 
         VaultDeployParams memory vaultDeployParams = 
             VaultDeployParams(
-                "Noma Token", // Name
-                "NOMA",       // Symbol
+                "Oikos Token", // Name
+                "OKS",        // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
                 1e18,         // IDO Price
@@ -401,15 +401,15 @@ contract OikosFactoryTest is Test {
 
     function testEnumerateVaults() public {
         expectedAddressesInResolver.push(
-            ContractInfo("WETH", WETH)
+            ContractInfo("WBNB", WETH)
         );
 
         configureResolver();    
 
         VaultDeployParams memory vaultDeployParams = 
             VaultDeployParams(
-                "Noma Token", // Name
-                "NOMA",       // Symbol
+                "Oikos Token", // Name
+                "OKS",       // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
                 1e18,         // IDO Price
@@ -487,7 +487,7 @@ contract OikosFactoryTest is Test {
     function testDeployerCanDeployMultipleVaults() public {
         // Prepare Resolver
         expectedAddressesInResolver.push(
-            ContractInfo("WETH", WETH)
+            ContractInfo("WBNB", WETH)
         );
         configureResolver();
 
