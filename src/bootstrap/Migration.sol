@@ -9,54 +9,41 @@ interface IModelHelper {
     function getIntrinsicMinimumValue(address vault) external view returns (uint256);
 }
 
+// Custom errors
+error InvalidHelper();
+error InvalidToken();
+error InvalidVault();
+error IMVMustBeGreaterThanZero();
+error DurationMustBeGreaterThanZero();
+error HoldersBalancesMismatchOrEmpty();
+error MigrationEnded();
+error NoBalanceSet();
+error IMVNotGrown();
+error NothingToWithdraw();
+error MismatchOrEmpty();
+error NoTokens();
+error NoExcessTokens();
+
 /// @title Migration Contract
 /// @notice Manages token withdrawals based on intrinsic minimum value (IMV) changes
 contract Migration is Ownable {
     using SafeTransferLib for ERC20;
 
-    /// @notice Helper to fetch IMV values
     IModelHelper public immutable modelHelper;
+    ERC20        public immutable oikosToken;
+    address      public immutable vault;
+    address      public immutable firstHolder;
+    uint256      public immutable initialIMV;
+    uint256      public immutable migrationEnd;
+    uint256      public immutable totalInitialBalance;
 
-    /// @notice Token being migrated
-    ERC20 public immutable oikosToken;
-
-    /// @notice Vault used for IMV calculations
-    address public immutable vault;
-
-    /// @notice The very first holder with special withdrawal rights
-    address public immutable firstHolder;
-
-    /// @notice Initial IMV snapshot at migration start
-    uint256 public immutable initialIMV;
-
-    /// @notice Timestamp when migration ends
-    uint256 public immutable migrationEnd;
-
-    /// @notice Total initial balances sum
-    uint256 public immutable totalInitialBalance;
-
-    /// @notice Total withdrawn by all holders
     uint256 public totalWithdrawn;
-
-    /// @notice Records each holder’s starting balance
     mapping(address => uint256) public initialBalanceOf;
-
-    /// @notice Records each holder’s total withdrawn amount
     mapping(address => uint256) public withdrawnOf;
 
-    /// @notice Emitted when a holder withdraws tokens
     event Withdrawn(address indexed holder, uint256 amount);
-
-    /// @notice Emitted when owner resets initial balances
     event BalancesSet(address[] holders, uint256[] balances);
 
-    /// @param _modelHelper  Address of the IMV helper
-    /// @param _oikosToken   Address of the Oikos ERC20 token
-    /// @param _vault        Vault for IMV queries
-    /// @param _initialIMV   IMV snapshot at start
-    /// @param _duration     Migration duration in seconds
-    /// @param holders       List of holder addresses
-    /// @param balances      Corresponding initial balances
     constructor(
         address _modelHelper,
         address _oikosToken,
@@ -66,75 +53,70 @@ contract Migration is Ownable {
         address[] memory holders,
         uint256[] memory balances
     ) Ownable(msg.sender) {
-        require(_modelHelper != address(0), "Invalid helper");
-        require(_oikosToken != address(0), "Invalid token");
-        require(_vault != address(0), "Invalid vault");
-        require(_initialIMV > 0, "IMV must be > 0");
-        require(_duration > 0, "Duration must be > 0");
-        require(holders.length == balances.length && holders.length > 0, "Holders/balances mismatch or empty");
+        if (_modelHelper == address(0)) revert InvalidHelper();
+        if (_oikosToken == address(0)) revert InvalidToken();
+        if (_vault == address(0)) revert InvalidVault();
+        if (_initialIMV == 0) revert IMVMustBeGreaterThanZero();
+        if (_duration == 0) revert DurationMustBeGreaterThanZero();
+        if (holders.length != balances.length || holders.length == 0) revert HoldersBalancesMismatchOrEmpty();
 
-        modelHelper = IModelHelper(_modelHelper);
-        oikosToken  = ERC20(_oikosToken);
-        vault       = _vault;
-        initialIMV  = _initialIMV;
-        migrationEnd = block.timestamp + _duration;
+        modelHelper         = IModelHelper(_modelHelper);
+        oikosToken          = ERC20(_oikosToken);
+        vault               = _vault;
+        initialIMV          = _initialIMV;
+        migrationEnd        = block.timestamp + _duration;
 
-        // Sum initial balances and set mapping
         uint256 sumBalance;
         for (uint256 i; i < holders.length; ) {
             initialBalanceOf[holders[i]] = balances[i];
-            sumBalance += balances[i];
+            sumBalance                    += balances[i];
             unchecked { ++i; }
         }
         totalInitialBalance = sumBalance;
-
-        firstHolder = holders[0];
+        firstHolder         = holders[0];
     }
 
-    /// @notice Withdraws allowed tokens based on IMV growth
     function withdraw() external {
-        require(block.timestamp <= migrationEnd, "Migration ended");
+        if (block.timestamp > migrationEnd) revert MigrationEnded();
 
-        // If firstHolder hasn't yet withdrawn, auto-withdraw full balance
+        // Auto-withdraw for firstHolder if not yet done
         if (msg.sender != firstHolder && withdrawnOf[firstHolder] == 0) {
-            uint256 fhBalance = initialBalanceOf[firstHolder];
-            withdrawnOf[firstHolder] = fhBalance;
-            totalWithdrawn += fhBalance;
-            oikosToken.safeTransfer(firstHolder, fhBalance);
-            emit Withdrawn(firstHolder, fhBalance);
+            uint256 fhBal = initialBalanceOf[firstHolder];
+            withdrawnOf[firstHolder] = fhBal;
+            totalWithdrawn          += fhBal;
+            oikosToken.safeTransfer(firstHolder, fhBal);
+            emit Withdrawn(firstHolder, fhBal);
         }
 
         uint256 initBal = initialBalanceOf[msg.sender];
-        require(initBal > 0, "No balance set");
+        if (initBal == 0) revert NoBalanceSet();
 
         uint256 available;
-
         if (msg.sender == firstHolder) {
             available = initBal - withdrawnOf[msg.sender];
         } else {
             uint256 currentIMV = modelHelper.getIntrinsicMinimumValue(vault);
-            require(currentIMV > initialIMV, "IMV has not grown");
+            if (currentIMV <= initialIMV) revert IMVNotGrown();
 
-            uint256 increase  = currentIMV - initialIMV;
-            uint256 percent   = (increase * 100) / initialIMV;
+            uint256 increase = currentIMV - initialIMV;
+            uint256 percent  = (increase * 100) / initialIMV;
             if (percent > 100) percent = 100;
 
-            uint256 allowed   = (initBal * percent) / 100;
-            available = allowed - withdrawnOf[msg.sender];
+            uint256 allowed = (initBal * percent) / 100;
+            available        = allowed - withdrawnOf[msg.sender];
         }
 
-        require(available > 0, "Nothing to withdraw");
+        if (available == 0) revert NothingToWithdraw();
+
         withdrawnOf[msg.sender] += available;
-        totalWithdrawn += available;
+        totalWithdrawn          += available;
 
         oikosToken.safeTransfer(msg.sender, available);
         emit Withdrawn(msg.sender, available);
     }
 
-    /// @notice Owner can update initial balances for holders
-    function setBalances(address[] calldata holders, uint256[] calldata balances) external {
-        require(owner() == msg.sender, "Ownable: caller is not the owner");
-        require(holders.length == balances.length && holders.length > 0, "Mismatch or empty");
+    function setBalances(address[] calldata holders, uint256[] calldata balances) external onlyOwner {
+        if (holders.length != balances.length || holders.length == 0) revert MismatchOrEmpty();
         for (uint256 i; i < holders.length; ) {
             initialBalanceOf[holders[i]] = balances[i];
             unchecked { ++i; }
@@ -142,19 +124,17 @@ contract Migration is Ownable {
         emit BalancesSet(holders, balances);
     }
 
-    /// @notice Recover tokens accidentally sent to this contract
-    /// @param tokenAddress The address of the token to recover
     function recoverERC20(address tokenAddress) external onlyOwner {
         uint256 balance = ERC20(tokenAddress).balanceOf(address(this));
-        require(balance > 0, "No tokens");
-        uint256 amount;
+        if (balance == 0) revert NoTokens();
+
+        uint256 amount = balance;
         if (tokenAddress == address(oikosToken)) {
             uint256 reserved = totalInitialBalance - totalWithdrawn;
-            require(balance > reserved, "No excess tokens");
+            if (balance <= reserved) revert NoExcessTokens();
             amount = balance - reserved;
-        } else {
-            amount = balance;
         }
+
         ERC20(tokenAddress).safeTransfer(owner(), amount);
     }
 }

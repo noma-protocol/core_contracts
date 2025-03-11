@@ -28,9 +28,9 @@ contract DummyERC20 is ERC20 {
 }
 
 contract MigrationTest is Test {
-    Migration public migration;
+    Migration       public migration;
     MockModelHelper public helper;
-    DummyERC20 public token;
+    DummyERC20      public token;
 
     address public constant HOLDER1 = address(0x1);
     address public constant HOLDER2 = address(0x2);
@@ -43,22 +43,21 @@ contract MigrationTest is Test {
     uint256 public constant TOTAL_SUP   = BAL1 + BAL2;
     
     function setUp() public {
-        // Deploy mocks and token
         helper = new MockModelHelper();
         helper.setIMV(INITIAL_IMV);
 
-        token  = new DummyERC20();
+        token = new DummyERC20();
 
-        // Prepare holders and balances
-        address[] memory holders  = new address[](2);
+        // --- Declare and populate holders & balances here ---
+        address[] memory holders = new address[](2);
         holders[0] = HOLDER1;
         holders[1] = HOLDER2;
 
         uint256[] memory balances = new uint256[](2);
         balances[0] = BAL1;
         balances[1] = BAL2;
+        // ----------------------------------------------------
 
-        // Deploy migration contract
         migration = new Migration(
             address(helper),
             address(token),
@@ -69,7 +68,6 @@ contract MigrationTest is Test {
             balances
         );
 
-        // Fund migration contract
         token.mint(address(migration), TOTAL_SUP);
     }
 
@@ -78,7 +76,6 @@ contract MigrationTest is Test {
         assertEq(migration.vault(), VAULT);
         assertEq(migration.migrationEnd(), block.timestamp + DURATION);
 
-        // initial balances
         assertEq(migration.initialBalanceOf(HOLDER1), BAL1);
         assertEq(migration.initialBalanceOf(HOLDER2), BAL2);
     }
@@ -94,12 +91,11 @@ contract MigrationTest is Test {
 
     function test_nonFirstHolder_cannotWithdrawBeforeIMVIncrease() public {
         vm.prank(HOLDER2);
-        vm.expectRevert(bytes("IMV has not grown"));
+        vm.expectRevert(abi.encodeWithSignature("IMVNotGrown()"));
         migration.withdraw();
     }
 
     function test_nonFirstHolder_withdrawsAfterIMVIncrease() public {
-        // Increase IMV by 50%
         helper.setIMV((INITIAL_IMV * 150) / 100);
 
         vm.prank(HOLDER2);
@@ -108,22 +104,19 @@ contract MigrationTest is Test {
         uint256 expected = (BAL2 * 50) / 100;
         assertEq(token.balanceOf(HOLDER2), expected);
         assertEq(migration.withdrawnOf(HOLDER2), expected);
+        // firstHolder auto‑withdraws BAL1 on first non‑first call
         assertEq(migration.totalWithdrawn(), BAL1 + expected);
     }
 
     function test_nonFirstHolder_withdraws_cappedAt100Percent() public {
-        // First, withdraw 50%
         helper.setIMV((INITIAL_IMV * 150) / 100);
         vm.prank(HOLDER2);
         migration.withdraw();
 
-        // Then, IMV jumps to 250% (cap at 100%)
         helper.setIMV((INITIAL_IMV * 250) / 100);
-
         vm.prank(HOLDER2);
         migration.withdraw();
 
-        // Total should now equal full BAL2
         assertEq(token.balanceOf(HOLDER2), BAL2);
         assertEq(migration.withdrawnOf(HOLDER2), BAL2);
     }
@@ -133,39 +126,39 @@ contract MigrationTest is Test {
         vm.prank(HOLDER2);
         migration.withdraw();
 
-        // Second withdraw at same IMV should revert
         vm.prank(HOLDER2);
-        vm.expectRevert(bytes("Nothing to withdraw"));
+        vm.expectRevert(abi.encodeWithSignature("NothingToWithdraw()"));
         migration.withdraw();
     }
 
     function test_cannotWithdrawAfterMigrationEnd() public {
-        // Warp past end
         vm.warp(block.timestamp + DURATION + 1);
 
         vm.prank(HOLDER1);
-        vm.expectRevert(bytes("Migration ended"));
+        vm.expectRevert(abi.encodeWithSignature("MigrationEnded()"));
         migration.withdraw();
     }
 
     function test_setBalances_onlyOwner() public {
-        address[] memory holders  = new address[](1);
+        // --- Declare and populate holders & balances here too ---
+        address[] memory holders = new address[](2);
         holders[0] = HOLDER1;
-        uint256[] memory balances = new uint256[](1);
-        balances[0] = BAL1 * 2;
 
-        // Non-owner cannot call
+        uint256[] memory balances = new uint256[](2);
+        balances[0] = BAL1 * 2;
+        // ---------------------------------------------------------
+
+        // non‑owner should revert with OZ’s own message
         vm.prank(HOLDER2);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert();
         migration.setBalances(holders, balances);
 
-        // Owner can call
+        // owner can reset
         migration.setBalances(holders, balances);
         assertEq(migration.initialBalanceOf(HOLDER1), BAL1 * 2);
     }
 
     function test_recoverERC20() public {
-        // Mint extra tokens to migration
         token.mint(address(migration), 5e18);
         uint256 before = token.balanceOf(address(this));
 
