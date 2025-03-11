@@ -72,7 +72,7 @@ contract DeployFactory is Script {
         vm.startBroadcast(privateKey);
 
         expectedAddressesInResolver.push(
-            ContractInfo("WETH", WETH)
+            ContractInfo("WBNB", WETH)
         );
 
         // Model Helper
@@ -136,7 +136,7 @@ contract DeployFactory is Script {
         );
         
         expectedAddressesInResolver.push(
-            ContractInfo("NomaFactory", address(oikosFactory))
+            ContractInfo("OikosFactory", address(oikosFactory))
         );
 
         ProtocolParameters memory _params =
