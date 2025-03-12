@@ -48,7 +48,7 @@ contract Staking {
     // Custom errors
     error StakingNotEnabled();
     error InvalidParameters();
-    error NotEnoughBalance();
+    error NotEnoughBalance(uint256 currentBalance);
     error InvalidReward();
     error OnlyVault();
     error CustomError();
@@ -104,7 +104,6 @@ contract Staking {
         NOMA.transferFrom(msg.sender, address(this), _amount);
 
         // Mint rebase-adjusted sNOMA to the staker
-        // sNOMA.mint(_to, (_amount * 1e18) / sNOMA.rebaseIndex());
         sNOMA.mint(msg.sender, _amount);
         // Track the originally staked amount
         stakedBalances[msg.sender] += _amount;
@@ -125,19 +124,11 @@ contract Staking {
         uint256 balance = Math.min(sNOMA.balanceOf(msg.sender), NOMA.balanceOf(address(this)));
 
         if (balance == 0) {
-            revert NotEnoughBalance();
+            revert NotEnoughBalance(0);
         }
 
         if (NOMA.balanceOf(address(this)) < balance) {
-            revert(
-                string(
-                    abi.encodePacked(
-                        "unstake : ", 
-                        Utils._uint2str(uint256(NOMA.balanceOf(address(this))))
-                    )
-                )
-            );
-            revert NotEnoughBalance();
+            revert NotEnoughBalance(NOMA.balanceOf(address(this)));
         }
 
         sNOMA.burn(sNOMA.balanceOf(msg.sender), msg.sender);
