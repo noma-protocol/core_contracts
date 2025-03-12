@@ -584,17 +584,6 @@ contract NomaFactory {
     }
 
     /**
-    * @notice Retrieves the total number of vaults deployed.
-    * @return result The total number of vaults.
-    */
-    function numVaults() public view returns (uint256 result) {
-        address[] memory _deployers = getDeployers();
-        for (uint256 i = 0; i < _deployers.length; i++) {
-            result += numVaults(_deployers[i]);
-        }
-    }
-
-    /**
     * @notice Retrieves the total number of deployers.
     * @return The total number of deployers.
     */
