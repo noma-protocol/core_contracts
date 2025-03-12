@@ -72,7 +72,7 @@ contract TestRebase is Test {
         vm.stopPrank();
 
         vm.prank(userA);
-        staking.stake(userA, 100e18);
+        staking.stake(100e18);
         vm.stopPrank();
 
         uint256 balanceAfterStaking = rebaseToken.balanceOf(userA);
@@ -90,7 +90,7 @@ contract TestRebase is Test {
         vm.stopPrank();
 
         vm.prank(userB);
-        staking.stake(userB, 100e18);
+        staking.stake(100e18);
         vm.stopPrank();
 
         uint256 nomaBalanceAfter = mockNomaToken.balanceOf(userB);
@@ -109,7 +109,7 @@ contract TestRebase is Test {
         vm.stopPrank();
 
         vm.prank(userA);
-        staking.stake(userA, 100e18);
+        staking.stake(100e18);
         vm.stopPrank();
 
         uint256 balanceAfterStaking = rebaseToken.balanceOf(userA);
@@ -125,7 +125,7 @@ contract TestRebase is Test {
         vm.stopPrank();
 
         vm.prank(userB);
-        staking.stake(userB, 100e18);
+        staking.stake(100e18);
         vm.stopPrank();
 
         uint256 nomaBalanceAfter = mockNomaToken.balanceOf(userB);
@@ -138,7 +138,7 @@ contract TestRebase is Test {
         vm.stopPrank();
 
         vm.prank(userC);
-        staking.stake(userC, 100e18);
+        staking.stake(100e18);
         vm.stopPrank();
 
         mockNomaToken.mintTest(userD, 1000e18);
@@ -148,7 +148,7 @@ contract TestRebase is Test {
         vm.stopPrank();
 
         vm.prank(userD);
-        staking.stake(userD, 100e18);
+        staking.stake(100e18);
         vm.stopPrank();
 
         uint256 profit = 3000e18;
@@ -201,7 +201,7 @@ contract TestRebase is Test {
             vm.stopPrank();
 
             vm.prank(users[i]);
-            staking.stake(users[i], stakeAmount);
+            staking.stake(stakeAmount);
             vm.stopPrank();
 
             afterStakeRebaseBalances[i] = rebaseToken.balanceOf(users[i]);
@@ -272,7 +272,7 @@ contract TestRebase is Test {
             vm.stopPrank();
 
             vm.prank(users[i]);
-            staking.stake(users[i], stakeAmount);
+            staking.stake(stakeAmount);
             vm.stopPrank();
 
             afterStakeRebaseBalances[i] = rebaseToken.balanceOf(users[i]);
@@ -349,7 +349,7 @@ contract TestRebase is Test {
             vm.stopPrank();
 
             vm.prank(users[i]);
-            staking.stake(users[i], stakeAmount);
+            staking.stake(stakeAmount);
             vm.stopPrank();
 
             afterStakeRebaseBalances[i] = rebaseToken.balanceOf(users[i]);
@@ -513,7 +513,7 @@ contract TestRebase is Test {
             vm.stopPrank();
 
             vm.prank(users[i]);
-            staking.stake(users[i], STAKE_AMOUNT);
+            staking.stake(STAKE_AMOUNT);
             vm.stopPrank();
         }
 

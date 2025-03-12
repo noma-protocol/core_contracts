@@ -47,7 +47,7 @@ contract TestStaking is Test {
         // All users stake
         for (uint i = 0; i < NUM_USERS; i++) {
             vm.prank(users[i]);
-            staking.stake(users[i], STAKE_AMOUNT);
+            staking.stake(STAKE_AMOUNT);
         }
 
         // Check balances after staking
@@ -72,7 +72,7 @@ contract TestStaking is Test {
 
             vm.prank(users[i]);
             sNOMA.approve(address(staking), type(uint256).max);
-            staking.unstake(users[i]);
+            staking.unstake();
 
             assertEq(sNOMA.balanceOf(users[i]), 0, "sNOMA balance should be 0 after unstake");
             assertEq(NOMA.balanceOf(users[i]), NOMABalanceBefore + sNOMABalanceBefore, "NOMA balance incorrect after unstake");
@@ -102,7 +102,7 @@ contract TestStaking is Test {
         // All users stake
         for (uint i = 0; i < NUM_USERS; i++) {
             vm.prank(users[i]);
-            staking.stake(users[i], STAKE_AMOUNT);
+            staking.stake(STAKE_AMOUNT);
         }
         
         vm.prank(address(staking));
@@ -123,7 +123,7 @@ contract TestStaking is Test {
 
             vm.prank(users[i]);
             sNOMA.approve(address(staking), type(uint256).max);
-            staking.unstake(users[i]);
+            staking.unstake();
 
             assertEq(sNOMA.balanceOf(users[i]), 0, "sNOMA balance should be 0 after unstake");
             assertEq(NOMA.balanceOf(users[i]), NOMABalanceBefore + sNOMABalanceBefore, "NOMA balance incorrect after unstake");
@@ -135,7 +135,7 @@ contract TestStaking is Test {
         // Half of users stake
         for (uint i = 0; i < NUM_USERS / 2; i++) {
             vm.prank(users[i]);
-            staking.stake(users[i], STAKE_AMOUNT);
+            staking.stake(STAKE_AMOUNT);
         }
 
         // Simulate some rewards
@@ -150,7 +150,7 @@ contract TestStaking is Test {
         // Other half of users stake
         for (uint i = NUM_USERS / 2; i < NUM_USERS; i++) {
             vm.prank(users[i]);
-            staking.stake(users[i], STAKE_AMOUNT);
+            staking.stake(STAKE_AMOUNT);
         }
 
         // Simulate more rewards
@@ -165,7 +165,7 @@ contract TestStaking is Test {
 
             vm.prank(users[i]);
             sNOMA.approve(address(staking), type(uint256).max);
-            staking.unstake(users[i]);
+            staking.unstake();
 
             assertEq(sNOMA.balanceOf(users[i]), 0, "sNOMA balance should be 0 after unstake");
             assertEq(NOMA.balanceOf(users[i]), NOMABalanceBefore + sNOMABalanceBefore, "NOMA balance incorrect after unstake");
@@ -183,7 +183,7 @@ contract TestStaking is Test {
             totalStaked += stakeAmount;
 
             vm.prank(users[i]);
-            staking.stake(users[i], stakeAmount);
+            staking.stake(stakeAmount);
 
             assertEq(NOMA.balanceOf(users[i]), INITIAL_NOMA_BALANCE - stakeAmount, "NOMA balance incorrect after stake");
             assertGe(sNOMA.balanceOf(users[i]), stakeAmount, "sNOMA balance should be equal or slightly higher than stake amount");
@@ -212,7 +212,7 @@ contract TestStaking is Test {
 
             vm.startPrank(users[i]);
             sNOMA.approve(address(staking), sNomaBalanceBefore);
-            staking.unstake(users[i]);
+            staking.unstake();
             vm.stopPrank();
 
             uint256 nomaBalanceAfter = NOMA.balanceOf(users[i]);
@@ -247,7 +247,7 @@ contract TestStaking is Test {
             totalStaked += stakeAmount;
 
             vm.prank(users[i]);
-            staking.stake(users[i], stakeAmount);
+            staking.stake(stakeAmount);
             
             // console.log("User", i);
             // console.log("staked:", stakeAmount);
@@ -268,7 +268,7 @@ contract TestStaking is Test {
             totalStaked += stakeAmount;
 
             vm.prank(users[i]);
-            staking.stake(users[i], stakeAmount);
+            staking.stake(stakeAmount);
             
             // console.log("User", i);
             // console.log("staked:", stakeAmount);
@@ -290,7 +290,7 @@ contract TestStaking is Test {
 
             vm.prank(users[i]);
             sNOMA.approve(address(staking), type(uint256).max);
-            staking.unstake(users[i]);
+            staking.unstake();
 
             uint256 NOMABalanceAfter = NOMA.balanceOf(users[i]);
             int256 NOMADifference = int256(NOMABalanceAfter) - int256(NOMABalanceBefore);
