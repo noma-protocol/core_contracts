@@ -48,6 +48,8 @@ contract TestStaking is Test {
         for (uint i = 0; i < NUM_USERS; i++) {
             vm.prank(users[i]);
             staking.stake(STAKE_AMOUNT);
+            vm.stopPrank();
+
         }
 
         // Check balances after staking
@@ -72,7 +74,11 @@ contract TestStaking is Test {
 
             vm.prank(users[i]);
             sNOMA.approve(address(staking), type(uint256).max);
+            vm.stopPrank();
+
+            vm.prank(users[i]);
             staking.unstake();
+            vm.stopPrank();
 
             assertEq(sNOMA.balanceOf(users[i]), 0, "sNOMA balance should be 0 after unstake");
             assertEq(NOMA.balanceOf(users[i]), NOMABalanceBefore + sNOMABalanceBefore, "NOMA balance incorrect after unstake");
@@ -123,8 +129,12 @@ contract TestStaking is Test {
 
             vm.prank(users[i]);
             sNOMA.approve(address(staking), type(uint256).max);
-            staking.unstake();
+            vm.stopPrank();
 
+            vm.prank(users[i]);
+            staking.unstake();
+            vm.stopPrank();
+            
             assertEq(sNOMA.balanceOf(users[i]), 0, "sNOMA balance should be 0 after unstake");
             assertEq(NOMA.balanceOf(users[i]), NOMABalanceBefore + sNOMABalanceBefore, "NOMA balance incorrect after unstake");
         }
@@ -165,7 +175,11 @@ contract TestStaking is Test {
 
             vm.prank(users[i]);
             sNOMA.approve(address(staking), type(uint256).max);
+            vm.stopPrank(); 
+
+            vm.prank(users[i]);
             staking.unstake();
+            vm.stopPrank();
 
             assertEq(sNOMA.balanceOf(users[i]), 0, "sNOMA balance should be 0 after unstake");
             assertEq(NOMA.balanceOf(users[i]), NOMABalanceBefore + sNOMABalanceBefore, "NOMA balance incorrect after unstake");
@@ -290,7 +304,11 @@ contract TestStaking is Test {
 
             vm.prank(users[i]);
             sNOMA.approve(address(staking), type(uint256).max);
+            vm.stopPrank();
+
+            vm.prank(users[i]);
             staking.unstake();
+            vm.stopPrank();
 
             uint256 NOMABalanceAfter = NOMA.balanceOf(users[i]);
             int256 NOMADifference = int256(NOMABalanceAfter) - int256(NOMABalanceBefore);
