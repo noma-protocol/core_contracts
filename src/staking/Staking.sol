@@ -89,10 +89,9 @@ contract Staking {
 
     /**
     * @notice Allows a user to stake NOMA tokens.
-    * @param _to The address to which the staked tokens will be credited.
     * @param _amount The amount of NOMA tokens to stake.
     */
-    function stake(address _to, uint256 _amount) public {
+    function stake(uint256 _amount) public {
         if (_amount == 0) {
             revert InvalidParameters();
         }
@@ -106,7 +105,7 @@ contract Staking {
 
         // Mint rebase-adjusted sNOMA to the staker
         // sNOMA.mint(_to, (_amount * 1e18) / sNOMA.rebaseIndex());
-        sNOMA.mint(_to, _amount);
+        sNOMA.mint(msg.sender, _amount);
         // Track the originally staked amount
         stakedBalances[msg.sender] += _amount;
         totalStaked += _amount;
@@ -117,20 +116,13 @@ contract Staking {
     
     /**
     * @notice Allows a user to unstake their NOMA tokens.
-    * @param _from The address from which the staked tokens will be withdrawn.
     */
-    function unstake(
-        address _from
-    ) external {
-        if (_from == address(0)) {
-            revert InvalidParameters();
-        }
-
+    function unstake() external {
         if (IVault(vault).stakingEnabled() == false) {
             revert StakingNotEnabled();
         }
         
-        uint256 balance = Math.min(sNOMA.balanceOf(_from), NOMA.balanceOf(address(this)));
+        uint256 balance = Math.min(sNOMA.balanceOf(msg.sender), NOMA.balanceOf(address(this)));
 
         if (balance == 0) {
             revert NotEnoughBalance();
@@ -148,13 +140,13 @@ contract Staking {
             revert NotEnoughBalance();
         }
 
-        sNOMA.burn(sNOMA.balanceOf(_from), _from);
-        NOMA.safeTransfer(_from, balance);
+        sNOMA.burn(sNOMA.balanceOf(msg.sender), msg.sender);
+        NOMA.safeTransfer(msg.sender, balance);
 
-        totalStaked -= stakedBalances[_from];
-        stakedBalances[_from] = 0;
+        totalStaked -= stakedBalances[msg.sender];
+        stakedBalances[msg.sender] = 0;
 
-        emit Unstaked(_from, balance);
+        emit Unstaked(msg.sender, balance);
     }
 
 
