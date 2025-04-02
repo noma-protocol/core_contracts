@@ -7,6 +7,7 @@ import {IsNomaToken} from "../interfaces/IsNomaToken.sol";
 import {IVault} from "../interfaces/IVault.sol";
 import {Utils} from "../libraries/Utils.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+
 /**
  * @title Staking
  * @notice A contract for staking NOMA tokens and earning rewards.
@@ -29,7 +30,7 @@ contract Staking {
 
     // State variables
     IERC20 public NOMA; // The NOMA token contract.
-    IsNomaToken public sNOMA; // The staked NOMA token contract.
+    IsNomaToken public sOKS; // The staked NOMA token contract.
     
     address public authority; // The address with authority over the contract.
     address public vault; // The address of the vault contract.
@@ -45,6 +46,15 @@ contract Staking {
     // Mapping to track staked amounts per user
     mapping(address => uint256) private stakedBalances;
 
+    // Mapping to track the last operation timestamp for each user
+    mapping(address => uint256) public lastOperationTimestamp;
+
+    // Mapping to track the epoch number when a user first staked
+    mapping(address => uint256) public stakedEpochs;
+
+    // Lock-in period in epochs (e.g., 1 for one epoch)
+    uint256 public lockInEpochs = 1;
+
     // Custom errors
     error StakingNotEnabled();
     error InvalidParameters();
@@ -52,6 +62,8 @@ contract Staking {
     error InvalidReward();
     error OnlyVault();
     error CustomError();
+    error CooldownNotElapsed();
+    error LockInPeriodNotElapsed();
 
     // Events
     event Staked(address indexed user, uint256 amount);
@@ -70,10 +82,10 @@ contract Staking {
         address _vault
     ) {
         NOMA = IERC20(_noma);
-        sNOMA = IsNomaToken(_sNoma);
+        sOKS = IsNomaToken(_sNoma);
         vault = _vault;
         
-        sNOMA.initialize(address(this));
+        sOKS.initialize(address(this));
 
         // Initialize first epoch with distribute 0
         epoch = Epoch({
@@ -99,20 +111,29 @@ contract Staking {
         if (IVault(vault).stakingEnabled() == false) {
             revert StakingNotEnabled();
         }
-
+        
+        // Ensure 3 days have passed since the user's last stake/unstake operation
+        if (block.timestamp < lastOperationTimestamp[msg.sender] + 3 days) {
+            revert CooldownNotElapsed();
+        }
+        
+        // Update the last operation timestamp for the user
+        lastOperationTimestamp[msg.sender] = block.timestamp;
+        
         // Transfer NOMA tokens from the user to the staking contract
         NOMA.transferFrom(msg.sender, address(this), _amount);
 
-        // Mint rebase-adjusted sNOMA to the staker
-        sNOMA.mint(msg.sender, _amount);
-        // Track the originally staked amount
+        // Mint rebase-adjusted sOKS to the staker
+        sOKS.mint(msg.sender, _amount);
+        
+        // Track the originally staked amount and the epoch number when staked
         stakedBalances[msg.sender] += _amount;
         totalStaked += _amount;
+        stakedEpochs[msg.sender] = epoch.number;
 
         emit Staked(msg.sender, _amount);
     }
 
-    
     /**
     * @notice Allows a user to unstake their NOMA tokens.
     */
@@ -120,18 +141,23 @@ contract Staking {
         if (IVault(vault).stakingEnabled() == false) {
             revert StakingNotEnabled();
         }
-        
-        uint256 balance = Math.min(sNOMA.balanceOf(msg.sender), NOMA.balanceOf(address(this)));
+
+        // Check if the user's tokens are locked in the lock-in period
+        if (epoch.number < stakedEpochs[msg.sender] + lockInEpochs) {
+            revert LockInPeriodNotElapsed();
+        }
+
+        uint256 balance = Math.min(sOKS.balanceOf(msg.sender), NOMA.balanceOf(address(this)));
 
         if (balance == 0) {
             revert NotEnoughBalance(0);
         }
 
         if (NOMA.balanceOf(address(this)) < balance) {
-            revert NotEnoughBalance(NOMA.balanceOf(address(this)));
+            revert NotEnoughBalance(balance); 
         }
 
-        sNOMA.burn(sNOMA.balanceOf(msg.sender), msg.sender);
+        sOKS.burn(sOKS.balanceOf(msg.sender), msg.sender);
         NOMA.safeTransfer(msg.sender, balance);
 
         totalStaked -= stakedBalances[msg.sender];
@@ -139,7 +165,6 @@ contract Staking {
 
         emit Unstaked(msg.sender, balance);
     }
-
 
     /**
      * @notice Notifies the contract of a new reward amount and starts a new epoch.
@@ -152,42 +177,36 @@ contract Staking {
 
         if (IVault(vault).stakingEnabled() == false) {
             revert StakingNotEnabled();
-        }        
-
-        _reward = totalEpochs == 1 ? epoch.distribute : _reward;
-        
-        // Save current epoch with the reward distributed
-        if (totalEpochs > 1) {
-            if (_reward == 0) {
-                revert InvalidReward();
-            }
-            epoch.distribute = _reward;
         }
 
+        // Mark end of current epoch
         epoch.end = block.timestamp;
         epochs[totalEpochs] = epoch;
 
-        // Start new epoch
+        // Increment totalEpochs before starting a new epoch
+        totalEpochs++;
+
+        // Set the distribute amount for the current epoch
+        epoch.distribute = _reward;
+
+        // Start new epoch with the updated epoch number
         epoch = Epoch({
             number: totalEpochs,
             end: 0,
             distribute: 0
         });
 
-        if (totalEpochs > 1 && _reward > 0) {
-            sNOMA.rebase(_reward); 
-            totalRewards += _reward;           
-        } 
-        
-        totalEpochs++;
-    
+        // Update total rewards and rebase sOKS
+        sOKS.rebase(_reward);
+        totalRewards += _reward;
+
         emit NotifiedReward(_reward);
     }
 
     /**
     * @notice Returns the originally staked amount of NOMA for a user.
-    * @param _user The address of the staker.
-    * @return The originally staked amount of NOMA.
+   * @param _user The address of the staker.
+   * @return The originally staked amount of NOMA.
     */
     function stakedBalance(address _user) external view returns (uint256) {
         return stakedBalances[_user];

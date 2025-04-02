@@ -13,7 +13,7 @@ interface IsNomaToken is IERC20 {
     
     /**
      * @notice Adjusts the total supply of the token by a specified amount.
-     * @param supplyDelta The amount by which to adjust the total supply. Positive values increase the supply, negative values decrease it.
+    * @param supplyDelta The number of new fragment tokens to add into circulation via expansion.
      * @dev This function is intended to be called to perform a rebase operation, modifying the total token supply.
      */
     function rebase(uint256 supplyDelta) external;

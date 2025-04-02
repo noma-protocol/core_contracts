@@ -173,7 +173,7 @@ contract OikosFactory {
             )
         ).preDeployVault(address(resolver));
 
-        (data.sNoma, data.stakingContract, data.tokenRepo) = IExtFactory(extFactory)
+        (data.sOKS, data.stakingContract, data.tokenRepo) = IExtFactory(extFactory)
             .deployAll(
                 address(this),
                 data.vaultAddress,
@@ -238,7 +238,7 @@ contract OikosFactory {
             address(resolver),
             data.vaultAddress,
             data.stakingContract,
-            data.sNoma,
+            data.sOKS,
             data.presaleContract,
             adaptiveSupply(),
             modelHelper(),

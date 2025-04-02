@@ -10,21 +10,14 @@ import {LiquidityDeployer} from "../libraries/LiquidityDeployer.sol";
 import {IVault} from "../interfaces/IVault.sol";
 import {Utils} from "../libraries/Utils.sol";
 import {ITokenRepo} from "../TokenRepo.sol";
-
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {
     LiquidityPosition, 
     LiquidityType,
     LoanPosition,
     ProtocolParameters
 } from "../types/Types.sol";
-
-interface IERC20 {
-    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
-    function transfer(address recipient, uint256 amount) external returns (bool);
-    function balanceOf(address account) external view returns (uint256);
-    function approve(address spender, uint256 amount) external;
-    function mint(address receiver, uint256 amount) external;
-}
 
 interface IOikosFactory {
     function deferredDeploy(address deployer) external;
@@ -53,6 +46,7 @@ error NotAuthorized();
  * @dev This contract extends the `BaseVault` contract and provides functionality for borrowing, repaying loans, and managing collateral.
  */
 contract LendingVault is BaseVault {
+    using SafeERC20 for IERC20;
 
     /**
      * @notice Calculates the total collateral required for a given borrow amount.
@@ -98,7 +92,7 @@ contract LendingVault is BaseVault {
         if (floorToken1Balance < borrowAmount) revert InsufficientFloorBalance();
 
         IERC20(_v.pool.token0()).transferFrom(who, address(this), collateralAmount);  
-        IERC20(_v.pool.token0()).transfer(_v.tokenRepo, collateralAmount);
+        SafeERC20.safeTransfer(IERC20(address(_v.pool.token0())), _v.tokenRepo, collateralAmount);
 
         uint256 loanFees = _calculateLoanFees(borrowAmount, duration);
 
@@ -109,7 +103,7 @@ contract LendingVault is BaseVault {
         Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick);         
         LiquidityDeployer.reDeployFloor(address(_v.pool), address(this), floorToken0Balance, floorToken1Balance - borrowAmount, positions);
         
-        IERC20(_v.pool.token1()).transfer(who, borrowAmount - loanFees);
+        SafeERC20.safeTransfer(IERC20(address(_v.pool.token1())), who, borrowAmount - loanFees);
 
         uint256 totalLoans = _v.totalLoansPerUser[who];
         LoanPosition memory loanPosition = LoanPosition({
@@ -126,8 +120,8 @@ contract LendingVault is BaseVault {
 
         IVault(address(this)).updatePositions([_v.floorPosition, _v.anchorPosition, _v.discoveryPosition]);
         
-        // IModelHelper(modelHelper())
-        // .enforceSolvencyInvariant(address(this));           
+        IModelHelper(modelHelper())
+        .enforceSolvencyInvariant(address(this));           
     }
 
     /**
@@ -141,7 +135,7 @@ contract LendingVault is BaseVault {
         if (block.timestamp > loan.expiry) revert LoanExpired();
 
         IERC20(_v.pool.token1()).transferFrom(who, address(this), loan.borrowAmount);
-        ITokenRepo(_v.tokenRepo).transfer(_v.pool.token0(), who, loan.collateralAmount);
+        ITokenRepo(_v.tokenRepo).transferToRecipient(_v.pool.token0(), who, loan.collateralAmount);
 
         // Collect fees from the Uniswap pool
         (,, uint256 floorToken0Balance, uint256 floorToken1Balance) = IModelHelper(modelHelper())
@@ -246,7 +240,7 @@ contract LendingVault is BaseVault {
     function _seizeCollateral(address who) internal {
         LoanPosition storage loan = _v.loanPositions[who];
         _v.collateralAmount -= loan.collateralAmount;
-        ITokenRepo(_v.tokenRepo).transfer(_v.pool.token0(), address(this), loan.collateralAmount);
+        ITokenRepo(_v.tokenRepo).transferToRecipient(_v.pool.token0(), address(this), loan.collateralAmount);
     }
 
     /**

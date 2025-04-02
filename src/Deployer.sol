@@ -92,6 +92,10 @@ contract Deployer is Ownable {
     /// @dev Error thrown when a callback is made by an unauthorized address.
     error CallBackCaller();
 
+    /// @dev Error thrown when the contract is already initialized.
+    error AlreadyInitialized();
+
+    /// @dev Error thrown when the contract is not deployed.
     event Initialized();
 
     /// @notice Initializes the contract with the owner and resolver addresses.
@@ -113,7 +117,7 @@ contract Deployer is Ownable {
         address _vault,
         address _pool,
         address _modelHelper
-    ) public onlyOwner {
+    ) public onlyOwner notInitialized() {
         if (
             _factory == address(0)    || 
             _vault == address(0)      || 
@@ -348,6 +352,12 @@ contract Deployer is Ownable {
     /// @dev Modifier to ensure only the factory can call certain functions.
     modifier onlyFactory() {
         if (msg.sender != factory) revert OnlyFactoryAllowed();
+        _;
+    }
+
+    /// @dev Modifier to ensure the contract is initialized before certain functions can be called.
+    modifier notInitialized() {
+        if (initialized) revert AlreadyInitialized();
         _;
     }
 }

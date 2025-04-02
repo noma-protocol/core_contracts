@@ -10,7 +10,7 @@ interface ITokenRepo {
     /// @param token The address of the ERC20 token contract
     /// @param to The recipient address
     /// @param amount The amount of tokens to transfer
-    function transfer(address token, address to, uint256 amount) external;
+    function transferToRecipient(address token, address to, uint256 amount) external;
 }
 
 /// @title Token Repository
@@ -31,7 +31,7 @@ contract TokenRepo {
     /// @param token The address of the ERC20 token.
     /// @param to The address of the recipient.
     /// @param amount The amount of tokens to transfer.
-    function transfer(address token, address to, uint256 amount) external onlyOwner {
+    function transferToRecipient(address token, address to, uint256 amount) external onlyOwner {
         IERC20(token).transfer(to, amount);
     }
 

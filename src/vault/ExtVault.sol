@@ -66,17 +66,12 @@ contract ExtVault {
 
     /**
      * @notice Allows a user to pay back a loan.
-     * @param who The address of the borrower.
      */
-    function payback(
-        address who
-    ) external {
+    function payback() external {
         ILendingVault(address(this))
-        .paybackLoan(
-            who
-        );
+        .paybackLoan(msg.sender);
 
-        emit Payback(who);
+        emit Payback(msg.sender);
     }
 
     /**
@@ -139,7 +134,7 @@ contract ExtVault {
         selectors[0] = bytes4(keccak256(bytes("shift()")));
         selectors[1] = bytes4(keccak256(bytes("slide()")));  
         selectors[2] = bytes4(keccak256(bytes("borrow(uint256,uint256)")));  
-        selectors[3] = bytes4(keccak256(bytes("payback(address)")));
+        selectors[3] = bytes4(keccak256(bytes("payback()")));
         selectors[4] = bytes4(keccak256(bytes("roll(uint256)")));              
         return selectors;
     }

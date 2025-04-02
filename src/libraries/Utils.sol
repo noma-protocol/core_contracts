@@ -90,7 +90,7 @@ library Utils {
         address resolverAddress,
         address vaultAddress,
         address stakingContract,
-        address sNoma,
+        address sOKS,
         address presaleContract,
         address adaptiveSupply,
         address modelHelper,
@@ -100,7 +100,7 @@ library Utils {
         names[0] = Utils.stringToBytes32("AdaptiveSupply");
         names[1] = Utils.stringToBytes32("ModelHelper");
         names[2] = Utils.stringToBytes32("Staking");
-        names[3] = Utils.stringToBytes32("sNoma");
+        names[3] = Utils.stringToBytes32("sOKS");
         names[4] = Utils.stringToBytes32("Deployer");
         names[5] = Utils.stringToBytes32("Presale");
 
@@ -109,7 +109,7 @@ library Utils {
         destinations[0] = adaptiveSupply;
         destinations[1] = modelHelper;
         destinations[2] = stakingContract;
-        destinations[3] = sNoma;
+        destinations[3] = sOKS;
         destinations[4] = deployer;
         destinations[5] = presaleContract;
 

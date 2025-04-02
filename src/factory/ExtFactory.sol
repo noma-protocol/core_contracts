@@ -1,3 +1,4 @@
+
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
@@ -64,7 +65,7 @@ contract ExtFactory {
     ) {
 
         // Deploy GonsToken contract
-        gonsToken = new GonsToken(address(this));
+        gonsToken = new GonsToken();
 
         // Deploy Staking contract
         stakingContract = new Staking(token0, address(gonsToken), vaultAddress);

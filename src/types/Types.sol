@@ -299,6 +299,7 @@ struct LiquidityInternalPars {
     LiquidityType liquidityType;
 }
 
+// @notice Parameters for deploying liquidity.
 struct DeploymentData {
     PresaleUserParams presaleParams;
     VaultDeployParams vaultDeployParams;
@@ -307,7 +308,7 @@ struct DeploymentData {
     int24 tickSpacing;
     address vaultAddress;
     address vaultUpgrade;
-    address sNoma;
+    address sOKS;
     address stakingContract;
     address presaleContract;
     address tokenRepo;
@@ -323,14 +324,4 @@ struct SwapParams {
     uint256 amountToSwap; 
     bool zeroForOne; 
     bool isLimitOrder;
-}
-
-// @notice Migration contract information.
-struct MigrationInfo {
-    uint256 initialIMV;
-    uint256 currentIMV;
-    uint256 migrationStartTime;
-    uint256 migrationEndTime;
-    bool migrationCompleted;
-    uint256 withdrawnAmount;
 }

@@ -53,7 +53,7 @@ contract GonsToken is ERC20Permit {
     // This is denominated in Fragments, because the gons-fragments conversion might change before it's fully paid.
     mapping (address => mapping (address => uint256)) private _allowedFragments;
 
-    constructor(address _authority) ERC20("Staked Noma", "sNOMA", 18) ERC20Permit("Staked Noma") {
+    constructor() ERC20("Staked Oikos", "sOKS", 18) ERC20Permit("Staked Oikos") {
         _totalSupply = INITIAL_FRAGMENTS_SUPPLY;
         _gonBalances[address(this)] = TOTAL_GONS;
         _gonsPerFragment = TOTAL_GONS.div(_totalSupply);
@@ -65,7 +65,7 @@ contract GonsToken is ERC20Permit {
      * @dev Initializes the contract by setting the staking contract address and transferring the total supply.
      * @param _stakingContract The address of the staking contract.
      */
-    function initialize(address _stakingContract) external  {
+    function initialize(address _stakingContract) external notInitialized {
         if (stakingContract != address(0)) {
             revert AlreadyInitialized();
         }
@@ -312,10 +312,23 @@ contract GonsToken is ERC20Permit {
         return balanceOf(address(this)) - balanceOf(address(0));
     }
 
+    /**
+     modifier to restrict access to the staking contract
+    */
     modifier onlyStakingContract() {
         if (msg.sender != stakingContract) {
             revert Unauthorized();
         }
         _;
     }    
+
+    /**
+     * @dev Modifier to restrict initialization to only once.
+    */
+    modifier notInitialized() {
+        if (initialized) {
+            revert AlreadyInitialized();
+        }
+        _;
+    }
 }
