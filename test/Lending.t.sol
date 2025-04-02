@@ -67,8 +67,8 @@ contract LendingVaultTest is Test {
         // Read the JSON file
         string memory json = vm.readFile(path);
 
-        string memory networkId = "1337";
-        // Parse the data for network ID `1337`
+        string memory networkId = "56";
+        // Parse the data for network ID `56`
         bytes memory data = vm.parseJson(json, string.concat(string("."), networkId));
 
         // Decode the data into the ContractAddresses struct
@@ -86,7 +86,7 @@ contract LendingVaultTest is Test {
         require(address(managerContract) != address(0), "Manager contract address is zero");
 
         noma = OikosToken(nomaToken);
-        require(address(noma) != address(0), "Noma token address is zero");
+        require(address(noma) != address(0), "Oikos token address is zero");
         
         modelHelper = ModelHelper(modelHelperContract);
         vaultAddress = address(managerContract.vault());
@@ -141,7 +141,7 @@ contract LendingVaultTest is Test {
         console.log("Token1 balance before payback is: ", token1Balance);
         
         vm.prank(deployer);
-        vault.payback(deployer);
+        vault.payback();
  
         assertEq(token1Balance - borrowAmount, token1.balanceOf(deployer));
     }    
@@ -296,7 +296,7 @@ contract LendingVaultTest is Test {
         console.log("Anchor capacity + floor balance is: ", anchorCapacity + floorBalance);
         console.log("Circulating supply is: ", circulatingSupply);
 
-        // To guarantee solvency, Noma ensures that capacity > circulating supply each liquidity is deployed.
+        // To guarantee solvency, Oikos ensures that capacity > circulating supply each liquidity is deployed.
         require(anchorCapacity + floorCapacity > circulatingSupply, "Insolvency invariant failed");
     }
 }

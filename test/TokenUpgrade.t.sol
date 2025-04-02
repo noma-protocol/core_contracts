@@ -2,8 +2,8 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "./token/TestMockNomaToken.sol";
-import "./token/TestMockNomaTokenV2.sol";
+import "./token/TestMockOikosToken.sol";
+import "./token/TestMockOikosTokenV2.sol";
 import "openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 struct ContractAddressesJson {
@@ -13,7 +13,7 @@ struct ContractAddressesJson {
     address Proxy;
 }
 
-interface NomaFactory {
+interface OikosFactory {
     function upgradeToken(
         address _token,
         address _newImplementation
@@ -21,8 +21,8 @@ interface NomaFactory {
 }
 
 contract TestTokenUpgrade is Test {
-    TestMockNomaToken public mockNomaToken;
-    TestMockNomaTokenV2 public mockNomaTokenV2;
+    TestMockOikosToken public mockOikosToken;
+    TestMockOikosTokenV2 public mockOikosTokenV2;
     ERC1967Proxy public proxy;
 
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
@@ -42,8 +42,8 @@ contract TestTokenUpgrade is Test {
         // Read the JSON file
         string memory json = vm.readFile(path);
 
-        string memory networkId = "1337";
-        // Parse the data for network ID `1337`
+        string memory networkId = "56";
+        // Parse the data for network ID `56`
         bytes memory data = vm.parseJson(json, string.concat(string("."), networkId));
 
         // Decode the data into the ContractAddresses struct
@@ -58,14 +58,14 @@ contract TestTokenUpgrade is Test {
     function testDirectUpgrade() public {
 
         // Deploy new implementation
-        mockNomaTokenV2 = new TestMockNomaTokenV2();
+        mockOikosTokenV2 = new TestMockOikosTokenV2();
 
         // Upgrade the proxy to use the new implementation
         vm.prank(factoryAddress);
-        TestMockNomaToken(proxyAddress).upgradeToAndCall(address(mockNomaTokenV2), new bytes(0));
+        TestMockOikosToken(proxyAddress).upgradeToAndCall(address(mockOikosTokenV2), new bytes(0));
 
-        // Cast the proxy to MockNomaTokenV2 to interact with the new implementation
-        TestMockNomaTokenV2 upgraded = TestMockNomaTokenV2(proxyAddress);
+        // Cast the proxy to MockOikosTokenV2 to interact with the new implementation
+        TestMockOikosTokenV2 upgraded = TestMockOikosTokenV2(proxyAddress);
 
         // Check if the new implementation is in use
         assertEq(upgraded.version(), "V2");        
@@ -74,16 +74,29 @@ contract TestTokenUpgrade is Test {
     
     function testUpgradeThroughFactory() public {
         // Deploy new implementation
-        mockNomaTokenV2 = new TestMockNomaTokenV2();
+        mockOikosTokenV2 = new TestMockOikosTokenV2();
 
         // Upgrade the proxy to use the new implementation
         vm.prank(deployer);
-        NomaFactory(factoryAddress).upgradeToken(proxyAddress, address(mockNomaTokenV2));
+        OikosFactory(factoryAddress).upgradeToken(proxyAddress, address(mockOikosTokenV2));
 
-        // Cast the proxy to MockNomaTokenV2 to interact with the new implementation
-        TestMockNomaTokenV2 upgraded = TestMockNomaTokenV2(proxyAddress);
+        // Cast the proxy to MockOikosTokenV2 to interact with the new implementation
+        TestMockOikosTokenV2 upgraded = TestMockOikosTokenV2(proxyAddress);
 
         // Check if the new implementation is in use
         assertEq(upgraded.version(), "V2");        
+    }
+
+    function testCannotUpgradeFromNonDeployer() public {
+        // Deploy new implementation
+        mockOikosTokenV2 = new TestMockOikosTokenV2();
+
+        // Try to upgrade the proxy from a non-deployer account
+        vm.prank(user);
+        vm.expectRevert();
+        OikosFactory(factoryAddress).upgradeToken(proxyAddress, address(mockOikosTokenV2));
+        
+        // Verify that the upgrade did not happen by checking the version is still V1
+        assertEq(TestMockOikosToken(proxyAddress).version(), "1");
     }
 }

@@ -6,7 +6,7 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract MockNomaTokenRestricted is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
+contract MockOikosTokenRestricted is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
     mapping(address => bool) public allowedPools;
 
     address uniswapPool = 0x4aBda2052f7E91eED7C2b6A6e6191E4db22463b0;

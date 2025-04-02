@@ -5,10 +5,12 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import { IAddressResolver } from "../../src/interfaces/IAddressResolver.sol";
 import { Utils } from "../../src/libraries/Utils.sol";
 
-contract TestMockNomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
+contract TestMockOikosTokenV2 is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
+    mapping(address => bool) public allowedPools;
 
     IAddressResolver public resolver;
 
@@ -22,28 +24,36 @@ contract TestMockNomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeabl
         __ERC20_init(_name, _symbol);
         __Ownable_init(_deployer);
         __UUPSUpgradeable_init();
-        _mint(msg.sender, _totalSupply);
+        // _mint(msg.sender, _totalSupply);
         resolver = IAddressResolver(_resolver);
-    }
-
-    function mintTest(address to, uint256 amount) public {
-        _mint(to, amount);
-    }
-    
-    function mintTo(address to, uint256 amount) public onlyFactory  {
-        _mint(to, amount);
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     function version() public pure returns (string memory) {
-        return "1";
+        return "V2";
     }
 
     function proxiableUUID() public pure override returns (bytes32) {
         bytes32 hash = keccak256("eip1967.proxy.implementation");
         bytes32 slot = bytes32(uint256(hash) - 1);
         return slot;
+    }
+    
+    function transfer(address recipient, uint256 amount) public override onlyUniswapV3(msg.sender, recipient) returns (bool) {
+        return super.transfer(recipient, amount);
+    }
+
+    function transferFrom(address sender, address recipient, uint256 amount) public override onlyUniswapV3(sender, recipient) returns (bool) {
+        return super.transferFrom(sender, recipient, amount);
+    }
+
+    function addAllowedPool(address pool) external onlyOwner {
+        allowedPools[pool] = true;
+    }
+
+    function removeAllowedPool(address pool) external onlyOwner {
+        allowedPools[pool] = false;
     }
 
     function setOwner(address _owner) external onlyOwner {
@@ -64,6 +74,14 @@ contract TestMockNomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeabl
 
     modifier onlyFactory() {
         require(msg.sender == nomaFactory(), "Only factory");
+        _;
+    }
+
+    modifier onlyUniswapV3(address sender, address recipient) {
+        require(
+            allowedPools[sender] || allowedPools[recipient],
+            "Token can only be transferred via Uniswap V3"
+        );
         _;
     }
 }

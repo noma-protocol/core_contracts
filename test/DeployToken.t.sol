@@ -4,13 +4,13 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 
-import "./token/TestMockNomaToken.sol";
-import "./token/TestMockNomaTokenV2.sol";
+import "./token/TestMockOikosToken.sol";
+import "./token/TestMockOikosTokenV2.sol";
 import "openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract DeployToken is Test {
-    TestMockNomaToken public mockNomaToken;
-    TestMockNomaTokenV2 public mockNomaTokenV2;
+    TestMockOikosToken public mockOikosToken;
+    TestMockOikosTokenV2 public mockOikosTokenV2;
     ERC1967Proxy public proxy;
 
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
@@ -21,11 +21,11 @@ contract DeployToken is Test {
         vm.startPrank(deployer);
 
         // Deploy the implementation contract
-        mockNomaToken = new TestMockNomaToken();
+        mockOikosToken = new TestMockOikosToken();
 
         // Encode the initialize function call
         bytes memory data = abi.encodeWithSelector(
-            mockNomaToken.initialize.selector,
+            mockOikosToken.initialize.selector,
             deployer,
             1000000 ether,
             "Mock NOMA",
@@ -35,43 +35,43 @@ contract DeployToken is Test {
 
         // Deploy the proxy contract
         proxy = new ERC1967Proxy(
-            address(mockNomaToken),
+            address(mockOikosToken),
             data
         );
 
-        // Cast the proxy to MockNomaToken to interact with it
-        mockNomaToken = TestMockNomaToken(address(proxy));
+        // Cast the proxy to MockOikosToken to interact with it
+        mockOikosToken = TestMockOikosToken(address(proxy));
 
         // Mint tokens
-        mockNomaToken.mintTest(deployer, 100 ether);
-        mockNomaToken.transfer(user, 100 ether);
+        mockOikosToken.mintTest(deployer, 100 ether);
+        mockOikosToken.transfer(user, 100 ether);
 
         vm.stopPrank();
     }
 
     function testInitialSupply() public {
-        uint256 deployerBalance = mockNomaToken.balanceOf(deployer);
+        uint256 deployerBalance = mockOikosToken.balanceOf(deployer);
         assertEq(deployerBalance, 1000000 ether);
     }
 
     function testTransfer() public {
-        uint256 userBalance = mockNomaToken.balanceOf(user);
+        uint256 userBalance = mockOikosToken.balanceOf(user);
         assertEq(userBalance, 100 ether);
     }
 
     function testUpgrade() public {
         // Deploy new implementation
-        mockNomaTokenV2 = new TestMockNomaTokenV2();
+        mockOikosTokenV2 = new TestMockOikosTokenV2();
 
         // Upgrade the proxy to use the new implementation
         vm.prank(deployer);
-        TestMockNomaToken(address(proxy)).upgradeToAndCall(address(mockNomaTokenV2), new bytes(0));
+        TestMockOikosToken(address(proxy)).upgradeToAndCall(address(mockOikosTokenV2), new bytes(0));
 
-        // Cast the proxy to TestMockNomaTokenV2 to interact with the new implementation
-        TestMockNomaTokenV2 upgraded = TestMockNomaTokenV2(address(proxy));
+        // Cast the proxy to TestMockOikosTokenV2 to interact with the new implementation
+        TestMockOikosTokenV2 upgraded = TestMockOikosTokenV2(address(proxy));
 
-        mockNomaTokenV2 = upgraded;
-        bytes32 uuid = mockNomaTokenV2.proxiableUUID();
+        mockOikosTokenV2 = upgraded;
+        bytes32 uuid = mockOikosTokenV2.proxiableUUID();
 
         console.log("UUID %s", uint256(uuid));
 
@@ -89,10 +89,10 @@ contract DeployToken is Test {
 
         console.log("UUID %s", uint256(uuid));
 
-        assertEq(mockNomaToken.proxiableUUID(), uuid);
+        assertEq(mockOikosToken.proxiableUUID(), uuid);
 
         // Deploy new implementation
-        mockNomaTokenV2 = new TestMockNomaTokenV2();
-        assertEq(mockNomaTokenV2.proxiableUUID(), uuid);
+        mockOikosTokenV2 = new TestMockOikosTokenV2();
+        assertEq(mockOikosTokenV2.proxiableUUID(), uuid);
     }
 }

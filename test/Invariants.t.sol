@@ -65,8 +65,8 @@ contract Invariants is Test {
         // Read the JSON file
         string memory json = vm.readFile(path);
 
-        string memory networkId = "1337";
-        // Parse the data for network ID `1337`
+        string memory networkId = "56";
+        // Parse the data for network ID `56`
         bytes memory data = vm.parseJson(json, string.concat(string("."), networkId));
 
         // Decode the data into the ContractAddresses struct

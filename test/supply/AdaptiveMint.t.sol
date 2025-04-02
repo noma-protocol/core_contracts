@@ -38,8 +38,8 @@ contract AdaptiveMintTest is Test {
         // Read the JSON file
         string memory json = vm.readFile(path);
 
-        string memory networkId = "1337";
-        // Parse the data for network ID `1337`
+        string memory networkId = "56";
+        // Parse the data for network ID `56`
         bytes memory data = vm.parseJson(json, string.concat(string("."), networkId));
 
         // Decode the data into the ContractAddresses struct
@@ -145,6 +145,91 @@ contract AdaptiveMintTest is Test {
         assertLt(lowMint, normalMint, "Low volatility mint should be smaller than normal");
         assertLt(normalMint, mediumMint, "Normal volatility mint should be smaller than medium");
         assertLt(mediumMint, highMint, "Medium volatility mint should be smaller than high");
+    }
+
+
+    function testMintAmountsIncreaseLinearly() public {
+    
+        uint256 increaseFactor = 1_000; // Example increase factor
+        uint256 deltaSupply = 1_000 ether; // Example delta supply
+        uint256 timeElapsed = 14 days;     // Example time elapsed
+
+        vm.prank(vaultAddress);
+        uint256 firstMintAmount = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 2e18, 1e18);
+
+        console.log("First Mint Amount: ", firstMintAmount);
+
+        emit log_named_uint("Mint Amount (Low Volatility)", firstMintAmount);
+
+        deltaSupply = deltaSupply * increaseFactor; 
+
+        //assert that firstMintAmount is less than 10% of deltaSupply
+        assertLt(firstMintAmount, deltaSupply / 10, "First mint amount should be less than 10% of delta supply");
+
+        vm.prank(vaultAddress);
+        uint256 secondMintAmount = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 2e18, 1e18);
+    
+        console.log("Second Mint Amount: ", secondMintAmount);
+
+        emit log_named_uint("Mint Amount (Low Volatility)", secondMintAmount);
+
+        //assert that secondMintAmount is less than 10% of deltaSupply
+        assertLt(secondMintAmount, deltaSupply / 10, "Second mint amount should be less than 10% of delta supply");
+
+        // Assert that the second mint amount is approximately equal to the first mint amount multiplied by increaseFactor
+        uint256 expectedAmount = firstMintAmount * increaseFactor;
+        uint256 tolerance = 1e18; // 1 token tolerance
+        assertApproxEqAbs(secondMintAmount, expectedAmount, tolerance, "Mint amount should scale linearly with delta supply");
+
+        // Repeat all tests above for 30 days
+
+        timeElapsed = 30 days; // Example time elapsed
+        vm.prank(vaultAddress);
+        uint256 thirdMintAmount = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 2e18, 1e18);
+        console.log("Third Mint Amount: ", thirdMintAmount);
+
+        emit log_named_uint("Mint Amount (Low Volatility)", thirdMintAmount);
+
+        //assert that thirdMintAmount is less than 10% of deltaSupply
+        assertLt(thirdMintAmount, deltaSupply / 10, "Third mint amount should be less than 10% of delta supply");
+
+        //assert that thirdMintAmount is less than 10% of deltaSupply
+        assertLt(thirdMintAmount, deltaSupply / 10, "Third mint amount should be less than 10% of delta supply");
+        // Assert that the third mint amount is approximately equal to the first mint amount multiplied by increaseFactor
+
+        expectedAmount = firstMintAmount * increaseFactor;
+        assertApproxEqAbs(thirdMintAmount, expectedAmount, tolerance, "Mint amount should scale linearly with delta supply");
+        
+        //assert that thirdMintAmount is less than 10% of deltaSupply
+        assertLt(thirdMintAmount, deltaSupply / 10, "Third mint amount should be less than 10% of delta supply");
+
+        //assert that thirdMintAmount is less than 10% of deltaSupply
+        assertLt(thirdMintAmount, deltaSupply / 10, "Third mint amount should be less than 10% of delta supply");
+
+        // Assert that the third mint amount is approximately equal to the first mint amount multiplied by increaseFactor
+        expectedAmount = firstMintAmount * increaseFactor;
+        assertApproxEqAbs(thirdMintAmount, expectedAmount, tolerance, "Mint amount should scale linearly with delta supply");
+
+        //assert that thirdMintAmount is less than 10% of deltaSupply
+        assertLt(thirdMintAmount, deltaSupply / 10, "Third mint amount should be less than 10% of delta supply");
+
+        //assert that thirdMintAmount is less than 10% of deltaSupply
+        assertLt(thirdMintAmount, deltaSupply / 10, "Third mint amount should be less than 10% of delta supply");
+
+        // Assert that the third mint amount is approximately equal to the first mint amount multiplied by increaseFactor
+        expectedAmount = firstMintAmount * increaseFactor;
+        assertApproxEqAbs(thirdMintAmount, expectedAmount, tolerance, "Mint amount should scale linearly with delta supply");
+
+        //assert that thirdMintAmount is less than 10% of deltaSupply
+        assertLt(thirdMintAmount, deltaSupply / 10, "Third mint amount should be less than 10% of delta supply");
+
+        //assert that thirdMintAmount is less than 10% of deltaSupply
+        assertLt(thirdMintAmount, deltaSupply / 10, "Third mint amount should be less than 10% of delta supply");
+
+        // Assert that the third mint amount is approximately equal to the first mint amount multiplied by increaseFactor
+        expectedAmount = firstMintAmount * increaseFactor;
+
+        assertApproxEqAbs(thirdMintAmount, expectedAmount, tolerance, "Mint amount should scale linearly with delta supply");
     }
 
 
