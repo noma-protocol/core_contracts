@@ -302,9 +302,9 @@ contract Presale is pAsset, Ownable {
         require(availableBalance >= minAmountOut, "Insufficient liquidity for withdrawal");
 
         // Transfer tokens to the user
-        IERC20(token0).safeTransfer(msg.sender, availableBalance);
+        IERC20(token0).safeTransfer(msg.sender, minAmountOut);
 
-        emit TokensWithdrawn(msg.sender, availableBalance);
+        emit TokensWithdrawn(msg.sender, minAmountOut);
     }  
 
     /**
