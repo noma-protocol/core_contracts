@@ -35,23 +35,21 @@ contract ExtVault {
 
     /**
      * @notice Allows a user to borrow tokens from the vault's floor liquidity.
-     * @param who The address of the borrower.
      * @param borrowAmount The amount of tokens to borrow.
      * @param duration The duration of the loan.
      */
     function borrow(
-        address who,
         uint256 borrowAmount,
         uint256 duration
     ) external {
         ILendingVault(address(this))
         .borrowFromFloor(
-            who,
+            msg.sender,
             borrowAmount,
             duration
         );
 
-        emit Borrow(who, borrowAmount, duration);
+        emit Borrow(msg.sender, borrowAmount, duration);
     }
 
     /**
