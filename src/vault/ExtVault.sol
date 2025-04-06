@@ -17,6 +17,7 @@ interface ILendingVault {
     function borrowFromFloor(address who, uint256 borrowAmount, uint256 duration) external;
     function paybackLoan(address who) external;
     function rollLoan(address who, uint256 newDuration) external;
+    function defaultLoans() external;
 }
 
 // Events
@@ -25,6 +26,7 @@ event Payback(address indexed who);
 event RollLoan(address indexed who);
 event Shift();
 event Slide();
+event DefaultLoans();
 
 /**
  * @title ExtVault
@@ -50,6 +52,16 @@ contract ExtVault {
         );
 
         emit Borrow(msg.sender, borrowAmount, duration);
+    }
+
+    /**
+     * @notice Allows anybody to default expired loans.
+     */
+    function defaultLoans() external {
+        ILendingVault(address(this))
+        .defaultLoans();
+
+        emit DefaultLoans();
     }
 
     /**
