@@ -138,6 +138,7 @@ contract LendingVault is BaseVault {
         LoanPosition storage loan = _v.loanPositions[who];
 
         if (loan.borrowAmount == 0) revert NoActiveLoan();
+        if (block.timestamp > loan.expiry) revert LoanExpired();
 
         IERC20(_v.pool.token1()).transferFrom(who, address(this), loan.borrowAmount);
         ITokenRepo(_v.tokenRepo).transfer(_v.pool.token0(), who, loan.collateralAmount);
