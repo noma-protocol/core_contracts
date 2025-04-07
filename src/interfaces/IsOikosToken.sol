@@ -4,10 +4,10 @@ pragma solidity ^0.8.23;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
- * @title IsNomaToken
- * @notice Interface for the sNomaToken, extending the standard ERC20 interface with additional functionalities.
+ * @title IsOikosToken
+ * @notice Interface for the sOikosToken, extending the standard ERC20 interface with additional functionalities.
  */
-interface IsNomaToken is IERC20 {
+interface IsOikosToken is IERC20 {
 
     function initialize(address _stakingContract) external;
     
