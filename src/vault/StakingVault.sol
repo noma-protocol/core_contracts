@@ -104,7 +104,7 @@ contract StakingVault is BaseVault {
             IVault(address(this)).mintTokens(address(this), toMint);
             IERC20(_v.tokenInfo.token0).transfer(_v.stakingContract, toMint);
 
-            // Update total minted (NOMA)
+            // Update total minted (OKS)
             _v.totalMinted += toMint;
 
             // Call notifyRewardAmount 

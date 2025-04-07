@@ -139,7 +139,7 @@ contract OikosFactory {
         bytes32 tokenHash = keccak256(abi.encodePacked(vaultDeployParams.name, vaultDeployParams.symbol));
         if (deployedTokenHashes[tokenHash]) revert TokenAlreadyExistsError();
 
-        (OikosToken nomaToken, ERC1967Proxy proxy, ) =
+        (OikosToken oikosToken, ERC1967Proxy proxy, ) =
         ITokenFactory(tokenFactory())
             .deployOikosToken(vaultDeployParams);
         

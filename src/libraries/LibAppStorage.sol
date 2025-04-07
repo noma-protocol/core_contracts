@@ -76,7 +76,7 @@ library LibAppStorage {
      */
     function vaultStorage() internal pure returns (VaultStorage storage vs) {
         assembly {
-            vs.slot := keccak256(add(0x20, "noma.money.vaultstorage"), 32)
+            vs.slot := keccak256(add(0x20, "oikos.cash.vaultstorage"), 32)
         }
     }
 }

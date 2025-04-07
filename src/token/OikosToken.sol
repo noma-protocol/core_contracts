@@ -10,7 +10,7 @@ import {Utils} from "../libraries/Utils.sol";
 
 /**
  * @title OikosToken
- * @notice Noma token contract.
+ * @notice Oikos token contract.
  * @dev This contract is upgradeable and uses the UUPS proxy pattern.
  */
 contract OikosToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable {

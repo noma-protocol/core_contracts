@@ -3,18 +3,18 @@ pragma solidity ^0.8.23;
 
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IsNomaToken} from "../interfaces/IsNomaToken.sol";
+import {IsOikosToken} from "../interfaces/IsOikosToken.sol";
 import {IVault} from "../interfaces/IVault.sol";
 import {Utils} from "../libraries/Utils.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title Staking
- * @notice A contract for staking NOMA tokens and earning rewards.
+ * @notice A contract for staking OKS tokens and earning rewards.
  */
 contract Staking {
     using SafeERC20 for IERC20;
-    using SafeERC20 for IsNomaToken;
+    using SafeERC20 for IsOikosToken;
 
     /**
      * @notice Struct representing an epoch.
@@ -29,8 +29,8 @@ contract Staking {
     }
 
     // State variables
-    IERC20 public NOMA; // The NOMA token contract.
-    IsNomaToken public sOKS; // The staked NOMA token contract.
+    IERC20 public OKS; // The OKS token contract.
+    IsOikosToken public sOKS; // The staked OKS token contract.
     
     address public authority; // The address with authority over the contract.
     address public vault; // The address of the vault contract.
@@ -41,7 +41,7 @@ contract Staking {
     
     uint256 public totalRewards; // Total rewards distributed.
     uint256 public totalEpochs; // Total number of epochs.
-    uint256 public totalStaked; // Total amount of NOMA staked.
+    uint256 public totalStaked; // Total amount of OKS staked.
 
     // Mapping to track staked amounts per user
     mapping(address => uint256) private stakedBalances;
@@ -72,17 +72,17 @@ contract Staking {
 
     /**
      * @notice Constructor to initialize the Staking contract.
-     * @param _noma The address of the NOMA token.
-     * @param _sNoma The address of the staked NOMA token.
+     * @param _oikos The address of the OKS token.
+     * @param _sOikos The address of the staked OKS token.
      * @param _vault The address of the vault contract.
      */
     constructor(    
-        address _noma,
-        address _sNoma,
+        address _oikos,
+        address _sOikos,
         address _vault
     ) {
-        NOMA = IERC20(_noma);
-        sOKS = IsNomaToken(_sNoma);
+        OKS = IERC20(_oikos);
+        sOKS = IsOikosToken(_sOikos);
         vault = _vault;
         
         sOKS.initialize(address(this));
@@ -100,8 +100,8 @@ contract Staking {
     }
 
     /**
-    * @notice Allows a user to stake NOMA tokens.
-    * @param _amount The amount of NOMA tokens to stake.
+    * @notice Allows a user to stake OKS tokens.
+    * @param _amount The amount of OKS tokens to stake.
     */
     function stake(uint256 _amount) public {
         if (_amount == 0) {
@@ -120,8 +120,8 @@ contract Staking {
         // Update the last operation timestamp for the user
         lastOperationTimestamp[msg.sender] = block.timestamp;
         
-        // Transfer NOMA tokens from the user to the staking contract
-        NOMA.transferFrom(msg.sender, address(this), _amount);
+        // Transfer OKS tokens from the user to the staking contract
+        OKS.transferFrom(msg.sender, address(this), _amount);
 
         // Mint rebase-adjusted sOKS to the staker
         sOKS.mint(msg.sender, _amount);
@@ -135,7 +135,7 @@ contract Staking {
     }
 
     /**
-    * @notice Allows a user to unstake their NOMA tokens.
+    * @notice Allows a user to unstake their OKS tokens.
     */
     function unstake() external {
         if (IVault(vault).stakingEnabled() == false) {
@@ -147,18 +147,18 @@ contract Staking {
             revert LockInPeriodNotElapsed();
         }
 
-        uint256 balance = Math.min(sOKS.balanceOf(msg.sender), NOMA.balanceOf(address(this)));
+        uint256 balance = Math.min(sOKS.balanceOf(msg.sender), OKS.balanceOf(address(this)));
 
         if (balance == 0) {
             revert NotEnoughBalance(0);
         }
 
-        if (NOMA.balanceOf(address(this)) < balance) {
+        if (OKS.balanceOf(address(this)) < balance) {
             revert NotEnoughBalance(balance); 
         }
 
         sOKS.burn(sOKS.balanceOf(msg.sender), msg.sender);
-        NOMA.safeTransfer(msg.sender, balance);
+        OKS.safeTransfer(msg.sender, balance);
 
         totalStaked -= stakedBalances[msg.sender];
         stakedBalances[msg.sender] = 0;
@@ -204,9 +204,9 @@ contract Staking {
     }
 
     /**
-    * @notice Returns the originally staked amount of NOMA for a user.
+    * @notice Returns the originally staked amount of OKS for a user.
    * @param _user The address of the staker.
-   * @return The originally staked amount of NOMA.
+   * @return The originally staked amount of OKS.
     */
     function stakedBalance(address _user) external view returns (uint256) {
         return stakedBalances[_user];

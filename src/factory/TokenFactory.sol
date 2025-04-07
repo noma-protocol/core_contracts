@@ -37,7 +37,7 @@ contract TokenFactory {
     returns (OikosToken, ERC1967Proxy, bytes32) {
         // Deploy the Oikos token
         (
-            OikosToken nomaToken, 
+            OikosToken oikosToken, 
             ERC1967Proxy proxy, 
             bytes32 tokenHash
         ) = _deployOikosToken(
@@ -47,7 +47,7 @@ contract TokenFactory {
             vaultDeployParams.totalSupply
         );
 
-        return (nomaToken, proxy, tokenHash);
+        return (oikosToken, proxy, tokenHash);
     }
 
     /**
@@ -56,7 +56,7 @@ contract TokenFactory {
     * @param symbol The symbol of the token.
     * @param _token1 The address of the paired token (token1).
     * @param totalSupply The total supply of the token.
-    * @return nomaToken The address of the newly deployed OikosToken.
+    * @return oikosToken The address of the newly deployed OikosToken.
     * @dev This internal function ensures the token does not already exist, generates a unique address using a salt, and initializes the token.
     * It reverts if the token address is invalid or if the token already exists.
     */
