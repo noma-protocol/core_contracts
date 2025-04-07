@@ -180,7 +180,6 @@ contract LendingVault is BaseVault {
 
         // Ensure the new duration is valid
         if (newDuration == 0) revert InvalidDuration();
-        if (newDuration > loan.duration) revert InvalidDuration();
 
         // Recalculate the collateral value
         uint256 newCollateralValue = DecimalMath.multiplyDecimal(
