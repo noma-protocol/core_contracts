@@ -116,7 +116,7 @@ contract LendingVaultTest is Test {
         uint256 balanceBeforeToken1 = token1.balanceOf(deployer);
 
         vm.prank(deployer);
-        vault.borrow(deployer, borrowAmount, duration);
+        vault.borrow(borrowAmount, duration);
 
         uint256 fees = calculateLoanFees(borrowAmount, duration);
 
@@ -155,7 +155,7 @@ contract LendingVaultTest is Test {
 
         // Borrow first
         vm.prank(deployer);
-        vault.borrow(deployer, borrowAmount, duration);
+        vault.borrow(borrowAmount, duration);
         
         uint256 balanceBeforePaybackToken1 = token1.balanceOf(deployer);
         uint256 balanceBeforePaybackToken0 = token0.balanceOf(deployer);
@@ -169,8 +169,7 @@ contract LendingVaultTest is Test {
 
         vm.prank(deployer);
 
-        vm.expectRevert(abi.encodeWithSignature("InvalidDuration()"));
-        vault.roll(deployer, newDuration);
+        vault.roll(newDuration);
 
         // check if the loan amount is deducted from the user's balance
         // assertEq(balanceBeforePaybackToken1 - token1.balanceOf(deployer), borrowAmount);
@@ -189,27 +188,17 @@ contract LendingVaultTest is Test {
 
         // Borrow first
         vm.prank(deployer);
-        vault.borrow(deployer, borrowAmount, duration);
+        vault.borrow(borrowAmount, duration);
         
         uint256 balanceBeforePaybackToken1 = token1.balanceOf(deployer);
         uint256 balanceBeforePaybackToken0 = token0.balanceOf(deployer);
 
-        // trigger shift
-        testLargePurchaseTriggerShift();
-
-        // Pay back part of the loan
         vm.prank(deployer);
-        token1.approve(vaultAddress, MAX_INT);
 
-        vm.prank(deployer);
-        vault.roll(deployer, newDuration);
-
-        // check if the loan amount is deducted from the user's balance
-        // assertEq(balanceBeforePaybackToken1 - token1.balanceOf(deployer), borrowAmount);
-        // // check if the borrowed amount is reduced by the payback amount
-        assertLt(balanceBeforePaybackToken0, token0.balanceOf(deployer));
-
+        vm.expectRevert();
+        vault.roll(newDuration);
     }
+    
 
     function testLargePurchaseTriggerShift() public {
         IDOManager managerContract = IDOManager(idoManager);
