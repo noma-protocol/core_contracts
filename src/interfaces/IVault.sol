@@ -34,12 +34,11 @@ interface IVault {
 
     /**
      * @notice Allows a user to borrow from the vault.
-     * @param who The address of the borrower.
      * @param borrowAmount The amount to borrow.
      * @param duration The duration of the loan.
      * @dev Implements borrowing logic while ensuring collateralization and solvency constraints.
      */
-    function borrow(address who, uint256 borrowAmount, uint256 duration) external;
+    function borrow(uint256 borrowAmount, uint256 duration) external;
 
     /**
      * @notice Retrieves the address of the Uniswap V3 pool associated with the vault.
@@ -56,11 +55,10 @@ interface IVault {
 
     /**
      * @notice Allows a borrower to roll their loan.
-     * @param who The address of the borrower rolling their loan.
-        * @param newDuration The new duration of the loan.
+     * @param newDuration The new duration of the loan.
      * @dev Rolls the loan to a new term with updated parameters.
      */
-    function roll(address who, uint256 newDuration) external;
+    function roll(uint256 newDuration) external;
 
     /**
      * @notice Updates the vault's liquidity positions.
