@@ -81,19 +81,17 @@ contract ExtVault {
 
     /**
      * @notice Allows a user to roll over a loan.
-     * @param who The address of the borrower.
      */
     function roll(
-        address who,
         uint256 newDuration
     ) external {
         ILendingVault(address(this))
         .rollLoan(
-            who,
+            msg.sender,
             newDuration
         );
 
-        emit RollLoan(who);
+        emit RollLoan(msg.sender);
     }
 
     /**
@@ -140,9 +138,9 @@ contract ExtVault {
         bytes4[] memory selectors = new bytes4[](5);
         selectors[0] = bytes4(keccak256(bytes("shift()")));
         selectors[1] = bytes4(keccak256(bytes("slide()")));  
-        selectors[2] = bytes4(keccak256(bytes("borrow(address,uint256,uint256)")));  
+        selectors[2] = bytes4(keccak256(bytes("borrow(uint256,uint256)")));  
         selectors[3] = bytes4(keccak256(bytes("payback(address)")));
-        selectors[4] = bytes4(keccak256(bytes("roll(address,uint256)")));              
+        selectors[4] = bytes4(keccak256(bytes("roll(uint256)")));              
         return selectors;
     }
 }
