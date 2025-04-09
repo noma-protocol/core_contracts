@@ -40,7 +40,7 @@ echo "}}" >> "$DEPLOYMENT_FILE"
 
 # Create out.json with specific keys
 echo "{ \"$NETWORK_ID\": {" > "$OUT_FILE"
-for key in "IDOHelper" "ModelHelper" "Proxy" "NomaFactory"; do
+for key in "IDOHelper" "ModelHelper" "Proxy" "Factory"; do
   address=$(grep -o "\"$key\": \".*\"" "$DEPLOYMENT_FILE" | awk -F: '{print $2}' | xargs)
   if [ -n "$address" ]; then
     echo "  \"$key\": \"$address\"," >> "$OUT_FILE"
