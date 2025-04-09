@@ -2,25 +2,56 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Script.sol";
+import {stdJson} from "forge-std/StdJson.sol";
+
 import { NomaFactory } from  "../../src/factory/NomaFactory.sol";
 import { VaultDeployParams, PresaleUserParams, VaultDescription, ProtocolParameters } from "../../src/types/Types.sol";
 import { IDOHelper } from "../../test/IDO_Helper/IDOHelper.sol";
 
+struct ContractAddressesJson {
+    address Factory;
+    address ModelHelper;
+}
+
 contract DeployVault is Script {
+    using stdJson for string;
+
     // Get environment variables.
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address deployer = vm.envAddress("DEPLOYER");
 
     // Constants
     address WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
-    address private nomaFactoryAddress = 0x0a856bD938e251A21504B3053f830FCfa24f46Fe;
-    address private modelHelper = 0x34Bd850baC7e1E27BC8D494D01445BADe8138a75;
+    address private nomaFactoryAddress;
+    address private modelHelper;
 
     IDOHelper private idoManager;
 
     function run() public {  
-
         vm.startBroadcast(privateKey);
+
+        // Define the file path
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/deploy_helper/out/out.json");
+
+        // Read the JSON file
+        string memory json = vm.readFile(path);
+
+        string memory networkId = "1337";
+        // Parse the data for network ID `1337`
+        bytes memory data = vm.parseJson(json, string.concat(string("."), networkId));
+
+        // Decode the data into the ContractAddresses struct
+        ContractAddressesJson memory addresses = abi.decode(data, (ContractAddressesJson));
+        
+        // Log parsed addresses for verification
+        console2.log("Model Helper Address:", addresses.ModelHelper);
+        console2.log("Factory Address:", addresses.Factory);
+
+        // Extract addresses from JSON
+        modelHelper = addresses.ModelHelper;
+        nomaFactoryAddress = addresses.Factory;
+
         NomaFactory nomaFactory = NomaFactory(nomaFactoryAddress);
 
         VaultDeployParams memory vaultDeployParams = 
