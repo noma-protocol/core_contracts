@@ -17,7 +17,6 @@ RAW_TMP="$(dirname "$0")/deploy_helper/raw.tmp"
 
 # Step 1: Capture output of the deployment commands
 forge script script/deploy/DeployFactory.s.sol -vv --rpc-url="$RPC_URL" --private-key="$PRIVATE_KEY" --gas-price 1000000000 --broadcast --slow --legacy --optimize | tee "$DEPLOY_LOG"
-forge script script/deploy/DeployVault.s.sol -vv --rpc-url="$RPC_URL" --private-key="$PRIVATE_KEY" --gas-price 1000000000 --broadcast --slow --legacy --optimize | tee -a "$DEPLOY_LOG"
 
 # Step 2: Extract relevant logs into a temporary file
 awk '
@@ -29,3 +28,8 @@ awk '
 # Step 3: Extract the addresses and update the deployment file
 sh "$(dirname "$0")/deploy_helper/extractFromRaw.sh"
 
+# Step 4: Deploy the Vault contract
+forge script script/deploy/DeployVault.s.sol -vv --rpc-url="$RPC_URL" --private-key="$PRIVATE_KEY" --gas-price 1000000000 --broadcast --slow --legacy --optimize | tee -a "$DEPLOY_LOG"
+
+# Step 5: Extract the addresses and update the deployment file
+sh "$(dirname "$0")/deploy_helper/extractFromRaw.sh"
