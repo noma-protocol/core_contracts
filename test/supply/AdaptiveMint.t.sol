@@ -14,6 +14,7 @@ interface IDOManager {
 }
 
 struct ContractAddressesJson {
+    address Factory;
     address IDOHelper;
     address ModelHelper;
     address Proxy;

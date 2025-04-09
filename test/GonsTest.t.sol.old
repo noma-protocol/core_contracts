@@ -1,0 +1,90 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.23;
+
+import "forge-std/Test.sol";
+import "../src/staking/Gons.sol";
+
+contract GonsTokenTest is Test {
+    GonsToken gonsToken;
+    address userA = address(0x1);
+    address userB = address(0x2);
+    address userC = address(0x3);
+    
+    function setUp() public {
+        gonsToken = new GonsToken(address(this));
+    }
+
+    function testMinting() public {
+        uint256 amount = 1000e18;
+        gonsToken.mint(userA, amount);
+        assertEq(gonsToken.balanceOf(userA), amount);
+    }
+
+    function testBurning() public {
+        uint256 amount = 1000e18;
+        gonsToken.mint(userA, amount);
+        gonsToken.burnFor(userA, amount / 2);
+        assertEq(gonsToken.balanceOf(userA), amount / 2);
+    }
+
+    function testRebase() public {
+        uint256 amount = 1000e18;
+        gonsToken.mint(userA, amount);
+        uint256 initialTotalSupply = gonsToken.totalSupply();
+        uint256 rebaseAmount = 500e18;
+
+        gonsToken.rebase(rebaseAmount);
+
+        uint256 newTotalSupply = gonsToken.totalSupply();
+        uint256 expectedTotalSupply = initialTotalSupply + rebaseAmount;
+        assertEq(newTotalSupply, expectedTotalSupply, "Total supply mismatch after rebase");
+        assertGt(gonsToken.balanceOf(userA), amount, "User balance did not increase");
+    }
+
+    function testTransfer() public {
+        uint256 amount = 1000e18;
+        gonsToken.mint(userA, amount);
+        vm.prank(userA);
+        gonsToken.transfer(userB, amount / 2);
+        assertEq(gonsToken.balanceOf(userA), amount / 2);
+        assertEq(gonsToken.balanceOf(userB), amount / 2);
+    }
+
+    function testRebaseAffectsAllBalances() public {
+        uint256 amount = 1000e18;
+        gonsToken.mint(userA, amount);
+        gonsToken.mint(userB, amount);
+        uint256 totalSupplyBefore = gonsToken.totalSupply();
+        uint256 rebaseAmount = 1000e18;
+
+        uint256 balanceABefore = gonsToken.balanceOf(userA);
+        uint256 balanceBBefore = gonsToken.balanceOf(userB);
+
+        gonsToken.rebase(rebaseAmount);
+
+        uint256 totalSupplyAfter = gonsToken.totalSupply();
+        assertEq(totalSupplyAfter, totalSupplyBefore + rebaseAmount, "Total supply should increase correctly");
+
+        uint256 balanceAAfter = gonsToken.balanceOf(userA);
+        uint256 balanceBAfter = gonsToken.balanceOf(userB);
+        assertEq(balanceAAfter * totalSupplyBefore, balanceABefore * totalSupplyAfter, "User A balance did not scale correctly");
+        assertEq(balanceBAfter * totalSupplyBefore, balanceBBefore * totalSupplyAfter, "User B balance did not scale correctly");
+    }
+
+    function testTotalSupplyAfterRebase() public {
+        gonsToken.mint(userA, 1000e18);
+
+        uint256 initialSupply = gonsToken.totalSupply();
+        uint256 rebaseAmount = 500e18;
+        
+        console.log("Initial total supply: ", initialSupply);
+        gonsToken.rebase(rebaseAmount);
+        
+
+        uint256 newSupply = gonsToken.totalSupply();
+        console.log("New total supply: ", newSupply);
+
+        assertEq(newSupply, initialSupply + rebaseAmount, "Total supply did not increase as expected");
+    }
+
+}
