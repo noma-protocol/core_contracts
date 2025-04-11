@@ -63,7 +63,7 @@ library DeployHelper {
             )
         );
 
-        // Set the upper tick as 3 tickSpacing steps above the lower tick
+        // Sets the upper tick value to lower tick + minimum tick spacing value
         int24 upperTick = lowerTick + tickSpacing;
 
         // Compute the liquidity amount based on the provided token0 amount
