@@ -27,7 +27,7 @@ contract ExchangeHelper {
     TokenInfo public tokenInfo;
     address public poolAddress;
 
-    address public WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
+    address public WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
 
     // Lock state variable to prevent reentrancy
     bool private locked;
@@ -59,11 +59,11 @@ contract ExchangeHelper {
         poolAddress = pool;
         uint8 decimals = IERC20Metadata(tokenInfo.token0).decimals();
 
-        // --- Record the initial WETH balance to avoid refunding extra ---
-        uint256 initialWETHBalance = IWETH(WETH).balanceOf(address(this));
+        // --- Record the initial WBNB balance to avoid refunding extra ---
+        uint256 initialWETHBalance = IWETH(WBNB).balanceOf(address(this));
 
-        // Deposit ETH into WETH (this increases the balance by msg.value)
-        IWETH(WETH).deposit{value: msg.value}();
+        // Deposit ETH into WBNB (this increases the balance by msg.value)
+        IWETH(WBNB).deposit{value: msg.value}();
 
         // Swap Params
         SwapParams memory swapParams = SwapParams({
@@ -81,7 +81,7 @@ contract ExchangeHelper {
             isLimitOrder: isLimitOrder
         });
         
-        // Perform the swap using the newly deposited WETH
+        // Perform the swap using the newly deposited WBNB
         (int256 amount0, int256 amount1) = Uniswap
         .swap(
             swapParams
@@ -93,11 +93,11 @@ contract ExchangeHelper {
         require(amount0 < 0, "ExchangeHelper: No token0 received");
         uint256 tokensReceived = uint256(-amount0);
 
-        uint256 refundAmount = IWETH(WETH).balanceOf(address(this)) - initialWETHBalance;
+        uint256 refundAmount = IWETH(WBNB).balanceOf(address(this)) - initialWETHBalance;
         
         if (refundAmount > 0) {
-            // Withdraw the excess WETH into ETH
-            IWETH(WETH).withdraw(refundAmount);
+            // Withdraw the excess WBNB into ETH
+            IWETH(WBNB).withdraw(refundAmount);
             // Refund the caller with the excess ETH
             payable(receiver).transfer(refundAmount);
         }
@@ -136,7 +136,7 @@ contract ExchangeHelper {
             isLimitOrder: isLimitOrder
         });
         
-        // Perform the swap using the newly deposited WETH
+        // Perform the swap using the newly deposited WBNB
         (int256 amount0, int256 amount1) = Uniswap
         .swap(
             swapParams
