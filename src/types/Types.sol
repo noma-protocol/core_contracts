@@ -168,6 +168,7 @@ struct PresaleProtocolParams {
     uint256 minDuration;
     uint256 maxDuration;
     uint256 referralPercentage;
+    uint256 teamFee;
 }
 
 /// @notice Parameters for deploying liquidity positions.
