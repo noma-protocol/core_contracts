@@ -52,7 +52,7 @@ contract DeployFactory is Script {
     address deployer = vm.envAddress("DEPLOYER");
 
     // Constants
-    address WETH = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+    address WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
     address private uniswapFactory = 0xdB1d10011AD0Ff90774D0C6Bb92e5C5c8b4461F7;
 
     ContractInfo[] private expectedAddressesInResolver;
@@ -72,7 +72,7 @@ contract DeployFactory is Script {
         vm.startBroadcast(privateKey);
 
         expectedAddressesInResolver.push(
-            ContractInfo("WBNB", WETH)
+            ContractInfo("WBNB", WBNB)
         );
 
         // Model Helper
@@ -152,8 +152,8 @@ contract DeployFactory is Script {
             300,        // slideAnchorUpperBips
             100,        // lowBalanceThresholdFactor
             100,        // highBalanceThresholdFactor
-            5e15,       // inflationFee
-            27,         // loanFee
+            5,          // inflationFee
+            27,         // loan interest fee
             0.01e18,    // deployFee (ETH)
             25          // presalePremium (25%)
         );
@@ -166,7 +166,8 @@ contract DeployFactory is Script {
             20,         // Percentage of funds kept from presale (20%)
             30 days,    // Min deadline
             90 days,    // Max deadline
-            3           // Referral bonus (3%)
+            3,          // Referral bonus (3%)
+            5           // Team fee (5%)
         );
 
         oikosFactory.setProtocolParameters(_params);

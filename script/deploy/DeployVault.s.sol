@@ -21,7 +21,7 @@ contract DeployVault is Script {
     address deployer = vm.envAddress("DEPLOYER");
 
     // Constants
-    address WETH = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+    address WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
     address private oikosFactoryAddress;
     address private modelHelper;
 
@@ -37,8 +37,8 @@ contract DeployVault is Script {
         // Read the JSON file
         string memory json = vm.readFile(path);
 
-        string memory networkId = "56";
-        // Parse the data for network ID `56`
+        string memory networkId = "1337";
+        // Parse the data for network ID `1337`
         bytes memory data = vm.parseJson(json, string.concat(string("."), networkId));
 
         // Decode the data into the ContractAddresses struct
@@ -56,13 +56,13 @@ contract DeployVault is Script {
 
         VaultDeployParams memory vaultDeployParams = 
         VaultDeployParams(
-            "TEST TOKEN 2",
-            "TOK",
+            "OIKOS TOKEN",
+            "OKS",
             18,
             100e18,
             1e18,
             0,
-            WETH,
+            WBNB,
             3000,
             0 // 0 = no presale
         );
@@ -80,7 +80,7 @@ contract DeployVault is Script {
             vaultDeployParams
         );
 
-        idoManager = new IDOHelper(pool, vault, modelHelper, proxy, WETH);
+        idoManager = new IDOHelper(pool, vault, modelHelper, proxy, WBNB);
 
         console.log("Vault address: ", vault);
         console.log("Pool address: ", pool);
