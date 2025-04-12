@@ -84,25 +84,14 @@ contract LendingVault is BaseVault {
         if (_v.loanPositions[who].borrowAmount > 0) revert ActiveLoan(); 
 
         (uint256 collateralAmount,) = _getTotalCollateral(borrowAmount);
+        uint256 loanFees = _calculateLoanFees(borrowAmount, duration);
+
         if (collateralAmount == 0) revert InsufficientCollateral();
 
-        (,, uint256 floorToken0Balance, uint256 floorToken1Balance) = IModelHelper(modelHelper())
-        .getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
-
-        if (floorToken1Balance < borrowAmount) revert InsufficientFloorBalance();
+        _fetchFromLiquidity(borrowAmount, true);
 
         IERC20(_v.pool.token0()).transferFrom(who, address(this), collateralAmount);  
         SafeERC20.safeTransfer(IERC20(address(_v.pool.token0())), _v.tokenRepo, collateralAmount);
-
-        uint256 loanFees = _calculateLoanFees(borrowAmount, duration);
-
-        _v.collateralAmount += collateralAmount;
-        
-        LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
-
-        Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick);         
-        LiquidityDeployer.reDeployFloor(address(_v.pool), address(this), floorToken0Balance, floorToken1Balance - borrowAmount, positions);
-        
         SafeERC20.safeTransfer(IERC20(address(_v.pool.token1())), who, borrowAmount - loanFees);
 
         uint256 totalLoans = _v.totalLoansPerUser[who];
@@ -114,6 +103,7 @@ contract LendingVault is BaseVault {
             duration: duration
         });
 
+        _v.collateralAmount += collateralAmount;
         _v.loanPositions[who] = loanPosition;
         _v.totalLoansPerUser[who] = totalLoans++;
         _v.loanAddresses.push(who);
@@ -136,27 +126,24 @@ contract LendingVault is BaseVault {
 
         IERC20(_v.pool.token1()).transferFrom(who, address(this), loan.borrowAmount);
         ITokenRepo(_v.tokenRepo).transferToRecipient(_v.pool.token0(), who, loan.collateralAmount);
-
-        // Collect fees from the Uniswap pool
-        (,, uint256 floorToken0Balance, uint256 floorToken1Balance) = IModelHelper(modelHelper())
-            .getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
-        
-        _v.collateralAmount -= loan.collateralAmount;
-
-        // Redeploy floor liquidity
-        LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
-        Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick);      
-        LiquidityDeployer.reDeployFloor(
-            address(_v.pool), 
-            address(this),
-            floorToken0Balance,
-            floorToken1Balance + loan.borrowAmount, 
-            positions
-        );              
+     
+        _fetchFromLiquidity(loan.borrowAmount, false);      
         
         delete _v.loanPositions[who];
         _removeLoanAddress(who);
     }
+
+    function addCollateral(address who, uint256 amount) public onlyInternalCalls {
+        if (amount == 0) revert InsufficientCollateral();
+        if (_v.loanPositions[who].borrowAmount == 0) revert NoActiveLoan();
+
+        IERC20(_v.pool.token0()).transferFrom(who, address(this), amount);
+        SafeERC20.safeTransfer(IERC20(address(_v.pool.token0())), _v.tokenRepo, amount);
+
+        _v.collateralAmount += amount;
+        _v.loanPositions[who].collateralAmount += amount;
+    }
+
 
     /**
      * @notice Allows a user to roll over a loan.
@@ -191,21 +178,8 @@ contract LendingVault is BaseVault {
         // Update the loan's expiry to reflect the new duration
         loan.expiry = block.timestamp + newDuration;
         loan.borrowAmount = loan.borrowAmount + newBorrowAmount;
-
-        // Collect fees from the Uniswap pool
-        (,, uint256 floorToken0Balance, uint256 floorToken1Balance) = IModelHelper(modelHelper())
-            .getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
-
-        // Redeploy floor liquidity
-        LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
-        Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick);      
-        LiquidityDeployer.reDeployFloor(
-            address(_v.pool), 
-            address(this),
-            floorToken0Balance,
-            floorToken1Balance - newBorrowAmount, 
-            positions
-        );
+        
+        _fetchFromLiquidity(newBorrowAmount, true);
 
         // Transfer the new borrow amount (minus fees) to the borrower
         IERC20(_v.pool.token1()).transfer(who, newBorrowAmount - newFees);     
@@ -231,6 +205,35 @@ contract LendingVault is BaseVault {
                 _removeLoanAddress(who);
             }
         }
+    }
+
+    /**
+     * @notice Fetches liquidity from the floor position and redeploys it.
+     * @param borrowAmount The amount to borrow.
+     */
+    function _fetchFromLiquidity(uint256 borrowAmount, bool remove) internal {
+        (,, uint256 floorToken0Balance, uint256 floorToken1Balance) = IModelHelper(modelHelper())
+        .getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
+
+        if (remove) {
+            if (floorToken1Balance < borrowAmount) revert InsufficientFloorBalance();
+        }
+
+         LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
+
+        Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick);         
+        LiquidityDeployer.reDeployFloor(
+            address(_v.pool), 
+            address(this), 
+            floorToken0Balance, 
+            (
+                remove ? 
+                floorToken1Balance - borrowAmount : 
+                floorToken1Balance + borrowAmount
+            ), 
+            positions
+        );
+        
     }
 
     /**
@@ -443,7 +446,7 @@ contract LendingVault is BaseVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure override returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](17);
+        bytes4[] memory selectors = new bytes4[](18);
         selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,uint256)")));    
         selectors[1] = bytes4(keccak256(bytes("paybackLoan(address)")));
         selectors[2] = bytes4(keccak256(bytes("rollLoan(address,uint256)")));
@@ -461,6 +464,7 @@ contract LendingVault is BaseVault {
         selectors[14] = bytes4(keccak256(bytes("afterPresale()")));
         selectors[15] = bytes4(keccak256(bytes("getActiveLoan(address)")));
         selectors[16] = bytes4(keccak256(bytes("calculateLoanFees(uint256,uint256)")));
+        selectors[17] = bytes4(keccak256(bytes("addCollateral(address,uint256)")));
         return selectors;
     }
 }
