@@ -551,31 +551,22 @@ library LiquidityOps {
                         mintAmount
                     );
 
-                    address teamMultisig = IVault(address(this)).teamMultiSig();
-
-                    if (teamMultisig != address(0)) {
-                        IERC20(IUniswapV3Pool(addresses.pool).token0()).safeTransfer(
-                            teamMultisig, 
-                            mintAmount - (mintAmount * (IVault(address(this)).getProtocolParameters().inflationFee / 1e18))
-                        );
-                    }
-
                 }
             }
         
             if (balanceToken0 >= circulatingSupply / IVault(address(this)).getProtocolParameters().highBalanceThresholdFactor) {
-                    if (!isShift) {
+                if (!isShift) {
     
-                        IVault(address(this))
-                        .burnTokens(
-                            balanceToken0
-                        );
+                    IVault(address(this))
+                    .burnTokens(
+                        balanceToken0
+                    );
 
-                        IVault(address(this))
-                        .mintTokens(
-                            address(this),
-                            circulatingSupply / IVault(address(this)).getProtocolParameters().highBalanceThresholdFactor
-                        );   
+                    IVault(address(this))
+                    .mintTokens(
+                        address(this),
+                        circulatingSupply / IVault(address(this)).getProtocolParameters().highBalanceThresholdFactor
+                    );   
                 }                
             }
 
