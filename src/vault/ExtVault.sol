@@ -17,6 +17,7 @@ interface ILendingVault {
     function borrowFromFloor(address who, uint256 borrowAmount, uint256 duration) external;
     function paybackLoan(address who) external;
     function rollLoan(address who, uint256 newDuration) external;
+    function addCollateral(address who, uint256 amount) external;
     function defaultLoans() external;
 }
 
@@ -90,6 +91,18 @@ contract ExtVault {
     }
 
     /**
+     * @notice Allows a user to add collateral to their loan.
+     * @param amount The amount of collateral to add.
+     */
+    function addCollateral(
+        uint256 amount
+    ) external {
+        ILendingVault(address(this))
+        .addCollateral(msg.sender, amount);
+    }
+
+
+    /**
      * @notice Shifts the liquidity positions in the vault.
      * @dev This function adjusts the liquidity positions and distributes staking rewards.
      */
@@ -130,12 +143,13 @@ contract ExtVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure  returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](5);
+        bytes4[] memory selectors = new bytes4[](6);
         selectors[0] = bytes4(keccak256(bytes("shift()")));
         selectors[1] = bytes4(keccak256(bytes("slide()")));  
         selectors[2] = bytes4(keccak256(bytes("borrow(uint256,uint256)")));  
         selectors[3] = bytes4(keccak256(bytes("payback()")));
-        selectors[4] = bytes4(keccak256(bytes("roll(uint256)")));              
+        selectors[4] = bytes4(keccak256(bytes("roll(uint256)")));  
+        selectors[5] = bytes4(keccak256(bytes("addCollateral(uint256)")));            
         return selectors;
     }
 }
