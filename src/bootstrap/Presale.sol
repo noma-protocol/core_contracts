@@ -23,6 +23,10 @@
       function buyTokens(uint256 price, uint256 amount, address receiver) external payable;
   }
 
+  interface IFactory {
+      function teamMultiSig() external view returns (address);
+  }
+
   /**
    * @title Presale Contract
    * @notice Manages the presale process and interfaces with the Bootstrap contract, including a referral system.
@@ -30,7 +34,7 @@
   contract Presale is pAsset, Ownable {
       using SafeERC20 for IERC20;
 
-      address constant WETH = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+      address constant WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
 
       address public vaultAddress;
 
@@ -70,6 +74,7 @@
       address[] public contributors;
 
       address public deployer;
+      address public factory; 
 
       /// @notice Tracks if an address has already been added as a contributor.
       mapping(address => bool) public isContributor;
@@ -83,6 +88,7 @@
 
       uint256 public MIN_CONTRIBUTION;
       uint256 public MAX_CONTRIBUTION;
+      uint256 teamFee;
 
       bool public emergencyWithdrawalFlag;
       bool private locked;
@@ -110,6 +116,7 @@
       error EmergencyWithdrawalNotEnabled();
 
       constructor(
+          address _factory,
           PresaleDeployParams memory params,
           PresaleProtocolParams memory _protocolParams
       ) 
@@ -127,6 +134,8 @@
           floorPercentage = params.floorPercentage;
           protocolParams = _protocolParams;
           referralPercentage = _protocolParams.referralPercentage;
+          factory = _factory;
+          teamFee = _protocolParams.teamFee;
 
           uint256 launchSupplyDecimals = IERC20Metadata(pool.token0()).decimals(); 
           uint256 initialPriceDecimals = 18; 
@@ -136,7 +145,7 @@
 
           hardCap = (
               (
-                  normalizedLaunchSupply * normalizedInitialPrice
+                normalizedLaunchSupply * normalizedInitialPrice
               ) / 1e18
           ) * params.floorPercentage / 100;
 
@@ -223,12 +232,18 @@
           uint256 totalAmount = address(this).balance;
           uint256 amount = totalAmount - (totalAmount * protocolParams.presalePercentage / 100);
 
-          if (amount < (softCap - (softCap * protocolParams.presalePercentage / 100))) revert SoftCapNotMet();
+          // Calculate the minimum amount required to meet the soft cap
+          uint256 requiredAmount = (softCap * (100 - protocolParams.presalePercentage)) / 100;
+
+          // Revert if the contributed amount is below that threshold
+          if (amount < requiredAmount) {
+              revert SoftCapNotMet();
+          }
 
           // Deploy liquidity to the vault
           IVault(vaultAddress).afterPresale();
 
-          // Deposit WETH
+          // Deposit WBNB
           IWETH(tokenInfo.token1).deposit{value: amount}();
 
           uint8 decimals = IERC20Metadata(tokenInfo.token0).decimals();
@@ -347,10 +362,20 @@
       }
 
       function _withdrawExcessEth() internal {
-          if (!finalized) revert NotFinalized();
+        if (!finalized) revert NotFinalized();
 
-          uint256 balance = address(this).balance;
-          payable(owner()).transfer(balance);
+        uint256 balance = address(this).balance;
+         
+        // calculate fee
+        uint256 teamFee = (balance * teamFee) / 100;
+
+        address teamMultiSig = IFactory(factory).teamMultiSig();
+
+        if (teamMultiSig != address(0)) {
+            // transfer fee to team multisig
+            payable(teamMultiSig).transfer(teamFee);
+        }
+        payable(owner()).transfer(balance - teamFee);
       }
 
       function _withdrawExcessTokens() internal {
