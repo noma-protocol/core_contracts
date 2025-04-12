@@ -86,7 +86,11 @@ contract StakingVault is BaseVault {
         uint256 intrinsicMinimumValue = IModelHelper(modelHelper())
         .getIntrinsicMinimumValue(address(this));
 
-        uint256 circulatingSupply = IModelHelper(modelHelper()).getCirculatingSupply(addresses.pool, address(this));
+        uint256 circulatingSupply = IModelHelper(modelHelper())
+        .getCirculatingSupply(
+            addresses.pool, 
+            address(this)
+        );
 
         uint256 toMintEth = 
         IRewardsCalculator(rewardsCalculator()).
@@ -102,10 +106,34 @@ contract StakingVault is BaseVault {
 
         if (toMint > 0) {        
             IVault(address(this)).mintTokens(address(this), toMint);
-            IERC20(_v.tokenInfo.token0).transfer(_v.stakingContract, toMint);
+
+            address teamMultisig = IVault(address(this)).teamMultiSig();
+            uint256 inflation = toMint * IVault(address(this)).getProtocolParameters().inflationFee / 100;
+            
+            if (inflation > 0) {
+                if (teamMultisig != address(0)) {
+                    IERC20(IUniswapV3Pool(addresses.pool).token0())
+                    .safeTransfer(
+                        teamMultisig, 
+                        inflation
+                    );
+                    toMint -= inflation;
+                }
+                if (_v.manager != address(0)) {
+                    IERC20(IUniswapV3Pool(addresses.pool).token0())
+                    .safeTransfer(
+                        _v.manager, 
+                        inflation
+                    );
+                    toMint -= inflation;
+                }
+            }
 
             // Update total minted (OKS)
             _v.totalMinted += toMint;
+
+            // Transfer to staking contract
+            IERC20(_v.tokenInfo.token0).transfer(_v.stakingContract, toMint);
 
             // Call notifyRewardAmount 
             IStakingRewards(_v.stakingContract).notifyRewardAmount(toMint);  
