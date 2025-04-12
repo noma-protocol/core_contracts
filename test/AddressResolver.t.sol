@@ -18,7 +18,7 @@ contract AddressResolverTest is Test {
     TestResolver resolver;
     ContractInfo[] private expectedAddressesInResolver;
 
-    address WETH = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+    address WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
 
     function setUp() public {
         // Resolver
@@ -27,7 +27,7 @@ contract AddressResolverTest is Test {
     
     function testAreAddressesImported() public {
         expectedAddressesInResolver.push(ContractInfo("Resolver", address(resolver)));
-        expectedAddressesInResolver.push(ContractInfo("WETH", WETH));
+        expectedAddressesInResolver.push(ContractInfo("WBNB", WBNB));
 
         bytes32[] memory names = new bytes32[](expectedAddressesInResolver.length);
         address[] memory addresses = new address[](expectedAddressesInResolver.length);
@@ -70,7 +70,7 @@ contract AddressResolverTest is Test {
         );  
 
         expectedAddressesInResolver.push(
-            ContractInfo("WETH", WETH)
+            ContractInfo("WBNB", WBNB)
         );
 
         vm.prank(deployer);

@@ -53,7 +53,7 @@ contract LendingVaultTest is Test {
     OikosToken private noma;
     ModelHelper private modelHelper;
 
-    address WETH = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+    address WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
     address payable idoManager;
     address nomaToken;
     address modelHelperContract;
@@ -135,7 +135,7 @@ contract LendingVaultTest is Test {
         token1.approve(vaultAddress, MAX_INT);
 
         vm.prank(deployer);
-        IWETH(WETH).deposit{ value: borrowAmount}();
+        IWETH(WBNB).deposit{ value: borrowAmount}();
 
         uint256 token1Balance = token1.balanceOf(deployer);
         console.log("Token1 balance before payback is: ", token1Balance);
@@ -213,8 +213,8 @@ contract LendingVaultTest is Test {
         uint16 totalTrades = 50;
         uint256 tradeAmount = 1 ether;
 
-        IWETH(WETH).deposit{ value: (tradeAmount * totalTrades)}();
-        IWETH(WETH).transfer(idoManager, tradeAmount * totalTrades);
+        IWETH(WBNB).deposit{ value: (tradeAmount * totalTrades)}();
+        IWETH(WBNB).transfer(idoManager, tradeAmount * totalTrades);
 
         uint256 tokenBalanceBefore = noma.balanceOf(address(this));
         uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault));

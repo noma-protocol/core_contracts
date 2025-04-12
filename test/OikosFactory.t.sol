@@ -48,7 +48,7 @@ contract OikosFactoryTest is Test {
     TokenFactory tokenFactory;
 
     // Constants
-    address WETH = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+    address WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
     address private uniswapFactory = 0xdB1d10011AD0Ff90774D0C6Bb92e5C5c8b4461F7;
 
     ContractInfo[] private expectedAddressesInResolver;
@@ -173,7 +173,7 @@ contract OikosFactoryTest is Test {
                 100e18,       // Total supply
                 1e18,         // IDO Price
                 0,
-                WETH,         // Token1 address
+                WBNB,         // Token1 address
                 3000,         // Uniswap V3 Fee tier
                 0             // Presale
             );
@@ -198,7 +198,7 @@ contract OikosFactoryTest is Test {
     function testCreateVaultShouldSucceed() public {
 
         expectedAddressesInResolver.push(
-            ContractInfo("WBNB", WETH)
+            ContractInfo("WBNB", WBNB)
         );
 
         configureResolver();    
@@ -211,7 +211,7 @@ contract OikosFactoryTest is Test {
                 100e18,       // Total supply
                 1e18,         // IDO Price
                 0,
-                WETH,         // Token1 address
+                WBNB,         // Token1 address
                 3000,         // Uniswap V3 Fee tier
                 0             // Presale
             );
@@ -234,7 +234,7 @@ contract OikosFactoryTest is Test {
     function testCreateDuplicateVault() public {
 
         expectedAddressesInResolver.push(
-            ContractInfo("WBNB", WETH)
+            ContractInfo("WBNB", WBNB)
         );
 
         configureResolver();    
@@ -247,7 +247,7 @@ contract OikosFactoryTest is Test {
             100e18,        // Total supply
             1e18,          // IDO Price
             0,
-            WETH,          // Token1 address
+            WBNB,          // Token1 address
             3000,          // Uniswap V3 Fee tier
             0              // Presale
         );
@@ -276,7 +276,7 @@ contract OikosFactoryTest is Test {
                 100e18,       // Total supply
                 1e18,         // IDO Price
                 0,
-                WETH,         // Token1 address
+                WBNB,         // Token1 address
                 3000,         // Uniswap V3 Fee tier
                 0             // Presale
             );
@@ -329,7 +329,7 @@ contract OikosFactoryTest is Test {
     function testPermissionlessDeployNotEnabled() public {
 
         expectedAddressesInResolver.push(
-            ContractInfo("WBNB", WETH)
+            ContractInfo("WBNB", WBNB)
         );
 
         configureResolver();    
@@ -342,7 +342,7 @@ contract OikosFactoryTest is Test {
                 100e18,       // Total supply
                 1e18,         // IDO Price
                 0,
-                WETH,         // Token1 address
+                WBNB,         // Token1 address
                 3000,         // Uniswap V3 Fee tier
                 0             // Presale
             );
@@ -365,7 +365,7 @@ contract OikosFactoryTest is Test {
     function testPermissionlessDeployEnabled() public {
 
         expectedAddressesInResolver.push(
-            ContractInfo("WBNB", WETH)
+            ContractInfo("WBNB", WBNB)
         );
 
         configureResolver();    
@@ -378,7 +378,7 @@ contract OikosFactoryTest is Test {
                 100e18,       // Total supply
                 1e18,         // IDO Price
                 0,
-                WETH,         // Token1 address
+                WBNB,         // Token1 address
                 3000,         // Uniswap V3 Fee tier
                 0             // Presale
             );
@@ -401,7 +401,7 @@ contract OikosFactoryTest is Test {
 
     function testEnumerateVaults() public {
         expectedAddressesInResolver.push(
-            ContractInfo("WBNB", WETH)
+            ContractInfo("WBNB", WBNB)
         );
 
         configureResolver();    
@@ -414,7 +414,7 @@ contract OikosFactoryTest is Test {
                 100e18,       // Total supply
                 1e18,         // IDO Price
                 0,
-                WETH,         // Token1 address
+                WBNB,         // Token1 address
                 3000,         // Uniswap V3 Fee tier
                 0             // Presale
             );
@@ -446,7 +446,7 @@ contract OikosFactoryTest is Test {
         assertEq(deployersList.length, 1);
         assertEq(vaultDesc.deployer, deployersList[0]);
         assertEq(deployersList[0], deployer);
-        assertEq(vaultDesc.token1, WETH);
+        assertEq(vaultDesc.token1, WBNB);
 
         vaultDeployParams = 
             VaultDeployParams(
@@ -456,7 +456,7 @@ contract OikosFactoryTest is Test {
                 100e18,       // Total supply
                 1e18,         // IDO Price
                 0,
-                WETH,         // Token1 address
+                WBNB,         // Token1 address
                 3000,         // Uniswap V3 Fee tier
                 0             // Presale
             );
@@ -480,14 +480,14 @@ contract OikosFactoryTest is Test {
         assertEq(deployersList.length, 2);
         assertEq(vaultDesc.deployer, deployersList[1]);
         assertEq(deployersList[1], user);
-        assertEq(vaultDesc.token1, WETH);
+        assertEq(vaultDesc.token1, WBNB);
 
     }
 
     function testDeployerCanDeployMultipleVaults() public {
         // Prepare Resolver
         expectedAddressesInResolver.push(
-            ContractInfo("WBNB", WETH)
+            ContractInfo("WBNB", WBNB)
         );
         configureResolver();
 
@@ -499,7 +499,7 @@ contract OikosFactoryTest is Test {
             100e18,             // Total supply
             1e18,               // IDO Price
             0,
-            WETH,               // Token1 address
+            WBNB,               // Token1 address
             3000,               // Uniswap V3 Fee tier
             0                   // Presale
         );
@@ -512,7 +512,7 @@ contract OikosFactoryTest is Test {
             200e18,             // Total supply
             2e18,               // IDO Price
             0,
-            WETH,               // Token1 address
+            WBNB,               // Token1 address
             3000,               // Uniswap V3 Fee tier
             0                   // Presale
         );
@@ -556,12 +556,12 @@ contract OikosFactoryTest is Test {
         // Validate Vault 1 details
         VaultDescription memory vault1Desc = oikosFactory.getVaultDescription(vaults[0]);
 
-        assertEq(vault1Desc.token1, WETH);
+        assertEq(vault1Desc.token1, WBNB);
 
         // Validate Vault 2 details
         VaultDescription memory vault2Desc = oikosFactory.getVaultDescription(vaults[1]);
 
-        assertEq(vault2Desc.token1, WETH);
+        assertEq(vault2Desc.token1, WBNB);
 
         // Validate deployers list
         address[] memory deployersList = oikosFactory.getDeployers();

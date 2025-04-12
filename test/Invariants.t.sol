@@ -45,7 +45,7 @@ contract Invariants is Test {
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address deployer = vm.envAddress("DEPLOYER");
 
-    address WETH = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+    address WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
     address payable idoManager;
     address oikosToken;
     address modelHelperContract;
@@ -129,8 +129,8 @@ contract Invariants is Test {
         uint8 totalTrades = 2;
         uint256 tradeAmount = 0.005 ether;
 
-        IWETH(WETH).deposit{ value: 10 ether }();
-        IWETH(WETH).transfer(idoManager, tradeAmount * totalTrades);
+        IWETH(WBNB).deposit{ value: 10 ether }();
+        IWETH(WBNB).transfer(idoManager, tradeAmount * totalTrades);
 
         uint256 tokenBalanceBefore = OKS.balanceOf(address(this));
         uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault));
@@ -206,8 +206,8 @@ contract Invariants is Test {
         uint8 numTrades = 100;
         uint256 tradeAmount = 1 ether;
         
-        IWETH(WETH).deposit{ value:  tradeAmount * numTrades}();
-        IWETH(WETH).transfer(idoManager, tradeAmount * numTrades);
+        IWETH(WBNB).deposit{ value:  tradeAmount * numTrades}();
+        IWETH(WBNB).transfer(idoManager, tradeAmount * numTrades);
 
         uint256 tokenBalanceBefore = OKS.balanceOf(address(deployer));
         uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, 18);
@@ -249,8 +249,8 @@ contract Invariants is Test {
         uint8 totalTradesBuy = 24;
         uint256 tradeAmountWETH = 2 ether;
 
-        IWETH(WETH).deposit{ value:  tradeAmountWETH * totalTradesBuy}();
-        IWETH(WETH).transfer(idoManager, tradeAmountWETH * totalTradesBuy);
+        IWETH(WBNB).deposit{ value:  tradeAmountWETH * totalTradesBuy}();
+        IWETH(WBNB).transfer(idoManager, tradeAmountWETH * totalTradesBuy);
 
         uint256 tokenBalanceBefore = OKS.balanceOf(address(deployer));
         console.log("Token balance before buying is %s", tokenBalanceBefore);
@@ -299,8 +299,8 @@ contract Invariants is Test {
         uint16 totalTrades = 50;
         uint256 tradeAmount = 1 ether;
 
-        IWETH(WETH).deposit{ value: (tradeAmount * totalTrades)}();
-        IWETH(WETH).transfer(idoManager, tradeAmount * totalTrades);
+        IWETH(WBNB).deposit{ value: (tradeAmount * totalTrades)}();
+        IWETH(WBNB).transfer(idoManager, tradeAmount * totalTrades);
 
         uint256 tokenBalanceBefore = OKS.balanceOf(address(this));
         uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault));
@@ -350,8 +350,8 @@ contract Invariants is Test {
         uint8 totalTrades = 2;
         uint256 tradeAmount = 0.005 ether;
 
-        IWETH(WETH).deposit{ value: 10 ether }();
-        IWETH(WETH).transfer(idoManager, tradeAmount * totalTrades);
+        IWETH(WBNB).deposit{ value: 10 ether }();
+        IWETH(WBNB).transfer(idoManager, tradeAmount * totalTrades);
 
         for (uint i = 0; i < totalTrades; i++) {
             managerContract.buyTokens(spotPrice, tradeAmount, address(deployer));
@@ -382,8 +382,8 @@ contract Invariants is Test {
         uint8 totalTrades = 5;
         uint256 tradeAmount = 0.05 ether;
 
-        IWETH(WETH).deposit{ value: 10 ether }();
-        IWETH(WETH).transfer(idoManager, tradeAmount * totalTrades);
+        IWETH(WBNB).deposit{ value: 10 ether }();
+        IWETH(WBNB).transfer(idoManager, tradeAmount * totalTrades);
 
         for (uint i = 0; i < totalTrades; i++) {
             managerContract.buyTokens(spotPrice, tradeAmount, address(deployer));
@@ -422,8 +422,8 @@ contract Invariants is Test {
         uint16 totalTrades = 100;
         uint256 tradeAmount = 1 ether;
 
-        IWETH(WETH).deposit{ value: tradeAmount * totalTrades }();
-        IWETH(WETH).transfer(idoManager, tradeAmount * totalTrades);
+        IWETH(WBNB).deposit{ value: tradeAmount * totalTrades }();
+        IWETH(WBNB).transfer(idoManager, tradeAmount * totalTrades);
 
         uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault));
         console.log("Circulating supply is: ", circulatingSupplyBefore);
