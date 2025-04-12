@@ -20,6 +20,7 @@ contract PresaleFactory {
     ) external onlyFactory returns (address) {
 
         Presale presale = new Presale(
+            factory(),
             params,
             protocolParams
         );
