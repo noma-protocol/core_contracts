@@ -25,6 +25,7 @@
 
   interface IFactory {
       function teamMultiSig() external view returns (address);
+      function owner() external view returns (address);
   }
 
   /**
@@ -75,6 +76,7 @@
 
       address public deployer;
       address public factory; 
+      address public migrationContract;
 
       /// @notice Tracks if an address has already been added as a contributor.
       mapping(address => bool) public isContributor;
@@ -91,12 +93,18 @@
       uint256 teamFee;
 
       bool public emergencyWithdrawalFlag;
+      bool public isOksPresale;
       bool private locked;
 
       /// @notice Events
       event Deposit(address indexed user, uint256 amount, bytes32 indexed referralCode);
       event ReferralPaid(bytes32 indexed referralCode, uint256 amount);
-      event Finalized();
+      event Finalized(
+          uint256 totalRaised,
+          uint256 feeTaken,
+          uint256 contributionAmount,
+          uint256 slippagePriceX96
+      );
       event TokenBurned(address indexed user, uint256 amount);
       event TokensWithdrawn(address indexed user, uint256 amount);
 
@@ -114,6 +122,9 @@
       error InvalidHardCap();
       error InvalidSoftCap();
       error EmergencyWithdrawalNotEnabled();
+      error NoReentrantCalls();
+      error NotAuthorized();
+      error OnlyFactoryOwner();
 
       constructor(
           address _factory,
@@ -150,7 +161,7 @@
           ) * params.floorPercentage / 100;
 
           if (softCap > hardCap * _protocolParams.maxSoftCap / 100) revert InvalidParameters();
-          if (softCap < hardCap * 5 / 100) revert InvalidSoftCap();
+          if (softCap < hardCap * 20 / 100) revert InvalidSoftCap();
           if (softCap > hardCap) revert InvalidHardCap();
 
           tokenInfo = TokenInfo({
@@ -163,8 +174,10 @@
 
           // Enable by default
           emergencyWithdrawalFlag = true;
+          isOksPresale = false;
       }
 
+ 
       /**
        * @notice Callback function for Uniswap v3 swaps.
        * @param amount0Delta Change in token0 balance.
@@ -192,11 +205,12 @@
           if (finalized) revert AlreadyFinalized();
           if (msg.value == 0 || msg.sender == address(uint160(uint256(referralCode)))) revert InvalidParameters();
 
-          if (msg.value < MIN_CONTRIBUTION || msg.value > MAX_CONTRIBUTION) revert InvalidParameters();
+          if (!isOksPresale) {
+            if (msg.value < MIN_CONTRIBUTION || msg.value > MAX_CONTRIBUTION) revert InvalidParameters();
+          }
 
           uint256 balance = address(this).balance;
-
-          if (balance + msg.value > hardCap) revert HardCapExceeded();
+          if (balance > hardCap) revert HardCapExceeded();
 
           // Track contributions
           contributions[msg.sender] += msg.value;
@@ -224,61 +238,71 @@
       /**
        * @notice Finalizes the presale and buys tokens.
        */
-      function finalize() external lock {
-          if (finalized) revert AlreadyFinalized();
-          if (!hasExpired()) revert PresaleOngoing();
-          if (protocolParams.presalePercentage == 0) revert InvalidParameters();
+        function finalize() external lock {
+            if (finalized) revert AlreadyFinalized();
+            if (!hasExpired()) revert PresaleOngoing();
 
-          uint256 totalAmount = address(this).balance;
-          uint256 amount = totalAmount - (totalAmount * protocolParams.presalePercentage / 100);
+            // 1) load & validate parameters
+            PresaleProtocolParams memory p = protocolParams;
+            uint256 pct = p.presalePercentage;
+            if (pct == 0 || pct > 100) revert InvalidParameters();
 
-          // Calculate the minimum amount required to meet the soft cap
-          uint256 requiredAmount = (softCap * (100 - protocolParams.presalePercentage)) / 100;
+            // 2) compute amounts
+            uint256 totalRaised       = address(this).balance;
+            uint256 feeTaken          = (totalRaised * pct) / 100;
+            uint256 contributionAmount = isOksPresale ? totalRaised : totalRaised - feeTaken;
 
-          // Revert if the contributed amount is below that threshold
-          if (amount < requiredAmount) {
-              revert SoftCapNotMet();
-          }
+            // 3) enforce soft-cap after fee
+            uint256 requiredAfterFee = isOksPresale
+                ? softCap
+                : (softCap * (100 - pct)) / 100;
+            if (contributionAmount < requiredAfterFee) revert SoftCapNotMet();
 
-          // Deploy liquidity to the vault
-          IVault(vaultAddress).afterPresale();
+            // 4) mark finalized _before_ external calls (checks‐effects)
+            finalized = true;
 
-          // Deposit WBNB
-          IWETH(tokenInfo.token1).deposit{value: amount}();
+            // 5) deploy liquidity and wrap BNB
+            IVault(vaultAddress).afterPresale();
+            IWETH(tokenInfo.token1).deposit{value: contributionAmount}();
 
-          uint8 decimals = IERC20Metadata(tokenInfo.token0).decimals();
-          (uint160 sqrtRatioX96,,,,,,) = pool.slot0();
-          uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, 18);
+            // 6) compute slippage-adjusted price
+            (uint160 sqrt0,,,,,,) = pool.slot0();
+            uint256 spotPriceX96 = Conversions.sqrtPriceX96ToPrice(
+                sqrt0,
+                18
+            );
+            // add 0.5% slippage tolerance
+            uint256 slippagePriceX96 = spotPriceX96 + (spotPriceX96 * 5) / 1000;
 
-          // Slippage due to floor tick width (0.5%)
-          uint256 purchasePrice = spotPrice + (spotPrice * 5/1000);
+            // 7) swap with a limit order at slippagePriceX96
+            Uniswap.swap(
+                SwapParams({
+                    poolAddress:   address(pool),
+                    receiver:      address(this),
+                    token0:        tokenInfo.token0,
+                    token1:        tokenInfo.token1,
+                    basePriceX96:  Conversions.priceToSqrtPriceX96(
+                                    int256(slippagePriceX96),
+                                    tickSpacing,
+                                    18
+                                ),
+                    amountToSwap:  contributionAmount,
+                    zeroForOne:    false,
+                    isLimitOrder:  true
+                })
+            );
 
-          SwapParams memory swapParams = SwapParams({
-              poolAddress: address(pool),
-              receiver: address(this),
-              token0: tokenInfo.token0,
-              token1: tokenInfo.token1,
-              basePriceX96: Conversions.priceToSqrtPriceX96(
-                  int256(purchasePrice),
-                  tickSpacing,
-                  decimals
-              ),
-              amountToSwap: amount,
-              zeroForOne: false,
-              isLimitOrder: true
-          });
+            // 8) emit for off-chain indexing, then payouts
+            emit Finalized(
+                totalRaised,
+                feeTaken,
+                contributionAmount,
+                slippagePriceX96
+            );
 
-          Uniswap.swap(
-              swapParams
-          );
-
-          finalized = true;
-
-          _payReferrals();
-          _withdrawExcessEth();
-
-          emit Finalized();
-      }
+            _payReferrals();
+            _withdrawExcessEth();
+        }
 
       /**
        * @notice Pays out referral fees after finalization.
@@ -303,31 +327,41 @@
       }
 
       function withdraw() external lock {
-          if (!finalized) revert NotFinalized();
+        if (!finalized) revert NotFinalized();
 
-          // Check if pAsset balance is greater than 0
-          uint256 balance = balanceOf(msg.sender);
+        // Check if pAsset balance is greater than 0
+        uint256 balance = balanceOf(msg.sender);
 
-          if (balance == 0) revert NoContributionsToWithdraw();
+        if (balance == 0) revert NoContributionsToWithdraw();
 
-          // Burn p-assets
-          _burn(msg.sender, balance);
+        // Burn p-assets
+        _burn(msg.sender, balance);
 
-          address token0 = pool.token0();
+        address token0 = pool.token0();
 
-          // Account for slippage due to floor tick width (max 1.5%)
-          uint256 minAmountOut = (balance * 985) / 1000;
+        // Account for slippage due to floor tick width (max 1.5%)
+        uint256 minAmountOut = (balance * 985) / 1000;
 
-          // Get the available balance of token0 in the contract
-          uint256 availableBalance = IERC20(token0).balanceOf(address(this));
+        // Get the available balance of token0 in the contract
+        uint256 availableBalance = IERC20(token0).balanceOf(address(this));
 
-          // Ensure the available balance meets the minimum required amount
-          require(availableBalance >= minAmountOut, "Insufficient liquidity for withdrawal");
+        // Ensure the available balance meets the minimum required amount
+        require(availableBalance >= minAmountOut, "Insufficient liquidity for withdrawal");
 
-          // Transfer tokens to the user
-          IERC20(token0).safeTransfer(msg.sender, minAmountOut);
+        bool transferToMigrationContract = migrationContract != address(0);
 
-          emit TokensWithdrawn(msg.sender, minAmountOut);
+        if (transferToMigrationContract) {
+            if (isOksPresale) {
+                IERC20(token0).safeTransfer(migrationContract, minAmountOut);
+            } else {
+                // Transfer to migration contract if set, otherwise transfer to user
+                IERC20(token0).safeTransfer(msg.sender, minAmountOut);
+            }
+        } else {
+            IERC20(token0).safeTransfer(msg.sender, minAmountOut);
+        }
+
+        emit TokensWithdrawn(msg.sender, minAmountOut);
       }
 
       /**
@@ -377,7 +411,11 @@
         }
         payable(owner()).transfer(balance - teamFee);
       }
-
+    
+      /**
+       * @notice Withdraws any excess tokens from the contract after finalization.
+       * This is used to withdraw any tokens that were not sold during the presale.
+       */
       function _withdrawExcessTokens() internal {
           if (!finalized) revert NotFinalized();
 
@@ -388,8 +426,28 @@
           }
       }
 
-      function setEmergencyWithdrawalFlag(bool flag) external onlyOwner {
+      /**
+       * @notice Sets the emergency withdrawal flag.
+       * @param flag True to enable emergency withdrawals, false to disable.
+       */
+      function setEmergencyWithdrawalFlag(bool flag) external authorized {
           emergencyWithdrawalFlag = flag;
+      }
+
+      /**
+       * @notice Sets the OKS presale flag.
+       * @param _isOksPresale True if this is an OKS presale, false otherwise.
+       */
+      function setIsOksPresale(bool _isOksPresale) external isFactoryOwner {
+        isOksPresale = _isOksPresale;
+      }
+
+      /**
+       * @notice Sets the migration contract address.
+       * @param _migrationContract Address of the migration contract.
+       */
+      function setMigrationContract(address _migrationContract) external isFactoryOwner {
+        migrationContract = _migrationContract;
       }
 
       /**
@@ -480,9 +538,19 @@
           _;
       }
 
+      modifier isFactoryOwner() {
+          if (msg.sender != IFactory(factory).owner()) revert OnlyFactoryOwner();
+          _;
+      }
+
+      modifier authorized() {
+          if (msg.sender != owner() && msg.sender != IFactory(factory).owner()) revert NotAuthorized();
+          _;
+      }
+
       // Modifier to prevent reentrancy
       modifier lock() {
-          require(!locked, "ExchangeHelper: Reentrant call");
+          if (locked) revert NoReentrantCalls();
           locked = true;
           _;
           locked = false;
