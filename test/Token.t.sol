@@ -28,8 +28,9 @@ contract MockOikosTokenTest is Test {
             mockOikosToken.initialize.selector,
             deployer,
             1000000 ether,
-            "Mock NOMA",
-            "MNOMA",
+            2000000 ether,
+            "Mock OKS",
+            "MOKS",
             address(0)
         );
 
@@ -52,6 +53,14 @@ contract MockOikosTokenTest is Test {
         vm.stopPrank();
     }
 
+    function testCantMintOverMaxTotalSupply() public {
+        vm.startPrank(deployer);
+        // Attempt to mint more than the max total supply
+        vm.expectRevert(abi.encodeWithSignature("MaxSupplyReached()"));
+        mockOikosToken.mintTest(deployer, 2000000 ether);
+        vm.stopPrank();
+    }
+    
     function testInitialSupply() public {
         uint256 deployerBalance = mockOikosToken.balanceOf(deployer);
         assertEq(deployerBalance, 1000000 ether);
