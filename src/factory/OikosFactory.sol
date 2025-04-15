@@ -203,8 +203,8 @@ contract OikosFactory {
             )
         );
 
-        IERC20(address(data.proxy)).safeTransfer(address(deployer), data.vaultDeployParams.totalSupply);
-        if (IERC20(address(data.proxy)).balanceOf(address(deployer)) != data.vaultDeployParams.totalSupply) revert SupplyTransferError();
+        IERC20(address(data.proxy)).safeTransfer(address(deployer), data.vaultDeployParams.initialSupply);
+        if (IERC20(address(data.proxy)).balanceOf(address(deployer)) != data.vaultDeployParams.initialSupply) revert SupplyTransferError();
 
         data.presaleContract = _configurePresale(
             address(data.proxy),
@@ -298,6 +298,11 @@ contract OikosFactory {
     ) internal returns (address presaleAddress) {
         int24 tickSpacing = Utils._validateFeeTier(vaultDeployParams.feeTier);
 
+        uint256 initialPrice = 
+            keccak256(bytes(vaultDeployParams.symbol)) == keccak256(bytes("OKS"))
+                ? vaultDeployParams.IDOPrice
+                : _calculatePresalePremium(vaultDeployParams.IDOPrice);
+
         if (vaultDeployParams.presale == 1) {
             
             deferredDeployParams[vaultAddress] = vaultDeployParams;
@@ -309,14 +314,14 @@ contract OikosFactory {
                     vaultAddress: vaultAddress,
                     pool: pool,
                     softCap: presaleParams.softCap,
-                    initialPrice: _calculatePresalePremium(vaultDeployParams.IDOPrice),
+                    initialPrice: initialPrice,
                     deadline: presaleParams.deadline,
                     name: string(abi.encodePacked(vaultDeployParams.name, " Pre Asset")),
                     symbol: string(abi.encodePacked("p-", vaultDeployParams.symbol)),
                     decimals: vaultDeployParams.decimals,
                     tickSpacing: tickSpacing,
                     floorPercentage: getProtocolParameters().floorPercentage,
-                    totalSupply: vaultDeployParams.totalSupply
+                    totalSupply: vaultDeployParams.initialSupply
                 }),
                 getPresaleProtocolParams()
             );
@@ -339,7 +344,7 @@ contract OikosFactory {
             );
             _deployLiquidity(
                 vaultDeployParams.IDOPrice, 
-                vaultDeployParams.totalSupply, 
+                vaultDeployParams.initialSupply, 
                 tickSpacing, 
                 getProtocolParameters()
             );
@@ -354,7 +359,7 @@ contract OikosFactory {
 
         _deployLiquidity(
             _params.IDOPrice, 
-            _params.totalSupply, 
+            _params.initialSupply, 
             tickSpacing, 
             getProtocolParameters()
         );
@@ -644,6 +649,10 @@ contract OikosFactory {
      */
     function _getVault(address _deployer, uint256 index) internal view returns (address) {
         return _vaults[_deployer].at(index);
+    }
+
+    function owner() public view returns (address) {
+        return authority;
     }
 
     /**
