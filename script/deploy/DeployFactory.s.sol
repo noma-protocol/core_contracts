@@ -141,7 +141,7 @@ contract DeployFactory is Script {
 
         ProtocolParameters memory _params =
         ProtocolParameters(
-            10,         // Floor percentage of total supply
+            39,         // Floor percentage of total supply
             5,          // Anchor percentage of total supply
             3,          // IDO price multiplier
             [200, 500], // Floor bips
@@ -160,7 +160,7 @@ contract DeployFactory is Script {
 
         PresaleProtocolParams memory _presaleParams =
         PresaleProtocolParams(
-            60,         // Max soft cap (60%)
+            100,         // Max soft cap (60%)
             100,        // Min contribution ratio 
             25,         // Max contribution ratio 
             20,         // Percentage of funds kept from presale (20%)

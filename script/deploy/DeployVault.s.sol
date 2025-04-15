@@ -5,12 +5,17 @@ import "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
 import { OikosFactory } from  "../../src/factory/OikosFactory.sol";
-import { VaultDeployParams, PresaleUserParams, VaultDescription, ProtocolParameters } from "../../src/types/Types.sol";
+import { ProtocolAddresses, VaultDeployParams, PresaleUserParams, VaultDescription, ProtocolParameters } from "../../src/types/Types.sol";
 import { IDOHelper } from "../../test/IDO_Helper/IDOHelper.sol";
+import { BaseVault } from  "../../src/vault/BaseVault.sol";
 
 struct ContractAddressesJson {
     address Factory;
     address ModelHelper;
+}
+
+interface IPresaleContract {
+    function setIsOksPresale(bool isOksPresale) external;
 }
 
 contract DeployVault is Script {
@@ -59,18 +64,19 @@ contract DeployVault is Script {
             "OIKOS TOKEN",
             "OKS",
             18,
-            100e18,
-            1e18,
+            3367606000000000000000000,
+            10102818000000000000000000,
+            37850000000000,
             0,
             WBNB,
             3000,
-            0 // 0 = no presale
+            1 // 0 = no presale
         );
 
         PresaleUserParams memory presaleParams =
         PresaleUserParams(
-            6e18,  // softCap
-            30     // deadline
+            29826549581000000000,     // softCap
+            60                       // duration (seconds)
         );
 
         (address vault, address pool, address proxy) = 
@@ -79,6 +85,10 @@ contract DeployVault is Script {
             presaleParams,
             vaultDeployParams
         );
+
+        BaseVault vaultContract = BaseVault(vault);
+        ProtocolAddresses memory protocolAddresses = vaultContract.getProtocolAddresses();
+        IPresaleContract(protocolAddresses.presaleContract).setIsOksPresale(true);
 
         idoManager = new IDOHelper(pool, vault, modelHelper, proxy, WBNB);
 
