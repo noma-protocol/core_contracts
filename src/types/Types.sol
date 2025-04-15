@@ -83,7 +83,8 @@ struct VaultInfo {
 /// @param name Name of the vault token.
 /// @param symbol Symbol of the vault token.
 /// @param decimals Number of decimals for the token.
-/// @param totalSupply Total supply of the token.
+/// @param initialSupply Initial supply of the token.
+/// @param maxTotalSupply Max Total supply of the token.
 /// @param IDOPrice Initial price of the token in the IDO.
 /// @param token1 Address of token1.
 /// @param feeTier Fee tier for the pool.
@@ -91,7 +92,8 @@ struct VaultDeployParams {
     string name;
     string symbol;
     uint8 decimals;
-    uint256 totalSupply;
+    uint256 initialSupply;
+    uint256 maxTotalSupply;
     uint256 IDOPrice;
     uint256 floorPrice;
     address token1;

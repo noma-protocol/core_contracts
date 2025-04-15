@@ -44,7 +44,8 @@ contract TokenFactory {
             vaultDeployParams.name,
             vaultDeployParams.symbol,
             vaultDeployParams.token1,
-            vaultDeployParams.totalSupply
+            vaultDeployParams.initialSupply,
+            vaultDeployParams.maxTotalSupply
         );
 
         return (oikosToken, proxy, tokenHash);
@@ -55,8 +56,11 @@ contract TokenFactory {
     * @param name The name of the token.
     * @param symbol The symbol of the token.
     * @param _token1 The address of the paired token (token1).
-    * @param totalSupply The total supply of the token.
-    * @return oikosToken The address of the newly deployed OikosToken.
+    * @param initialSupply The initial supply of the token.
+    * @param maxTotalSupply The max total supply of the token.
+    * @return oikosImpl The address of the newly deployed OikosToken.
+    * @return proxy The address of the ERC1967Proxy for the OikosToken.
+    * @return tokenHash The hash of the token, used for uniqueness.
     * @dev This internal function ensures the token does not already exist, generates a unique address using a salt, and initializes the token.
     * It reverts if the token address is invalid or if the token already exists.
     */
@@ -64,42 +68,49 @@ contract TokenFactory {
         string memory name,
         string memory symbol,
         address _token1,
-        uint256 totalSupply
-    ) internal returns  (OikosToken, ERC1967Proxy, bytes32) {
-        bytes32 tokenHash = keccak256(abi.encodePacked(name, symbol));
-
+        uint256 initialSupply,
+        uint256 maxTotalSupply
+    )
+        internal
+        returns (
+            OikosToken oikosImpl,
+            ERC1967Proxy proxy,
+            bytes32 tokenHash
+        )
+    {
+        // compute these once
+        tokenHash = keccak256(abi.encodePacked(name, symbol));
         uint256 nonce = uint256(tokenHash);
 
-        OikosToken _oikosToken;
-        ERC1967Proxy proxy ;
-
-        // Encode the initialize function call
-        bytes memory data = abi.encodeWithSelector(
-            _oikosToken.initialize.selector,
-            msg.sender,       // Deployer address
-            totalSupply,     // Initial supply
-            name,            // Token name
-            symbol,          // Token symbol
-            address(resolver) // Resolver address
-        );
+        // deploy implementation
+        oikosImpl = new OikosToken{salt: bytes32(nonce)}();
 
         do {
-            _oikosToken = new OikosToken{salt: bytes32(nonce)}();
-            // Deploy the proxy contract
+            // deploy proxy, with inline data encoding (no `data` local)
             proxy = new ERC1967Proxy{salt: bytes32(nonce)}(
-                address(_oikosToken),
-                data
+                address(oikosImpl),
+                abi.encodeWithSelector(
+                    OikosToken.initialize.selector,
+                    msg.sender,
+                    initialSupply,
+                    maxTotalSupply,
+                    name,
+                    symbol,
+                    address(resolver)
+                )
             );
             nonce++;
         } while (address(proxy) >= _token1);
 
+        // address check
         if (address(proxy) >= _token1) revert InvalidTokenAddressError();
 
-        uint256 totalSupplyFromContract = IERC20(address(proxy)).totalSupply();
-        require(totalSupplyFromContract == totalSupply, "wrong parameters");
-
+        // sanity checks
+        require(
+           IERC20(address(proxy)).totalSupply() == initialSupply,
+           "wrong parameters"
+        );
         require(address(proxy) != address(0), "Token deploy failed");
-        return (_oikosToken, proxy, tokenHash);
     }
 
     function factory() public view returns (address) {

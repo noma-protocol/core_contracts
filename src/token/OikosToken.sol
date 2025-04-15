@@ -17,10 +17,12 @@ contract OikosToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPS
 
     // State variables
     IAddressResolver public resolver; // The address resolver contract.
+    uint256 public maxTotalSupply; // The maximum total supply of the token.
 
     // Custom errors
     error OnlyFactory();
     error CannotInitializeLogicContract();
+    error MaxSupplyReached();
 
     /**
      * @notice Constructor to disable initializers for the logic contract.
@@ -33,14 +35,16 @@ contract OikosToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPS
     /**
      * @notice Initializes the contract.
      * @param _deployer The address of the deployer.
-     * @param _totalSupply The total supply of the token.
+     * @param _initialSupply The initial supply of the token.
+     * @param _maxTotalSupply The max total supply of the token.
      * @param _name The name of the token.
      * @param _symbol The symbol of the token.
      * @param _resolver The address of the resolver contract.
      */
     function initialize(
         address _deployer,
-        uint256 _totalSupply, 
+        uint256 _initialSupply,
+        uint256 _maxTotalSupply, 
         string memory _name, 
         string memory _symbol,
         address _resolver
@@ -49,7 +53,8 @@ contract OikosToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPS
         __ERC20_init(_name, _symbol);
         __Ownable_init(_deployer);
         __UUPSUpgradeable_init();
-        _mint(_deployer, _totalSupply);
+        _mint(_deployer, _initialSupply);
+        maxTotalSupply = _maxTotalSupply;
         resolver = IAddressResolver(_resolver);
     }
 
@@ -59,6 +64,7 @@ contract OikosToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPS
      * @param _amount The amount of tokens to mint.
      */
     function mint(address _recipient, uint256 _amount) public onlyFactory {
+        if (totalSupply() + _amount > maxTotalSupply) revert MaxSupplyReached();
         _mint(_recipient, _amount);
     }
     
@@ -90,7 +96,7 @@ contract OikosToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPS
      * @return The UUID for the proxy implementation slot.
      */
     function proxiableUUID() public pure override returns (bytes32) {
-        bytes32 hash = keccak256("eip1967.proxy.implementation");
+        bytes32 hash = keccak256("oikos.token.implementation");
         bytes32 slot = bytes32(uint256(hash) - 1);
         return slot;
     }
