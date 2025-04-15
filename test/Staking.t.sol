@@ -25,7 +25,7 @@ contract TestStaking is Test {
     function setUp() public {
         
         OKS = new TestMockOikosToken();
-        OKS.initialize(address(this), 1_000_000e18,  "TEST", "TEST", address(0)); // Large initial supply
+        OKS.initialize(address(this), 1_000_000e18, 200_000_000e18, "TEST", "TEST", address(0)); // Large initial supply
 
         sOKS = new GonsToken();
         vm.prank(deployer);

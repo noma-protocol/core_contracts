@@ -171,6 +171,7 @@ contract OikosFactoryTest is Test {
                 "OKS",       // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
+                200e18,       // Max supply
                 1e18,         // IDO Price
                 0,
                 WBNB,         // Token1 address
@@ -209,6 +210,7 @@ contract OikosFactoryTest is Test {
                 "OKS",       // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
+                200e18,       // Max supply
                 1e18,         // IDO Price
                 0,
                 WBNB,         // Token1 address
@@ -244,7 +246,8 @@ contract OikosFactoryTest is Test {
             "Oikos Token", // Name
             "OKS",         // Symbol
             18,            // Decimals
-            100e18,        // Total supply
+            100e18,       // Total supply
+            200e18,       // Max supply
             1e18,          // IDO Price
             0,
             WBNB,          // Token1 address
@@ -274,6 +277,7 @@ contract OikosFactoryTest is Test {
                 "OKS",        // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
+                200e18,       // Max supply
                 1e18,         // IDO Price
                 0,
                 WBNB,         // Token1 address
@@ -340,6 +344,7 @@ contract OikosFactoryTest is Test {
                 "OKS",       // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
+                200e18,       // Max supply
                 1e18,         // IDO Price
                 0,
                 WBNB,         // Token1 address
@@ -376,6 +381,7 @@ contract OikosFactoryTest is Test {
                 "OKS",        // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
+                200e18,       // Max supply
                 1e18,         // IDO Price
                 0,
                 WBNB,         // Token1 address
@@ -412,6 +418,7 @@ contract OikosFactoryTest is Test {
                 "OKS",       // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
+                200e18,       // Max supply
                 1e18,         // IDO Price
                 0,
                 WBNB,         // Token1 address
@@ -454,6 +461,7 @@ contract OikosFactoryTest is Test {
                 "TEST",       // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
+                200e18,       // Max supply
                 1e18,         // IDO Price
                 0,
                 WBNB,         // Token1 address
@@ -497,6 +505,7 @@ contract OikosFactoryTest is Test {
             "V1",               // Symbol
             18,                 // Decimals
             100e18,             // Total supply
+            200e18,             // Max supply
             1e18,               // IDO Price
             0,
             WBNB,               // Token1 address
@@ -510,6 +519,7 @@ contract OikosFactoryTest is Test {
             "V2",               // Symbol
             18,                 // Decimals
             200e18,             // Total supply
+            400e18,             // Max supply
             2e18,               // IDO Price
             0,
             WBNB,               // Token1 address

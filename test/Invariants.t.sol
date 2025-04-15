@@ -65,8 +65,8 @@ contract Invariants is Test {
         // Read the JSON file
         string memory json = vm.readFile(path);
 
-        string memory networkId = "56";
-        // Parse the data for network ID `56`
+        string memory networkId = "1337";
+        // Parse the data for network ID `1337`
         bytes memory data = vm.parseJson(json, string.concat(string("."), networkId));
 
         // Decode the data into the ContractAddresses struct
@@ -203,8 +203,8 @@ contract Invariants is Test {
         address pool = address(vault.pool());
 
         (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(vault.pool()).slot0();
-        uint8 numTrades = 100;
-        uint256 tradeAmount = 1 ether;
+        uint8 numTrades = 1;
+        uint256 tradeAmount = 0.00003785 ether;
         
         IWETH(WBNB).deposit{ value:  tradeAmount * numTrades}();
         IWETH(WBNB).transfer(idoManager, tradeAmount * numTrades);

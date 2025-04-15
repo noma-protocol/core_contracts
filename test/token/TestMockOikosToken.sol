@@ -11,10 +11,14 @@ import { Utils } from "../../src/libraries/Utils.sol";
 contract TestMockOikosToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
 
     IAddressResolver public resolver;
+    uint256 public maxTotalSupply; // The maximum total supply of the token.
+
+    error MaxSupplyReached();
 
     function initialize(
         address _deployer,
-        uint256 _totalSupply, 
+        uint256 _initialSupply,
+        uint256 _maxTotalSupply, 
         string memory _name, 
         string memory _symbol,
         address _resolver
@@ -22,15 +26,18 @@ contract TestMockOikosToken is Initializable, ERC20Upgradeable, OwnableUpgradeab
         __ERC20_init(_name, _symbol);
         __Ownable_init(_deployer);
         __UUPSUpgradeable_init();
-        _mint(msg.sender, _totalSupply);
+        _mint(msg.sender, _initialSupply);
+        maxTotalSupply = _maxTotalSupply;
         resolver = IAddressResolver(_resolver);
     }
 
     function mintTest(address to, uint256 amount) public {
+        if (totalSupply() + amount > maxTotalSupply) revert MaxSupplyReached();
         _mint(to, amount);
     }
     
     function mintTo(address to, uint256 amount) public onlyFactory  {
+        if (totalSupply() + amount > maxTotalSupply) revert MaxSupplyReached();
         _mint(to, amount);
     }
 

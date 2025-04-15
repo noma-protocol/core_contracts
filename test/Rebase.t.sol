@@ -23,7 +23,7 @@ contract TestRebase is Test {
 
     function setUp() public {
         mockOikosToken = new TestMockOikosToken();
-        mockOikosToken.initialize(address(this), 100_000e18, "TEST", "TEST", address(0));
+        mockOikosToken.initialize(address(this), 100_000e18, 200_000_000e18, "TEST", "TEST", address(0));
 
         rebaseToken = new TestGons();
 

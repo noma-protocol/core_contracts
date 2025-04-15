@@ -39,7 +39,7 @@ contract TestQuoter is Test {
         string memory json = vm.readFile(path);
 
         string memory networkId = "1337";
-        // Parse the data for network ID `56`
+        // Parse the data for network ID `1337`
         bytes memory data = vm.parseJson(json, string.concat(string("."), networkId));
 
         // Decode the data into the ContractAddresses struct

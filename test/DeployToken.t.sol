@@ -28,8 +28,9 @@ contract DeployToken is Test {
             mockOikosToken.initialize.selector,
             deployer,
             1000000 ether,
-            "Mock NOMA",
-            "MNOMA",
+            2000000 ether,
+            "Mock OKS",
+            "MOKS",
             address(0)
         );
 
