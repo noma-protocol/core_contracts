@@ -7,7 +7,7 @@ import {IERC20Metadata} from "openzeppelin/contracts/token/ERC20/extensions/IERC
 import {Conversions} from "../src/libraries/Conversions.sol";
 import {Uniswap} from "../src/libraries/Uniswap.sol";
 import {Utils} from "../src/libraries/Utils.sol";
-
+import {ISwapRouter} from "v3-periphery/interfaces/ISwapRouter.sol";
 import {
     TokenInfo,
     SwapParams
@@ -42,7 +42,7 @@ contract ExchangeHelper {
 
     constructor() {}
 
-    function buyTokensETH(
+    function buyTokens(
         address pool, 
         uint256 price, 
         uint256 amount, 
@@ -71,7 +71,8 @@ contract ExchangeHelper {
             receiver: receiver,
             token0: tokenInfo.token0,
             token1: tokenInfo.token1,
-            basePriceX96: Conversions.priceToSqrtPriceX96(
+            basePriceX96: Conversions
+            .priceToSqrtPriceX96(
                 int256(price), 
                 tickSpacing, 
                 decimals
@@ -91,7 +92,7 @@ contract ExchangeHelper {
         // Ensure the swap was successful and tokens were received.
         // (amount0 should be negative, meaning token0 was sold)
         require(amount0 < 0, "ExchangeHelper: No token0 received");
-        uint256 tokensReceived = uint256(-amount0);
+        // uint256 tokensReceived = uint256(-amount0);
 
         uint256 refundAmount = IWETH(WBNB).balanceOf(address(this)) - initialWETHBalance;
         
@@ -117,8 +118,11 @@ contract ExchangeHelper {
             token1: IUniswapV3Pool(pool).token1()
         });    
         poolAddress = pool;    
-        IERC20(tokenInfo.token0).transferFrom(msg.sender, address(this), amount);
-        uint8 decimals = IERC20Metadata(tokenInfo.token0).decimals();
+        IERC20(tokenInfo.token1).transferFrom(msg.sender, address(this), amount);
+        uint8 decimals = IERC20Metadata(tokenInfo.token1).decimals();
+
+        // track balance of WBNB before swap
+        uint256 initialWETHBalance = IWETH(WBNB).balanceOf(address(this));
 
         // Swap Params
         SwapParams memory swapParams = SwapParams({
@@ -126,7 +130,8 @@ contract ExchangeHelper {
             receiver: receiver,
             token0: tokenInfo.token0,
             token1: tokenInfo.token1,
-            basePriceX96: Conversions.priceToSqrtPriceX96(
+            basePriceX96: Conversions
+            .priceToSqrtPriceX96(
                 int256(price), 
                 tickSpacing, 
                 decimals
@@ -137,13 +142,15 @@ contract ExchangeHelper {
         });
         
         // Perform the swap using the newly deposited WBNB
-        (int256 amount0, int256 amount1) = Uniswap
+        (int256 amount0, ) = Uniswap
         .swap(
             swapParams
         );       
-       
-    }
 
+        // Ensure the swap was successful and tokens were received.
+        require(amount0 < 0, "ExchangeHelper: Invalid swap");
+
+    }
     
     function sellTokens(
         address pool, 
@@ -158,6 +165,7 @@ contract ExchangeHelper {
             token1: IUniswapV3Pool(pool).token1()
         });    
         poolAddress = pool;    
+        address token0 = tokenInfo.token0;
         IERC20(tokenInfo.token0).transferFrom(msg.sender, address(this), amount);
         uint8 decimals = IERC20Metadata(tokenInfo.token0).decimals();
 
@@ -167,7 +175,8 @@ contract ExchangeHelper {
             receiver: receiver,
             token0: tokenInfo.token0,
             token1: tokenInfo.token1,
-            basePriceX96: Conversions.priceToSqrtPriceX96(
+            basePriceX96: Conversions
+            .priceToSqrtPriceX96(
                 int256(price), 
                 tickSpacing, 
                 decimals
@@ -176,12 +185,79 @@ contract ExchangeHelper {
             zeroForOne: true,
             isLimitOrder: isLimitOrder
         });
-       
+            
+        // Perform the swap
+        (int256 amount0, int256 amount1) = Uniswap.swap(swapParams);
+        require(amount1 < 0, "ExchangeHelper: Invalid swap");
+        
+        uint256 balanceAfterSwap = IERC20Metadata(token0).balanceOf(address(this));
+
+        uint256 refund = balanceAfterSwap > (amount - uint256(amount0)) ?
+            amount - uint256(amount0) :
+            balanceAfterSwap;  
+
+        if (refund > 0) {
+            IERC20(token0).transfer(msg.sender, refund);
+        }
     }
 
-    /**
-     * @notice Uniswap v3 callback function, called back on pool.swap
-     */
+    function sellTokensETH(
+        address pool, 
+        uint256 price, 
+        uint256 amount, 
+        address receiver,
+        bool isLimitOrder
+    ) public lock {
+        require(amount > 0, "ExchangeHelper: Amount must be greater than 0");
+        tokenInfo = TokenInfo({
+            token0: IUniswapV3Pool(pool).token0(),
+            token1: IUniswapV3Pool(pool).token1()
+        });    
+        poolAddress = pool;    
+        address token0 = tokenInfo.token0;
+        IERC20(tokenInfo.token0).transferFrom(msg.sender, address(this), amount);
+        uint8 decimals = IERC20Metadata(tokenInfo.token0).decimals();
+
+        // Swap Params
+        SwapParams memory swapParams = SwapParams({
+            poolAddress: address(pool),
+            receiver: address(this),
+            token0: tokenInfo.token0,
+            token1: tokenInfo.token1,
+            basePriceX96: Conversions
+            .priceToSqrtPriceX96(
+                int256(price), 
+                tickSpacing, 
+                decimals
+            ),
+            amountToSwap: amount,
+            zeroForOne: true,
+            isLimitOrder: isLimitOrder
+        });
+            
+        // Perform the swap
+        (int256 amount0, int256 amount1) = Uniswap.swap(swapParams);
+        require(amount1 < 0, "ExchangeHelper: Invalid swap");
+        
+        uint256 bnbReceived = uint256(-amount1);
+        IWETH(WBNB).withdraw(bnbReceived);
+        payable(receiver).transfer(bnbReceived);
+
+        uint256 balanceAfterSwap = IERC20Metadata(token0).balanceOf(address(this));
+
+        uint256 refund = balanceAfterSwap > (amount - uint256(amount0)) ?
+            amount - uint256(amount0) :
+            balanceAfterSwap;  
+
+        if (refund > 0) {
+            IERC20(token0).transfer(msg.sender, refund);
+        }
+    }
+
+
+        /**
+         * @notice Uniswap v3 callback function, called back on pool.swap
+         */
     function uniswapV3SwapCallback(
         int256 amount0Delta, 
         int256 amount1Delta, 
