@@ -50,112 +50,143 @@ error StakingNotEnabled();
  */
 contract StakingVault is BaseVault {
     using SafeERC20 for IERC20;
-
     /**
      * @notice Mints and distributes staking rewards to the staking contract.
-     * @param addresses The protocol addresses.
+     * @param caller    entity to receive caller fee
+     * @param addresses protocol addresses struct
      */
-    function mintAndDistributeRewards(ProtocolAddresses memory addresses) public onlyInternalCalls {
-        if (msg.sender != address(this)) {
-            revert Unauthorized();
-        }
+    function mintAndDistributeRewards(
+        address caller,
+        ProtocolAddresses memory addresses
+    ) public onlyInternalCalls {
+        require(msg.sender == address(this), "Unauthorized");
+        if (_v.stakingContract == address(0)) revert StakingContractNotSet();
+        if (!_v.stakingEnabled) return;
 
-        if (_v.stakingContract == address(0)) {
-            revert StakingContractNotSet();
-        }
+        // 1) calculate base mint amounts
+        (uint256 toMintEth, uint256 toMint) = _calculateMint(addresses);
+        if (toMint == 0) revert NoStakingRewards();
 
-        if (!_v.stakingEnabled) {
-            return;
-        }
+        // 2) mint
+        IVault(address(this)).mintTokens(address(this), toMint);
 
-        LiquidityPosition[3] memory positions = [
-            _v.floorPosition, 
-            _v.anchorPosition, 
-            _v.discoveryPosition
-        ];
-
-        uint256 excessReservesToken1 = IModelHelper(modelHelper())
-        .getExcessReserveBalance(
-            address(_v.pool),
-            address(this),
-            false
+        // 3) distribute fees, returns post-fee amount
+        uint256 postFee = _distributeInflationFees(
+            caller,
+            addresses.pool,
+            toMint
         );
+        _v.totalMinted += postFee;
 
-        uint256 totalStaked = IERC20(_v.tokenInfo.token0).balanceOf(_v.stakingContract);
+        // 4) send to staking & notify
+        _notifyStaking(postFee);
 
-        uint256 intrinsicMinimumValue = IModelHelper(modelHelper())
-        .getIntrinsicMinimumValue(address(this));
-
-        uint256 circulatingSupply = IModelHelper(modelHelper())
-        .getCirculatingSupply(
-            addresses.pool, 
-            address(this)
-        );
-
-        uint256 toMintEth = 
-        IRewardsCalculator(rewardsCalculator()).
-        calculateRewards(
-            RewardParams(
-                excessReservesToken1,
-                circulatingSupply,
-                totalStaked
-            )
-        ); 
-
-        uint256 toMint = DecimalMath.divideDecimal(toMintEth, intrinsicMinimumValue);
-
-        if (toMint > 0) {        
-            IVault(address(this)).mintTokens(address(this), toMint);
-
-            address teamMultisig = IVault(address(this)).teamMultiSig();
-            uint256 inflation = toMint * IVault(address(this)).getProtocolParameters().inflationFee / 100;
-            
-            if (inflation > 0) {
-                if (teamMultisig != address(0)) {
-                    IERC20(IUniswapV3Pool(addresses.pool).token0())
-                    .safeTransfer(
-                        teamMultisig, 
-                        inflation
-                    );
-                    toMint -= inflation;
-                }
-                if (_v.manager != address(0)) {
-                    IERC20(IUniswapV3Pool(addresses.pool).token0())
-                    .safeTransfer(
-                        _v.manager, 
-                        inflation
-                    );
-                    toMint -= inflation;
-                }
-            }
-
-            // Update total minted (OKS)
-            _v.totalMinted += toMint;
-
-            // Transfer to staking contract
-            IERC20(_v.tokenInfo.token0).transfer(_v.stakingContract, toMint);
-
-            // Call notifyRewardAmount 
-            IStakingRewards(_v.stakingContract).notifyRewardAmount(toMint);  
-
-            // Send tokens to Floor
-            (,, uint256 floorToken0Balance, uint256 floorToken1Balance) = IModelHelper(modelHelper())
-            .getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
-            
-            Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick);         
-            LiquidityDeployer.reDeployFloor(
-                address(_v.pool), 
-                address(this), 
-                floorToken0Balance, 
-                floorToken1Balance + toMintEth, 
-                positions
-            );
-
-        } else {
-            revert NoStakingRewards();
-        }
+        // 5) redeploy floor liquidity
+        _redeployFloor(addresses.pool, toMintEth);
     }
 
+    function _calculateMint(
+        ProtocolAddresses memory addresses
+    ) internal view returns (uint256 toMintEth, uint256 toMint) {
+        // fetch data
+        uint256 excessReserves = IModelHelper(modelHelper())
+            .getExcessReserveBalance(
+                address(_v.pool),
+                address(this),
+                false
+            );
+        uint256 totalStaked = IERC20(_v.tokenInfo.token0)
+            .balanceOf(_v.stakingContract);
+        uint256 intrinsicMin = IModelHelper(modelHelper())
+            .getIntrinsicMinimumValue(address(this));
+        uint256 circulating = IModelHelper(modelHelper())
+            .getCirculatingSupply(
+                addresses.pool,
+                address(this)
+            );
+
+        toMintEth = IRewardsCalculator(rewardsCalculator())
+            .calculateRewards(
+                RewardParams(excessReserves, circulating, totalStaked)
+            );
+        toMint = DecimalMath.divideDecimal(toMintEth, intrinsicMin);
+    }
+
+    function _distributeInflationFees(
+        address caller,
+        address poolAddr,
+        uint256 toMint
+    ) internal returns (uint256 remain) {
+        uint256 inflationFee = IVault(address(this))
+            .getProtocolParameters()
+            .inflationFee;
+        address teamMultisig = IVault(address(this)).teamMultiSig();
+
+        uint256 inflation = (toMint * inflationFee) / 100;
+        if (inflation == 0) return toMint;
+
+        // 1.25% caller fee
+        uint256 callerFee = (inflation * 125) / 10_000;
+        // remaining after caller
+        uint256 rem = inflation - callerFee;
+        // split team/creator
+        uint256 teamFee = rem / 2;
+        uint256 creatorFee = rem - teamFee;
+
+        address token0 = IUniswapV3Pool(poolAddr).token0();
+        if (caller != address(0)) {
+            IERC20(token0).safeTransfer(caller, callerFee);
+        }
+        if (teamMultisig != address(0)) {
+            IERC20(token0).safeTransfer(teamMultisig, teamFee);
+        }
+        if (_v.manager != address(0)) {
+            IERC20(token0).safeTransfer(_v.manager, creatorFee);
+        }
+
+        remain = toMint - inflation;
+    }
+
+    function _notifyStaking(uint256 amount) internal {
+        IERC20(_v.tokenInfo.token0).transfer(
+            _v.stakingContract,
+            amount
+        );
+        IStakingRewards(_v.stakingContract)
+            .notifyRewardAmount(amount);
+    }
+
+    function _redeployFloor(
+        address poolAddr,
+        uint256 toMintEth
+    ) internal {
+        // collect existing liquidity & balances
+        (
+            ,
+            ,
+            uint256 floor0,
+            uint256 floor1
+        ) = IModelHelper(modelHelper())
+            .getUnderlyingBalances(
+                poolAddr,
+                address(this),
+                LiquidityType.Floor
+            );
+        Uniswap.collect(
+            poolAddr,
+            address(this),
+            _v.floorPosition.lowerTick,
+            _v.floorPosition.upperTick
+        );
+        LiquidityDeployer.reDeployFloor(
+            poolAddr,
+            address(this),
+            floor0,
+            floor1 + toMintEth,
+            [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition]
+        );
+    }
+    
     /**
      * @notice Collects liquidity from all positions.
      * @param positions The current liquidity positions.
