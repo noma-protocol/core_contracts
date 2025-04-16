@@ -10,7 +10,7 @@ import {
 import { IVault } from "../interfaces/IVault.sol";
 
 interface IStakingVault {
-    function mintAndDistributeRewards(ProtocolAddresses memory addresses) external;
+    function mintAndDistributeRewards(address caller, ProtocolAddresses memory addresses) external;
 }
 
 interface ILendingVault {
@@ -116,7 +116,7 @@ contract ExtVault {
             positions
         );
 
-        IStakingVault(address(this)).mintAndDistributeRewards(addresses);
+        IStakingVault(address(this)).mintAndDistributeRewards(msg.sender, addresses);
         
         emit Shift();
     }    
