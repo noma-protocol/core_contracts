@@ -15,7 +15,7 @@ interface IStakingVault {
 
 interface ILendingVault {
     function borrowFromFloor(address who, uint256 borrowAmount, uint256 duration) external;
-    function paybackLoan(address who) external;
+    function paybackLoan(address who, uint256 amount) external;
     function rollLoan(address who, uint256 newDuration) external;
     function addCollateral(address who, uint256 amount) external;
     function defaultLoans() external;
@@ -68,9 +68,9 @@ contract ExtVault {
     /**
      * @notice Allows a user to pay back a loan.
      */
-    function payback() external {
+    function payback(uint256 amount) external {
         ILendingVault(address(this))
-        .paybackLoan(msg.sender);
+        .paybackLoan(msg.sender, amount);
 
         emit Payback(msg.sender);
     }
@@ -105,6 +105,7 @@ contract ExtVault {
     /**
      * @notice Shifts the liquidity positions in the vault.
      * @dev This function adjusts the liquidity positions and distributes staking rewards.
+     * @dev It also pays rewards to the caller.
      */
     function shift() public {
 
@@ -147,7 +148,7 @@ contract ExtVault {
         selectors[0] = bytes4(keccak256(bytes("shift()")));
         selectors[1] = bytes4(keccak256(bytes("slide()")));  
         selectors[2] = bytes4(keccak256(bytes("borrow(uint256,uint256)")));  
-        selectors[3] = bytes4(keccak256(bytes("payback()")));
+        selectors[3] = bytes4(keccak256(bytes("payback(uint256)")));
         selectors[4] = bytes4(keccak256(bytes("roll(uint256)")));  
         selectors[5] = bytes4(keccak256(bytes("addCollateral(uint256)")));            
         return selectors;

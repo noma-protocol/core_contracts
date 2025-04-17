@@ -49,8 +49,9 @@ interface IVault {
     /**
      * @notice Allows a borrower to repay their loan.
      * @dev Updates the vault state to reflect the repayment.
+     * @param amount The amount to repay.
      */
-    function payback() external;
+    function payback(uint256 amount) external;
 
     /**
      * @notice Allows a borrower to roll their loan.

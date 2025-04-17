@@ -39,6 +39,7 @@ error CantRollLoan();
 error NoLiquidity();
 error OnlyVault();
 error NotAuthorized();
+error InvalidRepayAmount();
 
 /**
  * @title LendingVault
@@ -58,20 +59,22 @@ contract LendingVault is BaseVault {
         uint256 intrinsicMinimumValue = IModelHelper(modelHelper()).getIntrinsicMinimumValue(address(this));
         return (DecimalMath.divideDecimal(borrowAmount, intrinsicMinimumValue), intrinsicMinimumValue);
     }
-
+    
     /**
-     * @notice Calculates the loan fees for a given borrow amount and duration.
-     * @param borrowAmount The amount of tokens to borrow.
-     * @param duration The duration of the loan.
-     * @return fees The calculated loan fees.
+     * @notice Calculate loan fees based on a daily rate of 0.057%
+     * @param borrowAmount  principal amount borrowed
+     * @param duration      loan duration in seconds
+     * @return fees         total fees owed
      */
-    function _calculateLoanFees(uint256 borrowAmount, uint256 duration) internal view returns (uint256 fees) {
+    function _calculateLoanFees(
+        uint256 borrowAmount,
+        uint256 duration
+    ) internal view returns (uint256 fees) {
         uint256 SECONDS_IN_DAY = 86400;
-        uint256 percentage = _v.loanFee; // e.g. 27 --> 0.027% 
-        uint256 scaledPercentage = percentage * 10**12; 
-        fees = (borrowAmount * scaledPercentage * (duration / SECONDS_IN_DAY)) / (100 * 10**18); // TODO Check this
-    }    
-
+        // daily rate = 0.057% -> 57 / 100_000
+        uint256 daysElapsed = duration / SECONDS_IN_DAY;
+        fees = (borrowAmount *_v.loanFee * daysElapsed) / 100_000;
+    }
     /**
      * @notice Allows a user to borrow tokens from the vault's floor liquidity.
      * @param who The address of the borrower.
@@ -115,24 +118,55 @@ contract LendingVault is BaseVault {
     }
 
     /**
-     * @notice Allows a user to pay back a loan.
-     * @param who The address of the borrower.
+     * @notice Pay back a portion or all of a loan.
+     * @param who          borrower address
+     * @param repayAmount  amount of borrowed token1 to repay
      */
-    function paybackLoan(address who) public onlyInternalCalls {
+    function paybackLoan(address who, uint256 repayAmount) public onlyInternalCalls {
         LoanPosition storage loan = _v.loanPositions[who];
 
         if (loan.borrowAmount == 0) revert NoActiveLoan();
         if (block.timestamp > loan.expiry) revert LoanExpired();
 
-        IERC20(_v.pool.token1()).transferFrom(who, address(this), loan.borrowAmount);
-        ITokenRepo(_v.tokenRepo).transferToRecipient(_v.pool.token0(), who, loan.collateralAmount);
-     
-        _fetchFromLiquidity(loan.borrowAmount, false);      
-        
-        delete _v.loanPositions[who];
-        _removeLoanAddress(who);
-    }
+        // If repayAmount is zero, treat as full repayment
+        if (repayAmount == 0) {
+            repayAmount = loan.borrowAmount;
+        } else if (repayAmount > loan.borrowAmount) {
+            revert InvalidRepayAmount();
+        }
 
+        // Snapshot original values for proportional calculation
+        uint256 originalBorrow    = loan.borrowAmount;
+        uint256 originalCollateral = loan.collateralAmount;
+
+        // Calculate how much collateral to return
+        uint256 collateralToReturn = (originalCollateral * repayAmount) / originalBorrow;
+
+        // Pull in repayment tokens
+        IERC20(_v.pool.token1()).transferFrom(who, address(this), repayAmount);
+
+        // Release proportional collateral
+        ITokenRepo(_v.tokenRepo).transferToRecipient(
+            _v.pool.token0(),
+            who,
+            collateralToReturn
+        );
+
+        // Rebalance liquidity for the repaid amount
+        _fetchFromLiquidity(repayAmount, false);
+
+        // Update loan position
+        loan.borrowAmount     = originalBorrow - repayAmount;
+        loan.collateralAmount = originalCollateral - collateralToReturn;
+
+
+        // If fully repaid, remove the position
+        if (loan.borrowAmount == 0) {
+            delete _v.loanPositions[who];
+            _removeLoanAddress(who);
+        }
+    }
+    
     function addCollateral(address who, uint256 amount) public onlyInternalCalls {
         if (amount == 0) revert InsufficientCollateral();
         if (_v.loanPositions[who].borrowAmount == 0) revert NoActiveLoan();
@@ -153,6 +187,8 @@ contract LendingVault is BaseVault {
         // Fetch the loan position
         LoanPosition storage loan = _v.loanPositions[who];
 
+        uint256 currentDuration = loan.duration;
+
         // Check if the loan exists
         if (loan.borrowAmount == 0) revert NoActiveLoan();
 
@@ -160,7 +196,7 @@ contract LendingVault is BaseVault {
         if (block.timestamp > loan.expiry) revert LoanExpired();
 
         // Ensure the new duration is valid
-        if (newDuration == 0) revert InvalidDuration();
+        if (newDuration == 0 || newDuration > 30 days) revert InvalidDuration();
 
         // Recalculate the collateral value
         uint256 newCollateralValue = DecimalMath.multiplyDecimal(
@@ -173,10 +209,13 @@ contract LendingVault is BaseVault {
 
         // Calculate the new borrow amount and fees
         uint256 newBorrowAmount = newCollateralValue - loan.borrowAmount;
-        uint256 newFees = _calculateLoanFees(newBorrowAmount, newDuration);
 
-        // Update the loan's expiry to reflect the new duration
-        loan.expiry = block.timestamp + newDuration;
+        // Calculate the new fees
+        uint256 newFees = _calculateLoanFees(newBorrowAmount, currentDuration + newDuration);
+
+        // Update the loan's expiry to reflect the new duration 
+        loan.expiry = loan.expiry + newDuration;
+        loan.duration = currentDuration + newDuration;
         loan.borrowAmount = loan.borrowAmount + newBorrowAmount;
         
         _fetchFromLiquidity(newBorrowAmount, true);
@@ -448,7 +487,7 @@ contract LendingVault is BaseVault {
     function getFunctionSelectors() external pure override returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](18);
         selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,uint256)")));    
-        selectors[1] = bytes4(keccak256(bytes("paybackLoan(address)")));
+        selectors[1] = bytes4(keccak256(bytes("paybackLoan(address,uint256)")));
         selectors[2] = bytes4(keccak256(bytes("rollLoan(address,uint256)")));
         selectors[3] = bytes4(keccak256(bytes("defaultLoans()")));
         selectors[4] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256,int24)[3])")));
