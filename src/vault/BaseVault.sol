@@ -112,7 +112,7 @@ contract BaseVault {
         _v.tokenInfo.token1 = _v.pool.token1();
         _v.initialized = false;
         _v.stakingEnabled = true;
-        _v.loanFee = _params.loanFee;
+        _v.loanFee = uint8(_params.loanFee);
         _v.stakingContract = _stakingContract;
         _v.presaleContract = _presaleContract;
         _v.collateralAmount = 0;
