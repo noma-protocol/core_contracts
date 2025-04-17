@@ -141,7 +141,7 @@ contract LendingVaultTest is Test {
         console.log("Token1 balance before payback is: ", token1Balance);
         
         vm.prank(deployer);
-        vault.payback();
+        vault.payback(borrowAmount);
  
         assertEq(token1Balance - borrowAmount, token1.balanceOf(deployer));
     }    
@@ -149,7 +149,7 @@ contract LendingVaultTest is Test {
     function testRollLoan() public {
         uint256 borrowAmount = 5 ether;
         uint256 duration = 30 days;
-        uint256 newDuration = 90 days;
+        uint256 newDuration = 30 days;
 
         vm.prank(deployer);
         token0.approve(vaultAddress, MAX_INT);
@@ -169,7 +169,6 @@ contract LendingVaultTest is Test {
         token1.approve(vaultAddress, MAX_INT);
 
         vm.prank(deployer);
-
         vault.roll(newDuration);
 
         // check if the loan amount is deducted from the user's balance
@@ -201,6 +200,29 @@ contract LendingVaultTest is Test {
     }
     
 
+
+    function testRollLoanShouldFailMoreThan30Days() public {
+        uint256 borrowAmount = 5 ether;
+        uint256 duration = 30 days;
+        uint256 newDuration = 90 days;
+
+        vm.prank(deployer);
+        token0.approve(vaultAddress, MAX_INT);
+
+        // Borrow first
+        vm.prank(deployer);
+        vault.borrow(borrowAmount, duration);
+        
+        uint256 balanceBeforePaybackToken1 = token1.balanceOf(deployer);
+        uint256 balanceBeforePaybackToken0 = token0.balanceOf(deployer);
+
+        vm.prank(deployer);
+
+        vm.expectRevert();
+        vault.roll(newDuration);
+    }
+    
+
     function testLargePurchaseTriggerShift() public {
         IDOManager managerContract = IDOManager(idoManager);
         LendingVault vault = LendingVault(address(managerContract.vault()));
@@ -211,7 +233,7 @@ contract LendingVaultTest is Test {
         uint256 purchasePrice = spotPrice + (spotPrice * 1 / 100);
 
         uint16 totalTrades = 50;
-        uint256 tradeAmount = 1 ether;
+        uint256 tradeAmount = 2 ether;
 
         IWETH(WBNB).deposit{ value: (tradeAmount * totalTrades)}();
         IWETH(WBNB).transfer(idoManager, tradeAmount * totalTrades);
@@ -236,7 +258,7 @@ contract LendingVaultTest is Test {
         uint256 liquidityRatio = modelHelper.getLiquidityRatio(pool, address(vault));
         console.log("Liquidity ratio is: ", liquidityRatio);
 
-        if (liquidityRatio < 0.98e18) {
+        if (liquidityRatio < 0.90e18) {
             console.log("Attempt to shift positions");
             IVault(address(vault)).shift();
             nextFloorPrice = getNextFloorPrice(pool, address(vault));
@@ -264,7 +286,7 @@ contract LendingVaultTest is Test {
     }
 
     function calculateLoanFees(uint256 borrowAmount, uint256 duration) public view returns (uint256 fees) {
-        uint256 percentage = 27; // 0.027% 
+        uint256 percentage = 57; // 0.057% 
         uint256 scaledPercentage = percentage * 10**12; 
         fees = (borrowAmount * scaledPercentage * (duration / SECONDS_IN_DAY)) / (100 * 10**18);
     }    
