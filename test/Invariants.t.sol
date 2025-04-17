@@ -297,7 +297,7 @@ contract Invariants is Test {
         uint256 purchasePrice = spotPrice + (spotPrice * 1 / 100);
 
         uint16 totalTrades = 50;
-        uint256 tradeAmount = 1 ether;
+        uint256 tradeAmount = 2 ether;
 
         IWETH(WBNB).deposit{ value: (tradeAmount * totalTrades)}();
         IWETH(WBNB).transfer(idoManager, tradeAmount * totalTrades);
@@ -322,7 +322,7 @@ contract Invariants is Test {
         uint256 liquidityRatio = modelHelper.getLiquidityRatio(pool, address(vault));
         console.log("Liquidity ratio is: ", liquidityRatio);
 
-        if (liquidityRatio < 0.98e18) {
+        if (liquidityRatio < 0.90e18) {
             console.log("Attempt to shift positions");
             IVault(address(vault)).shift();
             nextFloorPrice = getNextFloorPrice(pool, address(vault));
