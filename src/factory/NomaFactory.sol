@@ -120,6 +120,7 @@ contract NomaFactory {
         ) revert ZeroAddressError();
 
         authority = msg.sender;
+        teamMultisigAddress = msg.sender;
         uniswapV3Factory = _uniswapV3Factory;
         resolver = IAddressResolver(_resolver);
         deployerFactory = _deployerFactory;
@@ -504,6 +505,18 @@ contract NomaFactory {
     */
     function setPermissionlessDeploy(bool _flag) public isAuthority {
         permissionlessDeployEnabled = _flag;
+    }
+
+    /**
+    * @notice Sets the address of the multisig wallet.
+    * @param _address The new address of the multisig wallet.
+    * @dev This function can only be called by the current multisig address.
+    * It reverts if the provided address is zero.
+    */
+    function setMultiSigAddress(address _address) public {
+        if (msg.sender != teamMultisigAddress) revert NotAuthorityError();
+        if (_address == address(0)) revert ZeroAddressError();
+        teamMultisigAddress = _address;
     }
 
     /**
