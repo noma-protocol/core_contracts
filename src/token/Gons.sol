@@ -8,6 +8,7 @@ error AlreadyInitialized();
 error InvalidAmount();
 error InvalidAddress();
 error Unauthorized();
+error InvalidTransfer();
 
 contract GonsToken is ERC20Permit {
     // PLEASE READ BEFORE CHANGING ANY ACCOUNTING OR MATH
@@ -174,6 +175,10 @@ contract GonsToken is ERC20Permit {
         override
         returns (bool)
     {
+        if (to == address(0) || to == address(this) || to == msg.sender) {
+            revert InvalidTransfer();
+        }
+
         uint256 gonValue = value.mul(_gonsPerFragment);
         _gonBalances[msg.sender] = _gonBalances[msg.sender].sub(gonValue);
         _gonBalances[to] = _gonBalances[to].add(gonValue);
@@ -207,6 +212,10 @@ contract GonsToken is ERC20Permit {
         override
         returns (bool)
     {
+        if (to == address(0) || to == address(this) || to == msg.sender) {
+            revert InvalidTransfer();
+        }
+        
         _allowedFragments[from][msg.sender] = _allowedFragments[from][msg.sender].sub(value);
 
         uint256 gonValue = value.mul(_gonsPerFragment);
