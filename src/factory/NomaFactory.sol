@@ -507,6 +507,20 @@ contract NomaFactory {
     }
 
     /**
+    * @notice Upgrades the implementation of a token to a new version.
+    * @param _token The address of the token to upgrade.
+    * @param _newImplementation The address of the new implementation contract.
+    * @dev This function can only be called by the authority.
+    * It uses the `upgradeToAndCall` function of the NomaToken contract to perform the upgrade.
+    */
+    function upgradeToken(
+        address _token,
+        address _newImplementation
+    ) public isAuthority {
+        NomaToken(_token).upgradeToAndCall(_newImplementation, new bytes(0));
+    }
+
+    /**
     * @notice Validates the provided token address.
     * @param token The address of the token to validate.
     * @dev This internal function checks if the token has a valid symbol and is recognized by the resolver.
