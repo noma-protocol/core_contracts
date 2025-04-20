@@ -525,6 +525,7 @@ library LiquidityOps {
 
             if (balanceToken0 < circulatingSupply / IVault(address(this)).getProtocolParameters().lowBalanceThresholdFactor) {
                 if (isShift) {
+                    
                     // Mint unbacked supply
                     (uint256 mintAmount) = IAdaptiveSupply(
                         addresses.adaptiveSupplyController

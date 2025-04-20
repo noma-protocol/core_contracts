@@ -486,7 +486,7 @@ contract OikosFactory {
     * @param _params The new liquidity structure parameters.
     * @dev This function can only be called by the authority.
     */
-    function setProtocolParameters( //TODO check this
+    function setProtocolParameters( 
         ProtocolParameters memory _params
     ) public isAuthority {
         protocolParameters = _params;

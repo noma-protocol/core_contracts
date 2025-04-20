@@ -65,7 +65,8 @@ contract Resolver is Ownable {
     }
 
     function importVaultAddress(
-        address _vault, bytes32[] calldata names, 
+        address _vault, 
+        bytes32[] calldata names, 
         address[] calldata destinations
     ) external onlyFactoryOrOwner {
         if (names.length != destinations.length) revert InputLengthsMismatch();
