@@ -12,6 +12,7 @@ import {Utils} from "../libraries/Utils.sol";
 import {ITokenRepo} from "../TokenRepo.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import {
     LiquidityPosition, 
     LiquidityType,
@@ -40,6 +41,8 @@ error NoLiquidity();
 error OnlyVault();
 error NotAuthorized();
 error InvalidRepayAmount();
+error InvalidParams();
+error NotPermitted();
 
 /**
  * @title LendingVault
@@ -82,6 +85,7 @@ contract LendingVault is BaseVault {
      * @param duration The duration of the loan.
      */
     function borrowFromFloor(address who, uint256 borrowAmount, uint256 duration) public onlyInternalCalls {
+        if (_v.timeLastMinted == 0) revert NotPermitted();
         if (borrowAmount == 0) revert InsufficientLoanAmount();
         if (duration < 30 days || duration > 365 days) revert InvalidDuration();
         if (_v.loanPositions[who].borrowAmount > 0) revert ActiveLoan(); 
@@ -123,6 +127,7 @@ contract LendingVault is BaseVault {
      * @param repayAmount  amount of borrowed token1 to repay
      */
     function paybackLoan(address who, uint256 repayAmount) public onlyInternalCalls {
+        if (_v.timeLastMinted == 0) revert NotPermitted();
         LoanPosition storage loan = _v.loanPositions[who];
 
         if (loan.borrowAmount == 0) revert NoActiveLoan();
@@ -152,13 +157,14 @@ contract LendingVault is BaseVault {
             collateralToReturn
         );
 
+        _v.collateralAmount -= collateralToReturn;
+
         // Rebalance liquidity for the repaid amount
         _fetchFromLiquidity(repayAmount, false);
 
         // Update loan position
         loan.borrowAmount     = originalBorrow - repayAmount;
         loan.collateralAmount = originalCollateral - collateralToReturn;
-
 
         // If fully repaid, remove the position
         if (loan.borrowAmount == 0) {
@@ -167,23 +173,12 @@ contract LendingVault is BaseVault {
         }
     }
     
-    function addCollateral(address who, uint256 amount) public onlyInternalCalls {
-        if (amount == 0) revert InsufficientCollateral();
-        if (_v.loanPositions[who].borrowAmount == 0) revert NoActiveLoan();
-
-        IERC20(_v.pool.token0()).transferFrom(who, address(this), amount);
-        SafeERC20.safeTransfer(IERC20(address(_v.pool.token0())), _v.tokenRepo, amount);
-
-        _v.collateralAmount += amount;
-        _v.loanPositions[who].collateralAmount += amount;
-    }
-
-
     /**
      * @notice Allows a user to roll over a loan.
      * @param who The address of the borrower.
      */
     function rollLoan(address who, uint256 newDuration) public onlyInternalCalls {
+        if (_v.timeLastMinted == 0) revert NotPermitted();
         // Fetch the loan position
         LoanPosition storage loan = _v.loanPositions[who];
 
@@ -231,6 +226,18 @@ contract LendingVault is BaseVault {
         .enforceSolvencyInvariant(address(this));                  
     }
 
+    function addCollateral(address who, uint256 amount) public onlyInternalCalls {
+        if (_v.timeLastMinted == 0) revert NotPermitted();
+        if (amount == 0) revert InsufficientCollateral();
+        if (_v.loanPositions[who].borrowAmount == 0) revert NoActiveLoan();
+
+        IERC20(_v.pool.token0()).transferFrom(who, address(this), amount);
+        SafeERC20.safeTransfer(IERC20(address(_v.pool.token0())), _v.tokenRepo, amount);
+
+        _v.collateralAmount += amount;
+        _v.loanPositions[who].collateralAmount += amount;
+    }
+
     /**
      * @notice Defaults all expired loans and seizes the collateral.
      */
@@ -248,27 +255,30 @@ contract LendingVault is BaseVault {
 
     /**
      * @notice Fetches liquidity from the floor position and redeploys it.
-     * @param borrowAmount The amount to borrow.
+     * @param amount The amount to borrow.
      */
-    function _fetchFromLiquidity(uint256 borrowAmount, bool remove) internal {
+    function _fetchFromLiquidity(uint256 amount, bool remove) internal {
         (,, uint256 floorToken0Balance, uint256 floorToken1Balance) = IModelHelper(modelHelper())
         .getUnderlyingBalances(address(_v.pool), address(this), LiquidityType.Floor);
 
+        if (amount <= 0) revert InvalidParams();
+
         if (remove) {
-            if (floorToken1Balance < borrowAmount) revert InsufficientFloorBalance();
+            if (floorToken1Balance < amount) revert InsufficientFloorBalance();
         }
 
-         LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
+        LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
+        Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick);
 
-        Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick);         
-        LiquidityDeployer.reDeployFloor(
+        LiquidityDeployer
+        .reDeployFloor(
             address(_v.pool), 
             address(this), 
             floorToken0Balance, 
             (
                 remove ? 
-                floorToken1Balance - borrowAmount : 
-                floorToken1Balance + borrowAmount
+                floorToken1Balance - amount : 
+                floorToken1Balance + amount
             ), 
             positions
         );
@@ -354,34 +364,6 @@ contract LendingVault is BaseVault {
             amount
         );
     }
-
-    function afterPresale() public  {
-        if (msg.sender != _v.presaleContract) revert NotAuthorized();
-
-        address deployer = _v.resolver.requireAndGetAddress(
-            Utils.stringToBytes32("Deployer"), 
-            "no Deployer"
-        );
-
-        IOikosFactory(
-            _v.factory
-        ).deferredDeploy(
-            deployer
-        );
-    }
-
-    /**
-     * @notice Retrieves the current liquidity positions.
-     * @return positions The current liquidity positions.
-     */
-    function getPositions() public view
-    returns (LiquidityPosition[3] memory positions) {
-        positions = [
-            _v.floorPosition, 
-            _v.anchorPosition, 
-            _v.discoveryPosition
-        ];
-    }
     
     /**
     * @notice Retrieves the active loan details for a specific user.
@@ -420,52 +402,11 @@ contract LendingVault is BaseVault {
 
 
     /**
-     * @notice Retrieves the address of the team multisig.
-     * @return The address of the team multisig.
-     */
-    function teamMultiSig() public view returns (address) {
-        return IOikosFactory(_v.factory).teamMultiSig();
-    }
-
-    /**
-     * @notice Retrieves the protocol parameters.
-     * @return The protocol parameters.
-     */
-    function getProtocolParameters() public view returns 
-    (ProtocolParameters memory ) {
-        return _v.protocolParameters;
-    }
-
-    /**
-     * @notice Retrieves the time since the last mint operation.
-     * @return The time since the last mint operation.
-     */
-    function getTimeSinceLastMint() public view returns (uint256) {
-        return block.timestamp - _v.timeLastMinted;
-    }
-
-    /**
      * @notice Retrieves the total collateral amount.
      * @return The total collateral amount.
      */
     function getCollateralAmount() public view returns (uint256) {
         return _v.collateralAmount;
-    }
-
-    /**
-     * @notice Retrieves the Uniswap V3 pool contract.
-     * @return The Uniswap V3 pool contract.
-     */
-    function pool() public view returns (IUniswapV3Pool) {
-        return _v.pool;
-    }
-
-    /**
-     * @notice Retrieves the accumulated fees.
-     * @return The accumulated fees for token0 and token1.
-     */
-    function getAccumulatedFees() public view returns (uint256, uint256) {
-        return (_v.feesAccumulatorToken0, _v.feesAccumulatorToken1);
     }
 
     function calculateLoanFees(uint256 borrowAmount, uint256 duration) public view returns (uint256) {
@@ -485,25 +426,18 @@ contract LendingVault is BaseVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure override returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](18);
+        bytes4[] memory selectors = new bytes4[](11);
         selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,uint256)")));    
         selectors[1] = bytes4(keccak256(bytes("paybackLoan(address,uint256)")));
         selectors[2] = bytes4(keccak256(bytes("rollLoan(address,uint256)")));
-        selectors[3] = bytes4(keccak256(bytes("defaultLoans()")));
+        selectors[3] = bytes4(keccak256(bytes("defaultLoans(address)")));
         selectors[4] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256,int24)[3])")));
-        selectors[5] = bytes4(keccak256(bytes("getPositions()")));
-        selectors[6] = bytes4(keccak256(bytes("teamMultiSig()")));
-        selectors[7] = bytes4(keccak256(bytes("getProtocolParameters()")));  
-        selectors[8] = bytes4(keccak256(bytes("getTimeSinceLastMint()")));
-        selectors[9] = bytes4(keccak256(bytes("getCollateralAmount()")));
-        selectors[10] = bytes4(keccak256(bytes("mintTokens(address,uint256)")));
-        selectors[11] = bytes4(keccak256(bytes("burnTokens(uint256)")));
-        selectors[12] = bytes4(keccak256(bytes("pool()")));
-        selectors[13] = bytes4(keccak256(bytes("getAccumulatedFees()")));
-        selectors[14] = bytes4(keccak256(bytes("afterPresale()")));
-        selectors[15] = bytes4(keccak256(bytes("getActiveLoan(address)")));
-        selectors[16] = bytes4(keccak256(bytes("calculateLoanFees(uint256,uint256)")));
-        selectors[17] = bytes4(keccak256(bytes("addCollateral(address,uint256)")));
+        selectors[5] = bytes4(keccak256(bytes("getCollateralAmount()")));
+        selectors[6] = bytes4(keccak256(bytes("mintTokens(address,uint256)")));
+        selectors[7] = bytes4(keccak256(bytes("burnTokens(uint256)")));
+        selectors[8] = bytes4(keccak256(bytes("getActiveLoan(address)")));
+        selectors[9] = bytes4(keccak256(bytes("calculateLoanFees(uint256,uint256)")));
+        selectors[10] = bytes4(keccak256(bytes("addCollateral(address,uint256)")));
         return selectors;
     }
 }
