@@ -10,7 +10,7 @@ import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {OikosToken} from  "../src/token/OikosToken.sol";
 import {ModelHelper} from  "../src/model/Helper.sol";
 import {BaseVault} from  "../src/vault/BaseVault.sol";
-import {LendingVault} from  "../src/vault/LendingVault.sol";
+import {AuxVault} from  "../src/vault/AuxVault.sol";
 import {Utils} from "../src/libraries/Utils.sol";
 import {Conversions} from "../src/libraries/Conversions.sol";
 import {Underlying } from  "../src/libraries/Underlying.sol";
@@ -53,7 +53,7 @@ contract LendingVaultTest is Test {
     OikosToken private noma;
     ModelHelper private modelHelper;
 
-    address WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+    address WBNB = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
     address payable idoManager;
     address nomaToken;
     address modelHelperContract;
@@ -225,7 +225,7 @@ contract LendingVaultTest is Test {
 
     function testLargePurchaseTriggerShift() public {
         IDOManager managerContract = IDOManager(idoManager);
-        LendingVault vault = LendingVault(address(managerContract.vault()));
+        AuxVault vault = AuxVault(address(managerContract.vault()));
         address pool = address(vault.pool());
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
@@ -293,7 +293,7 @@ contract LendingVaultTest is Test {
     
     function solvency() public view {
         IDOManager managerContract = IDOManager(idoManager);
-        LendingVault vault = LendingVault(address(managerContract.vault()));
+        AuxVault vault = AuxVault(address(managerContract.vault()));
         address pool = address(vault.pool());
 
         uint256 circulatingSupply = modelHelper.getCirculatingSupply(pool, address(vault));
@@ -301,7 +301,7 @@ contract LendingVaultTest is Test {
 
         uint256 intrinsicMinimumValue = modelHelper.getIntrinsicMinimumValue(address(vault));
         
-        LiquidityPosition[3] memory positions =  LendingVault(address(vault)).getPositions();
+        LiquidityPosition[3] memory positions =  AuxVault(address(vault)).getPositions();
 
         uint256 anchorCapacity = modelHelper.getPositionCapacity(pool, address(vault), positions[1], LiquidityType.Anchor);
         (,,,uint256 floorBalance) = Underlying.getUnderlyingBalances(pool, address(vault), positions[0]);

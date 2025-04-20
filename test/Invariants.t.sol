@@ -9,7 +9,7 @@ import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {Deployer} from "../src/Deployer.sol";
 import {BaseVault} from  "../src/vault/BaseVault.sol";
 import {ExtVault} from  "../src/vault/ExtVault.sol";
-import {LendingVault} from  "../src/vault/LendingVault.sol";
+import {IVault} from  "../src/interfaces/IVault.sol";
 import {OikosToken} from  "../src/token/OikosToken.sol";
 import {ModelHelper} from  "../src/model/Helper.sol";
 import {Underlying } from  "../src/libraries/Underlying.sol";
@@ -19,6 +19,7 @@ import {Conversions} from "../src/libraries/Conversions.sol";
 import {Utils} from "../src/libraries/Utils.sol";
 import "../src/token/Gons.sol";
 import "../src/staking/Staking.sol";
+
 
 interface IWETH {
     function balanceOf(address account) external view returns (uint256);
@@ -45,7 +46,7 @@ contract Invariants is Test {
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address deployer = vm.envAddress("DEPLOYER");
 
-    address WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+    address WBNB = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
     address payable idoManager;
     address oikosToken;
     address modelHelperContract;
@@ -97,7 +98,7 @@ contract Invariants is Test {
 
     function testCirculatingSupply() public {     
         IDOManager managerContract = IDOManager(idoManager);
-        LendingVault vault = LendingVault(address(managerContract.vault()));
+        IVault vault = IVault(address(managerContract.vault()));
 
         address pool = address(vault.pool());
 
@@ -121,7 +122,7 @@ contract Invariants is Test {
 
     function testCirculatingSupplyMatchesBalances() public {
         IDOManager managerContract = IDOManager(idoManager);
-        LendingVault vault = LendingVault(address(managerContract.vault()));
+        IVault vault = IVault(address(managerContract.vault()));
         address pool = address(vault.pool());
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
@@ -198,7 +199,7 @@ contract Invariants is Test {
         vm.startBroadcast(privateKey);
         
         IDOManager managerContract = IDOManager(idoManager);
-        LendingVault vault = LendingVault(address(managerContract.vault()));
+        IVault vault = IVault(address(managerContract.vault()));
 
         address pool = address(vault.pool());
 
@@ -237,7 +238,7 @@ contract Invariants is Test {
 
         IDOManager managerContract = IDOManager(idoManager);
 
-        LendingVault vault = LendingVault(address(managerContract.vault()));
+        IVault vault = IVault(address(managerContract.vault()));
         address pool = address(vault.pool());
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
@@ -289,7 +290,7 @@ contract Invariants is Test {
 
     function testLargePurchaseTriggerShift() public {
         IDOManager managerContract = IDOManager(idoManager);
-        LendingVault vault = LendingVault(address(managerContract.vault()));
+        IVault vault = IVault(address(managerContract.vault()));
         address pool = address(vault.pool());
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
@@ -342,7 +343,7 @@ contract Invariants is Test {
 
     function testShiftAboveThreshold() public {
         IDOManager managerContract = IDOManager(idoManager);
-        LendingVault vault = LendingVault(address(managerContract.vault()));
+        IVault vault = IVault(address(managerContract.vault()));
 
         address pool = address(vault.pool());        
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
@@ -374,7 +375,7 @@ contract Invariants is Test {
     
     function testShiftBelowThreshold() public {
         IDOManager managerContract = IDOManager(idoManager);
-        LendingVault vault = LendingVault(address(managerContract.vault()));
+        IVault vault = IVault(address(managerContract.vault()));
 
         address pool = address(vault.pool());        
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
@@ -389,7 +390,7 @@ contract Invariants is Test {
             managerContract.buyTokens(spotPrice, tradeAmount, address(deployer));
         }
 
-        LiquidityPosition[3] memory positions = LendingVault(address(vault)).getPositions();
+        LiquidityPosition[3] memory positions = IVault(address(vault)).getPositions();
 
         uint256 circulatingSupply = modelHelper.getCirculatingSupply(pool, address(vault));
         uint256 anchorCapacity = modelHelper.getPositionCapacity(pool, address(vault), positions[1], LiquidityType.Anchor);
@@ -412,7 +413,7 @@ contract Invariants is Test {
     
     function testSlide() public {
         IDOManager managerContract = IDOManager(idoManager);
-        LendingVault vault = LendingVault(address(managerContract.vault()));
+        IVault vault = IVault(address(managerContract.vault()));
         address pool = address(vault.pool());
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
@@ -484,7 +485,7 @@ contract Invariants is Test {
 
     function solvencyInvariant() public view {
         IDOManager managerContract = IDOManager(idoManager);
-        LendingVault vault = LendingVault(address(managerContract.vault()));
+        IVault vault = IVault(address(managerContract.vault()));
         address pool = address(vault.pool());
 
 
@@ -493,7 +494,7 @@ contract Invariants is Test {
 
         uint256 intrinsicMinimumValue = modelHelper.getIntrinsicMinimumValue(address(vault));
         
-        LiquidityPosition[3] memory positions =  LendingVault(address(vault)).getPositions();
+        LiquidityPosition[3] memory positions =  IVault(address(vault)).getPositions();
         uint256 anchorCapacity = modelHelper.getPositionCapacity(pool, address(vault), positions[1], LiquidityType.Anchor);
         (,,,uint256 floorBalance) = Underlying.getUnderlyingBalances(pool, address(vault), positions[0]);
         

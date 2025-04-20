@@ -73,6 +73,10 @@ contract TestResolver is Ownable {
     function getAddress(bytes32 name) external view returns (address) {
         return repository[name];
     }
+    
+    function getVaultAddress(address _vault, bytes32 name) external view returns (address) {
+        return vaultAddressCache[_vault][name];
+    }
 
     function requireDeployerACL(address _vault) external view {
         if (!deployerACL[_vault]) revert NotAllowed();

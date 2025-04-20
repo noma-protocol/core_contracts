@@ -18,7 +18,7 @@ contract AddressResolverTest is Test {
     TestResolver resolver;
     ContractInfo[] private expectedAddressesInResolver;
 
-    address WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+    address WBNB = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
 
     function setUp() public {
         // Resolver

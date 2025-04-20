@@ -48,8 +48,8 @@ contract OikosFactoryTest is Test {
     TokenFactory tokenFactory;
 
     // Constants
-    address WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
-    address private uniswapFactory = 0xdB1d10011AD0Ff90774D0C6Bb92e5C5c8b4461F7;
+    address WBNB = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
+    address private uniswapFactory = 0x961235a9020B05C44DF1026D956D1F4D78014276;
 
     ContractInfo[] private expectedAddressesInResolver;
 
@@ -199,7 +199,7 @@ contract OikosFactoryTest is Test {
     function testCreateVaultShouldSucceed() public {
 
         expectedAddressesInResolver.push(
-            ContractInfo("WBNB", WBNB)
+            ContractInfo("WMON", WBNB)
         );
 
         configureResolver();    
@@ -236,7 +236,7 @@ contract OikosFactoryTest is Test {
     function testCreateDuplicateVault() public {
 
         expectedAddressesInResolver.push(
-            ContractInfo("WBNB", WBNB)
+            ContractInfo("WMON", WBNB)
         );
 
         configureResolver();    
@@ -333,7 +333,7 @@ contract OikosFactoryTest is Test {
     function testPermissionlessDeployNotEnabled() public {
 
         expectedAddressesInResolver.push(
-            ContractInfo("WBNB", WBNB)
+            ContractInfo("WMON", WBNB)
         );
 
         configureResolver();    
@@ -370,7 +370,7 @@ contract OikosFactoryTest is Test {
     function testPermissionlessDeployEnabled() public {
 
         expectedAddressesInResolver.push(
-            ContractInfo("WBNB", WBNB)
+            ContractInfo("WMON", WBNB)
         );
 
         configureResolver();    
@@ -407,7 +407,7 @@ contract OikosFactoryTest is Test {
 
     function testEnumerateVaults() public {
         expectedAddressesInResolver.push(
-            ContractInfo("WBNB", WBNB)
+            ContractInfo("WMON", WBNB)
         );
 
         configureResolver();    
@@ -495,7 +495,7 @@ contract OikosFactoryTest is Test {
     function testDeployerCanDeployMultipleVaults() public {
         // Prepare Resolver
         expectedAddressesInResolver.push(
-            ContractInfo("WBNB", WBNB)
+            ContractInfo("WMON", WBNB)
         );
         configureResolver();
 
