@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { ExtVault } from "../ExtVault.sol"; 
+import { AuxVault } from "../AuxVault.sol";
+
 import { IDiamondCut } from "../../interfaces/IDiamondCut.sol";
 import { IFacet } from "../../interfaces/IFacet.sol";
 
@@ -11,16 +12,28 @@ interface IDiamondInterface {
 }
 
 /**
+ * @title IVaultUpgrader
+ * @notice Interface for the VaultUpgrader contract.
+ */
+interface IVaultUpgrader {
+    function doUpgradeStart(address diamond, address _vaultUpgradeFinalize) external;
+    function doUpgradeStep1(address diamond) external;
+    function doUpgradeStep2(address diamond) external;
+    function doUpgradeFinalize(address diamond) external;
+}
+
+/**
  * @title VaultFinalize
  * @notice A contract for finalizing the upgrade of a Diamond proxy vault.
  * @dev This contract is responsible for adding new facets to the Diamond proxy and transferring ownership to the final authority.
  */
-contract VaultFinalize  {
+contract VaultAux  {
     // State variables
     address private owner; // The address of the contract owner.
     address private finalAuthority; // The address of the final authority.
     address private upgradePreviousStep; // The address of the previous upgrade step contract.
-    
+    address private upgradeNextStep; // The address of the previous upgrade step contract.
+
     /**
      * @notice Constructor to initialize the VaultFinalize contract.
      * @param _owner The address of the contract owner.
@@ -34,13 +47,17 @@ contract VaultFinalize  {
      * @param _someContract The address of the final authority.
      * @param _upgradePreviousStep The address of the previous upgrade step contract.
      */
-    function init(address _someContract, address _upgradePreviousStep) onlyOwner public {
+    function init(
+        address _someContract, 
+        address _upgradePreviousStep,
+        address _upgradeNextStep
+        ) onlyOwner public {
         require(_upgradePreviousStep != address(0), "Invalid address");
         finalAuthority = _someContract;
         upgradePreviousStep = _upgradePreviousStep;
+        upgradeNextStep = _upgradeNextStep;
     }
-
-
+ 
     /**
      * @notice Finalizes the upgrade of the Diamond proxy by adding new facets and transferring ownership.
      * @param diamond The address of the Diamond proxy contract.
@@ -51,7 +68,7 @@ contract VaultFinalize  {
         IDiamondCut.FacetCutAction[] memory actions = new IDiamondCut.FacetCutAction[](1);
         bytes4[][] memory functionSelectors = new bytes4[][](1);
 
-        newFacets[0] = address(new ExtVault());
+        newFacets[0] = address(new AuxVault());
         actions[0] = IDiamondCut.FacetCutAction.Add;
         functionSelectors[0] = IFacet(newFacets[0]).getFunctionSelectors();
 
@@ -65,7 +82,8 @@ contract VaultFinalize  {
         }
 
         IDiamondCut(diamond).diamondCut(cuts, address(0), "");
-        IDiamondInterface(diamond).transferOwnership(finalAuthority);
+        IDiamondInterface(diamond).transferOwnership(upgradeNextStep);
+        IVaultUpgrader(upgradeNextStep).doUpgradeFinalize(diamond);
     }  
 
     /**
