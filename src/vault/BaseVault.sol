@@ -15,7 +15,6 @@ import {
 } from "../types/Types.sol";
 
 import {Utils} from "../libraries/Utils.sol";
-
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface IOikosFactory {
@@ -41,13 +40,14 @@ error OnlyDeployer();
 error OnlyInternalCalls();
 error CallbackCaller();
 error ResolverNotSet();
+error Locked();
 
 /**
  * @title BaseVault
  * @notice A base contract for managing a vault's liquidity positions and interactions with Uniswap V3.
  * @dev This contract handles initialization, fee management, and interactions with the Uniswap V3 pool.
  */
-contract BaseVault {
+contract BaseVault  {
     VaultStorage internal _v;
 
     // Events
@@ -112,6 +112,7 @@ contract BaseVault {
         _v.tokenInfo.token1 = _v.pool.token1();
         _v.initialized = false;
         _v.stakingEnabled = true;
+        _v.timeLastMinted = 0;
         _v.loanFee = uint8(_params.loanFee);
         _v.stakingContract = _stakingContract;
         _v.presaleContract = _presaleContract;
@@ -120,7 +121,7 @@ contract BaseVault {
         _v.deployerContract = _deployer;
         _v.protocolParameters = _params;
         _v.manager = _owner;
-        
+        _v.isLocked[address(this)] = false;
         IERC20(_v.pool.token0()).approve(_deployer, type(uint256).max);
     }
     
@@ -132,7 +133,7 @@ contract BaseVault {
      */
     function initializeLiquidity(
         LiquidityPosition[3] memory positions
-    ) public onlyDeployer {
+    ) public onlyDeployer lock {
         if (_v.initialized) revert AlreadyInitialized();
 
         if (
@@ -259,11 +260,15 @@ contract BaseVault {
      */
     function adaptiveSupply() public view returns (address) {
         IAddressResolver resolver = _getResolver();
-        return resolver
-            .requireAndGetAddress(
-                Utils.stringToBytes32("AdaptiveSupply"), 
-                "no AdaptiveSupply"
-            );
+        address _adaptiveSupply = resolver.getVaultAddress(address(this), Utils.stringToBytes32("AdaptiveSupply"));
+        if (_adaptiveSupply == address(0)) {
+            _adaptiveSupply = resolver
+                .requireAndGetAddress(
+                    Utils.stringToBytes32("AdaptiveSupply"), 
+                    "no AdaptiveSupply"
+                );
+        }
+        return _adaptiveSupply;
     }
 
     /**
@@ -272,20 +277,28 @@ contract BaseVault {
      */
     function modelHelper() public view returns (address) {
         IAddressResolver resolver = _getResolver();
-        return resolver
-            .requireAndGetAddress(
-                Utils.stringToBytes32("ModelHelper"), 
-                "no ModelHelper"
-            );
+        address _modelHelper = resolver.getVaultAddress(address(this), Utils.stringToBytes32("ModelHelper"));
+        if (_modelHelper == address(0)) {
+            _modelHelper = resolver
+                .requireAndGetAddress(
+                    Utils.stringToBytes32("ModelHelper"), 
+                    "no ModelHelper"
+                );
+        }
+        return _modelHelper;
     }
 
     function factory() public view returns (address) {
         IAddressResolver resolver = _getResolver();
-        return resolver
-            .requireAndGetAddress(
-                Utils.stringToBytes32("OikosFactory"), 
-                "no Factory"
-            );
+        address _factory = resolver.getVaultAddress(address(this), Utils.stringToBytes32("OikosFactory"));
+        if (_factory == address(0)) {
+            _factory = resolver
+                .requireAndGetAddress(
+                    Utils.stringToBytes32("OikosFactory"), 
+                    "no Factory"
+                );
+        }
+        return _factory;
     }
     // *** MODIFIERS *** //
 
@@ -313,8 +326,15 @@ contract BaseVault {
         _;
     }
 
-    // *** FUNCTION SELECTORS *** //
+    /// @dev Reentrancy lock modifier.
+    modifier lock() {
+        if (_v.isLocked[address(this)]) revert Locked();
+        _v.isLocked[address(this)] = true;
+        _;
+        _v.isLocked[address(this)] = false;
+    }
 
+    // *** FUNCTION SELECTORS *** //
     /**
      * @notice Retrieves the function selectors for this contract.
      * @return selectors An array of function selectors.
