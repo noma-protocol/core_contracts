@@ -8,6 +8,8 @@ import {
 } from "../types/Types.sol";
 
 import { IVault } from "../interfaces/IVault.sol";
+import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
+import { VaultStorage } from "../libraries/LibAppStorage.sol";
 
 interface IStakingVault {
     function mintAndDistributeRewards(address caller, ProtocolAddresses memory addresses) external;
@@ -29,12 +31,15 @@ event Shift();
 event Slide();
 event DefaultLoans();
 
+error Locked();
+
 /**
  * @title ExtVault
  * @notice A contract for vault external functions.
  * @dev n/a.
  */
 contract ExtVault {
+    VaultStorage internal _v;
 
     /**
      * @notice Allows a user to borrow tokens from the vault's floor liquidity.
@@ -44,7 +49,7 @@ contract ExtVault {
     function borrow(
         uint256 borrowAmount,
         uint256 duration
-    ) external {
+    ) external lock {
         ILendingVault(address(this))
         .borrowFromFloor(
             msg.sender,
@@ -58,7 +63,7 @@ contract ExtVault {
     /**
      * @notice Allows anybody to default expired loans.
      */
-    function defaultLoans() external {
+    function defaultLoans() external lock {
         ILendingVault(address(this))
         .defaultLoans();
 
@@ -68,7 +73,7 @@ contract ExtVault {
     /**
      * @notice Allows a user to pay back a loan.
      */
-    function payback(uint256 amount) external {
+    function payback(uint256 amount) external lock {
         ILendingVault(address(this))
         .paybackLoan(msg.sender, amount);
 
@@ -80,7 +85,7 @@ contract ExtVault {
      */
     function roll(
         uint256 newDuration
-    ) external {
+    ) external lock {
         ILendingVault(address(this))
         .rollLoan(
             msg.sender,
@@ -96,7 +101,7 @@ contract ExtVault {
      */
     function addCollateral(
         uint256 amount
-    ) external {
+    ) external lock {
         ILendingVault(address(this))
         .addCollateral(msg.sender, amount);
     }
@@ -107,7 +112,7 @@ contract ExtVault {
      * @dev This function adjusts the liquidity positions and distributes staking rewards.
      * @dev It also pays rewards to the caller.
      */
-    function shift() public {
+    function shift() public lock {
 
         LiquidityPosition[3] memory positions = IVault(address(this)).getPositions();
         ProtocolAddresses memory addresses = IVault(address(this)).getProtocolAddresses();
@@ -126,7 +131,7 @@ contract ExtVault {
      * @notice Slides the liquidity positions in the vault.
      * @dev This function adjusts the liquidity positions without distributing staking rewards.
      */
-    function slide() public  {
+    function slide() public lock {
 
         LiquidityPosition[3] memory positions = IVault(address(this)).getPositions();
         ProtocolAddresses memory addresses = IVault(address(this)).getProtocolAddresses();
@@ -139,18 +144,28 @@ contract ExtVault {
         emit Slide();
     }
 
+    /// @dev Reentrancy lock modifier.
+    modifier lock() {
+        if (_v.isLocked[address(this)]) revert Locked();
+        _v.isLocked[address(this)] = true;
+        _;
+        _v.isLocked[address(this)] = false;
+    }
+
     /**
      * @notice Retrieves the function selectors for this contract.
      * @return selectors An array of function selectors.
      */
+     // TODO add defaultLoans to selectors
     function getFunctionSelectors() external pure  returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](6);
+        bytes4[] memory selectors = new bytes4[](7);
         selectors[0] = bytes4(keccak256(bytes("shift()")));
         selectors[1] = bytes4(keccak256(bytes("slide()")));  
         selectors[2] = bytes4(keccak256(bytes("borrow(uint256,uint256)")));  
         selectors[3] = bytes4(keccak256(bytes("payback(uint256)")));
         selectors[4] = bytes4(keccak256(bytes("roll(uint256)")));  
-        selectors[5] = bytes4(keccak256(bytes("addCollateral(uint256)")));            
+        selectors[5] = bytes4(keccak256(bytes("addCollateral(uint256)")));           
+        selectors[6] = bytes4(keccak256(bytes("defaultLoans()"))); 
         return selectors;
     }
 }
