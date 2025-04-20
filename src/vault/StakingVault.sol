@@ -236,8 +236,19 @@ contract StakingVault is BaseVault {
      * @return The address of the rewards calculator.
      */
     function rewardsCalculator() public view returns (address) {
-        return _v.resolver
-        .requireAndGetAddress("RewardsCalculator", "No rewards calculator");
+        address _rewardsCalculator = _v.resolver
+        .getVaultAddress(
+            address(this), 
+            Utils.stringToBytes32("RewardsCalculator")
+        );
+        if (_rewardsCalculator == address(0)) {
+            _rewardsCalculator = _v.resolver
+            .requireAndGetAddress(
+                "RewardsCalculator", 
+                "No rewards calculator"
+            );
+        }
+        return _rewardsCalculator;
     }
 
     /**
