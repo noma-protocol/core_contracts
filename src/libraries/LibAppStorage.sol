@@ -63,6 +63,9 @@ struct VaultStorage {
     // Uniswap Fees
     uint256 feesAccumulatorToken0;
     uint256 feesAccumulatorToken1;
+
+    // Per vault lock state
+    mapping(address => bool) isLocked;
 }
 
 
