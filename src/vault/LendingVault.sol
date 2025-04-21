@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {BaseVault} from "./BaseVault.sol";
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
 import {DecimalMath} from "../libraries/DecimalMath.sol";
 import {Uniswap} from "../libraries/Uniswap.sol";
 import {LiquidityDeployer} from "../libraries/LiquidityDeployer.sol";
 import {IVault} from "../interfaces/IVault.sol";
-import {Utils} from "../libraries/Utils.sol";
 import {ITokenRepo} from "../TokenRepo.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -16,8 +14,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {
     LiquidityPosition, 
     LiquidityType,
-    LoanPosition,
-    ProtocolParameters
+    LoanPosition
 } from "../types/Types.sol";
 
 interface IOikosFactory {
@@ -39,7 +36,6 @@ error InsufficientCollateral();
 error CantRollLoan();
 error NoLiquidity();
 error OnlyVault();
-error NotAuthorized();
 error InvalidRepayAmount();
 error InvalidParams();
 error NotPermitted();

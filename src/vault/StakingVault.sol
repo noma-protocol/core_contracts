@@ -3,28 +3,22 @@ pragma solidity ^0.8.0;
 
 import {BaseVault} from "./BaseVault.sol";
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
-import {IDeployer} from "../interfaces/IDeployer.sol";
-import {LiquidityOps} from "../libraries/LiquidityOps.sol";
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {Conversions} from "../libraries/Conversions.sol";
 import {Utils} from "../libraries/Utils.sol";
 import {Uniswap} from "../libraries/Uniswap.sol";
 import {IVault} from "../interfaces/IVault.sol";
-import {TickMath} from 'v3-core/libraries/TickMath.sol';
 import {DecimalMath} from "../libraries/DecimalMath.sol";
 import {LiquidityDeployer} from "../libraries/LiquidityDeployer.sol";
 
 import {
-    LiquidityPosition, 
     LiquidityType,
+    LiquidityPosition,
     ProtocolAddresses,
-    RewardParams,
-    LiquidityInternalPars
+    RewardParams
 } from "../types/Types.sol";
 
 interface IStakingRewards {
@@ -36,12 +30,9 @@ interface IRewardsCalculator {
 }
 
 // Custom errors
-error NotInitialized();
-error LiquidityRatioOutOfRange();
 error StakingContractNotSet();
 error Unauthorized();
 error NoStakingRewards();
-error StakingNotEnabled();
 
 /**
  * @title StakingVault
