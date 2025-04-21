@@ -7,12 +7,12 @@ import {IsOikosToken} from "../interfaces/IsOikosToken.sol";
 import {IVault} from "../interfaces/IVault.sol";
 import {Utils} from "../libraries/Utils.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 /**
  * @title Staking
  * @notice A contract for staking OKS tokens and earning rewards.
  */
-contract Staking {
+contract Staking is ReentrancyGuard {
     using SafeERC20 for IERC20;
     using SafeERC20 for IsOikosToken;
 
@@ -103,7 +103,7 @@ contract Staking {
     * @notice Allows a user to stake OKS tokens.
     * @param _amount The amount of OKS tokens to stake.
     */
-    function stake(uint256 _amount) public {
+    function stake(uint256 _amount) external nonReentrant {
         if (_amount == 0) {
             revert InvalidParameters();
         }
@@ -137,7 +137,7 @@ contract Staking {
     /**
     * @notice Allows a user to unstake their OKS tokens.
     */
-    function unstake() external {
+    function unstake() external nonReentrant {
         if (IVault(vault).stakingEnabled() == false) {
             revert StakingNotEnabled();
         }
@@ -170,7 +170,7 @@ contract Staking {
      * @notice Notifies the contract of a new reward amount and starts a new epoch.
      * @param _reward The amount of rewards to distribute.
      */
-    function notifyRewardAmount(uint256 _reward) public onlyVault {
+    function notifyRewardAmount(uint256 _reward) public onlyVault nonReentrant {
         if (_reward == type(uint256).max) {
             revert InvalidReward();
         }
