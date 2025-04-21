@@ -116,9 +116,6 @@ contract LendingVault is BaseVault {
         _v.loanAddresses.push(who);
 
         IVault(address(this)).updatePositions([_v.floorPosition, _v.anchorPosition, _v.discoveryPosition]);
-        
-        IModelHelper(modelHelper())
-        .enforceSolvencyInvariant(address(this));           
     }
 
     /**
@@ -219,11 +216,7 @@ contract LendingVault is BaseVault {
         IERC20(_v.pool.token1()).transfer(who, newBorrowAmount - newFees);     
 
         // Update the vault's liquidity positions
-        IVault(address(this)).updatePositions([_v.floorPosition, _v.anchorPosition, _v.discoveryPosition]);
-
-        // Enforce insolvency invariant
-         IModelHelper(modelHelper())
-        .enforceSolvencyInvariant(address(this));                  
+        IVault(address(this)).updatePositions([_v.floorPosition, _v.anchorPosition, _v.discoveryPosition]);             
     }
 
     function addCollateral(address who, uint256 amount) public onlyInternalCalls {
