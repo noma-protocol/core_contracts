@@ -55,6 +55,8 @@ contract ExtFactory {
      * @custom:require Only callable by the factory contract.
      */
     function deployAll(
+        string memory name, 
+        string memory symbol,
         address deployerAddress,
         address vaultAddress,
         address token0
@@ -63,9 +65,11 @@ contract ExtFactory {
         address stakingContractAddress, 
         address tokenRepoAddress
     ) {
-
         // Deploy GonsToken contract
-        gonsToken = new GonsToken();
+        gonsToken = new GonsToken(
+            string(abi.encodePacked(name, " Staked")), 
+            string(abi.encodePacked("s", symbol))
+        );
 
         // Deploy Staking contract
         stakingContract = new Staking(token0, address(gonsToken), vaultAddress);

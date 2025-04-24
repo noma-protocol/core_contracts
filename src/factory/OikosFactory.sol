@@ -50,7 +50,7 @@ interface IPresaleFactory {
         PresaleDeployParams memory params,
         PresaleProtocolParams memory protocolParams
     ) external returns (address);
-}
+}  
 
 interface ITokenFactory {
     function deployOikosToken(VaultDeployParams memory vaultDeployParams) external returns (OikosToken, ERC1967Proxy, bytes32);
@@ -132,7 +132,9 @@ contract OikosFactory {
     function deployVault(
         PresaleUserParams memory presaleParams,
         VaultDeployParams memory vaultDeployParams
-    ) public checkDeployAuthority returns (address, address, address) {
+    ) public 
+    checkDeployAuthority  
+    returns (address, address, address) {
         _validateToken1(vaultDeployParams.token1);
         int24 tickSpacing = Utils._validateFeeTier(vaultDeployParams.feeTier);
     
@@ -160,10 +162,11 @@ contract OikosFactory {
         data.proxy = proxy;
         data.tickSpacing = tickSpacing;
 
-        return _finalizeVaultDeployment(data);
+        return _finalizeVaultDeployment(vaultDeployParams, data);
     }
 
     function _finalizeVaultDeployment(
+        VaultDeployParams memory vaultDeployParams,
         DeploymentData memory data
     ) internal returns (address, address, address) {
         (data.vaultAddress, data.vaultUpgrade) = IEtchVault(
@@ -173,8 +176,11 @@ contract OikosFactory {
             )
         ).preDeployVault(address(resolver));
 
+
         (data.sOKS, data.stakingContract, data.tokenRepo) = IExtFactory(extFactory)
             .deployAll(
+                vaultDeployParams.name,
+                vaultDeployParams.symbol,
                 address(this),
                 data.vaultAddress,
                 address(data.proxy)

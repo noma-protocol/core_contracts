@@ -35,22 +35,28 @@
   contract Presale is pAsset, Ownable {
       using SafeERC20 for IERC20;
 
-      address constant WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+      /// @notice Address of the WBNB token on the BSC network.
+      address constant WBNB = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
 
+      /// @notice Address of the vault contract.  
       address public vaultAddress;
 
       /// @notice Soft cap for the presale in ETH.
       uint256 public softCap;
 
+      /// @notice Hard cap for the presale in ETH.
       uint256 public hardCap;
 
+      /// @notice Total amount of ETH raised during the presale.
       uint256 private totalRaised;
 
       /// @notice Initial price of the token in ETH.
       uint256 public initialPrice;
 
+      /// @notice Total supply of the token to be launched.
       uint256 public launchSupply;
 
+      /// @notice Percentage of the liquidity assigned to floor position.
       uint256 public floorPercentage;
 
       /// @notice Interface to the Uniswap v3 pool.
@@ -73,9 +79,14 @@
 
       /// @notice Tracks all contributors.
       address[] public contributors;
-
+      
+      /// @notice Struct to hold token information.
       address public deployer;
+
+      /// @notice Factory address for the presale.
       address public factory; 
+
+      /// @notice Migration contract address, if applicable.
       address public migrationContract;
 
       /// @notice Tracks if an address has already been added as a contributor.
@@ -84,6 +95,7 @@
       /// @dev Stores token information
       TokenInfo private tokenInfo;
 
+      /// @notice Parameters for the presale protocol.
       PresaleProtocolParams public protocolParams;
 
       int24 public tickSpacing;
@@ -93,7 +105,6 @@
       uint256 teamFee;
 
       bool public emergencyWithdrawalFlag;
-      bool public isOksPresale;
       bool private locked;
 
       /// @notice Events
@@ -161,7 +172,18 @@
           ) * params.floorPercentage / 100;
 
           if (softCap > hardCap * _protocolParams.maxSoftCap / 100) revert InvalidParameters();
-          if (softCap < hardCap * 20 / 100) revert InvalidSoftCap();
+          if (softCap < hardCap / 8) {
+            revert(
+                string(
+                    abi.encodePacked(
+                        "presale(1): hardCap is : ", 
+                        Utils._uint2str(uint256(hardCap))
+                    )
+                )
+            );            
+          }
+          
+          //revert InvalidSoftCap(); // 1 / 8 of hard cap is the minimum soft cap
           if (softCap > hardCap) revert InvalidHardCap();
 
           tokenInfo = TokenInfo({
@@ -172,9 +194,8 @@
           MIN_CONTRIBUTION = hardCap / _protocolParams.minContributionRatio;
           MAX_CONTRIBUTION = hardCap / _protocolParams.maxContributionRatio;
 
-          // Enable by default
+          // Set default values for flags
           emergencyWithdrawalFlag = true;
-          isOksPresale = false;
       }
 
  
@@ -205,7 +226,7 @@
           if (finalized) revert AlreadyFinalized();
           if (msg.value == 0 || msg.sender == address(uint160(uint256(referralCode)))) revert InvalidParameters();
 
-          if (!isOksPresale) {
+          if (migrationContract == address(0)) {
             if (msg.value < MIN_CONTRIBUTION || msg.value > MAX_CONTRIBUTION) revert InvalidParameters();
           }
 
@@ -250,10 +271,10 @@
             // 2) compute amounts
             uint256 totalRaised       = address(this).balance;
             uint256 feeTaken          = (totalRaised * pct) / 100;
-            uint256 contributionAmount = isOksPresale ? totalRaised : totalRaised - feeTaken;
+            uint256 contributionAmount = migrationContract != address(0) ? totalRaised : totalRaised - feeTaken;
 
             // 3) enforce soft-cap after fee
-            uint256 requiredAfterFee = isOksPresale
+            uint256 requiredAfterFee = migrationContract != address(0)
                 ? softCap
                 : (softCap * (100 - pct)) / 100;
             if (contributionAmount < requiredAfterFee) revert SoftCapNotMet();
@@ -311,7 +332,7 @@
           if (!finalized) revert NotFinalized();
 
           for (uint256 i = 0; i < contributors.length; i++) {
-              bytes32 referralCode = generateReferralCode(contributors[i]);
+              bytes32 referralCode = Utils.generateReferralCode(contributors[i]);
               uint256 fee = referralEarnings[referralCode];
               if (fee > 0) {
                   referralEarnings[referralCode] = 0;
@@ -348,15 +369,10 @@
         // Ensure the available balance meets the minimum required amount
         require(availableBalance >= minAmountOut, "Insufficient liquidity for withdrawal");
 
-        bool transferToMigrationContract = migrationContract != address(0);
+        bool isMigration = migrationContract != address(0);
 
-        if (transferToMigrationContract) {
-            if (isOksPresale) {
-                IERC20(token0).safeTransfer(migrationContract, minAmountOut);
-            } else {
-                // Transfer to migration contract if set, otherwise transfer to user
-                IERC20(token0).safeTransfer(msg.sender, minAmountOut);
-            }
+        if (isMigration) {
+            IERC20(token0).safeTransfer(migrationContract, minAmountOut);
         } else {
             IERC20(token0).safeTransfer(msg.sender, minAmountOut);
         }
@@ -435,14 +451,6 @@
       }
 
       /**
-       * @notice Sets the OKS presale flag.
-       * @param _isOksPresale True if this is an OKS presale, false otherwise.
-       */
-      function setIsOksPresale(bool _isOksPresale) external isFactoryOwner {
-        isOksPresale = _isOksPresale;
-      }
-
-      /**
        * @notice Sets the migration contract address.
        * @param _migrationContract Address of the migration contract.
        */
@@ -450,14 +458,6 @@
         migrationContract = _migrationContract;
       }
 
-      /**
-       * @notice Generates a referral code based on an address.
-       * @param user Address to generate a referral code for.
-       * @return Referral code.
-       */
-      function generateReferralCode(address user) public pure returns (bytes32) {
-          return bytes32(uint256(uint160(user)));
-      }
 
       // ==================== New Functions ====================
 
@@ -502,7 +502,7 @@
       function getReferralUserCount(bytes32 referralCode) external view returns (uint256) {
           uint256 count = 0;
           for (uint256 i = 0; i < contributors.length; i++) {
-              if (generateReferralCode(contributors[i]) == referralCode) {
+              if (Utils.generateReferralCode(contributors[i]) == referralCode) {
                   count++;
               }
           }

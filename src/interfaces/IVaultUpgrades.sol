@@ -41,6 +41,8 @@ interface IEtchVault {
 interface IExtFactory {
     /**
      * @notice Deploys all necessary auxiliary contracts for a vault.
+     * @param name The name of the token to be created.
+     * @param symbol The symbol of the token to be created.
      * @param deployerAddress The address of the deployer initiating the process.
      * @param vaultAddress The address of the vault for which auxiliary contracts are being deployed.
      * @param token0 The address of the primary token associated with the vault.
@@ -48,6 +50,8 @@ interface IExtFactory {
      * @return auxiliaryContract2 The address of the second auxiliary contract deployed.
      */
     function deployAll(
+        string memory name,
+        string memory symbol,
         address deployerAddress,
         address vaultAddress,
         address token0
