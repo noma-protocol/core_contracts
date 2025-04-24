@@ -133,7 +133,7 @@ contract BaseVault  {
      */
     function initializeLiquidity(
         LiquidityPosition[3] memory positions
-    ) public onlyDeployer lock {
+    ) public onlyDeployer {
         if (_v.initialized) revert AlreadyInitialized();
 
         if (
@@ -324,14 +324,6 @@ contract BaseVault  {
     modifier onlyFactory() {
         if (msg.sender != factory()) revert OnlyFactory();
         _;
-    }
-
-    /// @dev Reentrancy lock modifier.
-    modifier lock() {
-        if (_v.isLocked[address(this)]) revert Locked();
-        _v.isLocked[address(this)] = true;
-        _;
-        _v.isLocked[address(this)] = false;
     }
 
     // *** FUNCTION SELECTORS *** //
