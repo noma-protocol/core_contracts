@@ -248,4 +248,35 @@ library Utils {
             return rounded;
         }
     }
+
+    /**
+    * @notice Generates an 8‐character hex referral code from an address
+    * @param user Address to generate a referral code for.
+    * @return A bytes32 where the first 8 bytes are ASCII hex chars (0–9, a–f) and the remaining 24 bytes are zero.
+    */
+    function generateReferralCode(address user) public pure returns (bytes32) {
+        bytes16 _HEX_SYMBOLS = "0123456789abcdef";
+
+        // 1) Hash the user address
+        bytes32 hash = keccak256(abi.encodePacked(user));
+
+        // 2) Allocate an 8‐byte buffer for ASCII hex (8 chars)
+        bytes memory buf = new bytes(8);
+
+        // 3) Convert first 4 bytes of hash into 8 hex digits
+        for (uint256 i = 0; i < 4; i++) {
+            uint8 b = uint8(hash[i]);              // extract one byte
+            buf[2 * i]     = _HEX_SYMBOLS[b >> 4]; // high nibble → ASCII
+            buf[2 * i + 1] = _HEX_SYMBOLS[b & 0x0f]; // low nibble → ASCII
+        }
+
+        // 4) Load those 8 bytes into a bytes32 (left‐aligned in the 32‐byte word)
+        bytes32 code;
+        assembly {
+            code := mload(add(buf, 32))
+        }
+
+        return code;
+    }
+    
 }
