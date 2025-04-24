@@ -50,8 +50,8 @@ contract Migration is Ownable {
         address _vault,
         uint256 _initialIMV,
         uint256 _duration,
-        address[] memory holders,
-        uint256[] memory balances
+        address[22] memory holders,
+        uint256[22] memory balances
     ) Ownable(msg.sender) {
         if (_modelHelper == address(0)) revert InvalidHelper();
         if (_oikosToken == address(0)) revert InvalidToken();
@@ -125,6 +125,8 @@ contract Migration is Ownable {
     }
 
     function recoverERC20(address tokenAddress) external onlyOwner {
+        if (block.timestamp > migrationEnd) revert MigrationEnded(); 
+
         uint256 balance = ERC20(tokenAddress).balanceOf(address(this));
         if (balance == 0) revert NoTokens();
 
