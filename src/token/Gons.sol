@@ -165,28 +165,6 @@ contract GonsToken is ERC20Permit {
     }
 
     /**
-     * @dev Transfer tokens to a specified address.
-     * @param to The address to transfer to.
-     * @param value The amount to be transferred.
-     * @return True on success, false otherwise.
-     */
-    function transfer(address to, uint256 value)
-        public
-        override
-        returns (bool)
-    {
-        if (to == address(0) || to == address(this) || to == msg.sender) {
-            revert InvalidTransfer();
-        }
-
-        uint256 gonValue = value.mul(_gonsPerFragment);
-        _gonBalances[msg.sender] = _gonBalances[msg.sender].sub(gonValue);
-        _gonBalances[to] = _gonBalances[to].add(gonValue);
-        emit Transfer(msg.sender, to, value);
-        return true;
-    }
-
-    /**
      * @dev Function to check the amount of tokens that an owner has allowed to a spender.
      * @param owner_ The address which owns the funds.
      * @param spender The address which will spend the funds.
@@ -201,30 +179,53 @@ contract GonsToken is ERC20Permit {
         return _allowedFragments[owner_][spender];
     }
 
-    /**
+    /** 
+     * @dev Transfer tokens to a specified address.
+     *      ONLY allowed if sending _to_ or _from_ the stakingContract.
+     */
+    function transfer(address to, uint256 value)
+        public
+        override
+        returns (bool)
+    {
+        // neither side is stakingContract → forbidden
+        if (msg.sender != stakingContract && to != stakingContract) {
+            revert InvalidTransfer();
+        }
+
+        uint256 gonValue = value.mul(_gonsPerFragment);
+        _gonBalances[msg.sender] = _gonBalances[msg.sender].sub(gonValue);
+        _gonBalances[to]            = _gonBalances[to].add(gonValue);
+
+        emit Transfer(msg.sender, to, value);
+        return true;
+    }
+
+    /** 
      * @dev Transfer tokens from one address to another.
-     * @param from The address you want to send tokens from.
-     * @param to The address you want to transfer to.
-     * @param value The amount of tokens to be transferred.
+     *      ONLY allowed if sending _to_ or _from_ the stakingContract.
      */
     function transferFrom(address from, address to, uint256 value)
         public
         override
         returns (bool)
     {
-        if (to == address(0) || to == address(this) || to == msg.sender) {
+        // neither side is stakingContract → forbidden
+        if (from != stakingContract && to != stakingContract) {
             revert InvalidTransfer();
         }
-        
-        _allowedFragments[from][msg.sender] = _allowedFragments[from][msg.sender].sub(value);
+
+        _allowedFragments[from][msg.sender] =
+            _allowedFragments[from][msg.sender].sub(value);
 
         uint256 gonValue = value.mul(_gonsPerFragment);
         _gonBalances[from] = _gonBalances[from].sub(gonValue);
-        _gonBalances[to] = _gonBalances[to].add(gonValue);
+        _gonBalances[to]   = _gonBalances[to].add(gonValue);
 
         emit Transfer(from, to, value);
         return true;
     }
+
 
     /**
      * @dev Approve the passed address to spend the specified amount of tokens on behalf of
