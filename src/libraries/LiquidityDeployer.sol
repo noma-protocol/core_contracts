@@ -296,8 +296,8 @@ library LiquidityDeployer {
             revert(
                 string(
                     abi.encodePacked(
-                        "_deployPosition(2): liquidity is 0 : ", 
-                        Utils._uint2str(uint256(liquidity))
+                        "_deployPosition(2): amount0 is : ", 
+                        Utils._uint2str(uint256(amounts.amount0))
                     )
                 )
             );
@@ -371,14 +371,6 @@ library LiquidityDeployer {
         uint256 circulatingSupply,
         LiquidityPosition[3] memory positions
     ) internal pure returns (uint256) {
-
-        if (
-            positions[0].liquidity == 0  || 
-            positions[1].liquidity == 0 || 
-            positions[2].liquidity == 0
-        ) {
-            revert NoLiquidity();
-        }
 
         uint256 newFloorPrice = DecimalMath.divideDecimal(
             floorNewToken1Balance + toSkim,
