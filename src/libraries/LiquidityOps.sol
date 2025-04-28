@@ -68,7 +68,6 @@ library LiquidityOps {
         ProtocolAddresses memory addresses,
         LiquidityPosition[3] memory positions
     ) internal 
-    onlyNotEmptyPositions(addresses.pool, positions) 
     returns (
         uint256 currentLiquidityRatio,
         LiquidityPosition[3] memory newPositions
@@ -88,7 +87,9 @@ library LiquidityOps {
             uint256 discoveryToken0Balance
         ) = getVaultData(addresses);
 
-        if (currentLiquidityRatio <= IVault(address(this)).getProtocolParameters().shiftRatio) {
+        if (
+            currentLiquidityRatio <= IVault(address(this)).getProtocolParameters().shiftRatio
+        ) {
             
             // Shift --> ETH after skim at floor = 
             // ETH before skim at anchor - (liquidity ratio * ETH before skim at anchor)
@@ -253,15 +254,6 @@ library LiquidityOps {
                 params
             );
  
-            
-            if (
-                newPositions[0].liquidity == 0 || 
-                newPositions[1].liquidity == 0 || 
-                newPositions[2].liquidity == 0
-            ) {
-                revert NoLiquidity();
-            }
-
         } else {
             revert("shiftPositions: no liquidity in Floor");
         }
@@ -277,7 +269,6 @@ library LiquidityOps {
         ProtocolAddresses memory addresses,
         LiquidityPosition[3] memory positions
     ) internal 
-    onlyNotEmptyPositions(addresses.pool, positions) 
     returns (
         LiquidityPosition[3] memory newPositions
     ) {
@@ -288,7 +279,7 @@ library LiquidityOps {
 
         if (
             IModelHelper(addresses.modelHelper).getLiquidityRatio(addresses.pool, addresses.vault) >= 
-            IVault(address(this)).getProtocolParameters().slideRatio
+            IVault(address(this)).getProtocolParameters().slideRatio 
         ) {
             
             (
@@ -692,31 +683,4 @@ library LiquidityOps {
         return (feesPosition0Token0, feesPosition0Token1, feesPosition1Token0, feesPosition1Token1);
     }
 
-    /**
-     * @notice Modifier to ensure that all positions have liquidity.
-     * @param pool The Uniswap V3 pool address.
-     * @param positions The liquidity positions.
-     */
-    modifier onlyNotEmptyPositions(
-        address pool,
-        LiquidityPosition[3] memory positions
-    ) {
-
-        for (uint256 i = 0; i < positions.length; i++) {
-                   
-            bytes32 positionId = keccak256(
-                abi.encodePacked(
-                    address(this), 
-                    positions[i].lowerTick, 
-                    positions[i].upperTick
-                )
-            );
-
-            (uint128 liquidity,,,,) = IUniswapV3Pool(pool).positions(positionId);
-            if (liquidity == 0) {
-                revert OnlyNotEmptyPositions();
-            }
-        }
-        _;
-    }
 }

@@ -53,6 +53,7 @@ contract ModelHelper {
         liquidityRatio = DecimalMath.divideDecimal(anchorUpperPrice, spotPrice);
     }
 
+    
     /**
      * @notice Calculates the capacity of a liquidity position.
      * @param pool The address of the Uniswap V3 pool.
@@ -125,9 +126,6 @@ contract ModelHelper {
             position = positions[2];
         }
 
-        if (position.liquidity == 0) {
-            revert NoLiquidity();
-        }
         return Underlying.getUnderlyingBalances(address(pool), vault, position);
     }
 
