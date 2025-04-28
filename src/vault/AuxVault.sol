@@ -14,6 +14,9 @@ interface IOikosFactory {
 }
 
 error NotAuthorized();
+error OnlyInternalCalls();
+error NotInitialized();
+error NoLiquidity();
 
 /**
  * @title AuxVault
@@ -103,6 +106,33 @@ contract AuxVault {
         return (_v.feesAccumulatorToken0, _v.feesAccumulatorToken1);
     }
 
+    function setModelHelper(address modelHelper) public onlyManagerOrMultiSig {
+        _v.modelHelper = modelHelper;
+    }   
+
+    /**
+     * @notice Updates the liquidity positions in the vault.
+     * @param _positions The new liquidity positions.
+     */
+    function updatePositions(LiquidityPosition[3] memory _positions) public onlyInternalCalls {
+        if (!_v.initialized) revert NotInitialized();             
+        // if (_positions[0].liquidity == 0 || _positions[1].liquidity == 0 || _positions[2].liquidity == 0) revert NoLiquidity();
+        
+        _updatePositions(_positions);
+    }
+    
+    /**
+     * @notice Internal function to update the liquidity positions.
+     * @param _positions The new liquidity positions.
+     */
+    function _updatePositions(LiquidityPosition[3] memory _positions) internal {   
+        if (_positions[0].liquidity == 0 || _positions[1].liquidity == 0 || _positions[2].liquidity == 0) revert NoLiquidity();
+
+        _v.floorPosition = _positions[0];
+        _v.anchorPosition = _positions[1];
+        _v.discoveryPosition = _positions[2];
+    }
+    
     /**
      * @notice Modifier to restrict access to the authorized manager.`
      */
@@ -119,11 +149,19 @@ contract AuxVault {
     }
 
     /**
+     * @notice Modifier to restrict access to internal calls.
+     */
+    modifier onlyInternalCalls() {
+        if (msg.sender != _v.factory && msg.sender != address(this)) revert OnlyInternalCalls();
+        _;        
+    }
+
+    /**
      * @notice Retrieves the function selectors for this contract.
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](9);
+        bytes4[] memory selectors = new bytes4[](11);
 
         selectors[0] = bytes4(keccak256(bytes("teamMultiSig()")));
         selectors[1] = bytes4(keccak256(bytes("getProtocolParameters()")));  
@@ -132,9 +170,10 @@ contract AuxVault {
         selectors[4] = bytes4(keccak256(bytes("pool()")));
         selectors[5] = bytes4(keccak256(bytes("getPositions()")));
         selectors[6] = bytes4(keccak256(bytes("afterPresale()")));
-        selectors[7] = bytes4(keccak256(bytes("setProtocolParameters((uint256,uint256,uint256,uint256,uint256,uint256))")));
+        selectors[7] = bytes4(keccak256(bytes("setProtocolParameters((uint8,uint8,uint8,uint16[2],uint256,uint256,int24,int24,int24,uint256,uint256,uint256,uint256,uint256,uint256))")));
         selectors[8] = bytes4(keccak256(bytes("setManager(address)")));
-
+        selectors[9] = bytes4(keccak256(bytes("setModelHelper(address)")));
+        selectors[10] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256,int24)[3])")));
         return selectors;
     }
-}
+}        
