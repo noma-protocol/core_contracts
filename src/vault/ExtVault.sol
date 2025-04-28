@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { LiquidityOps } from "../libraries/LiquidityOps.sol";
+import { LiquidityOps } from "../libraries/LiquidityOpsPatched.sol"; 
 import {
     LiquidityPosition, 
     ProtocolAddresses
@@ -20,17 +20,17 @@ interface ILendingVault {
     function paybackLoan(address who, uint256 amount) external;
     function rollLoan(address who, uint256 newDuration) external;
     function addCollateral(address who, uint256 amount) external;
-    function defaultLoans() external;
+    function defaultLoans() external returns (uint256 totalBurned, uint256 totalLoans);
 }
 
 // Events
 event Borrow(address indexed who, uint256 borrowAmount, uint256 duration);
 event Payback(address indexed who);
 event RollLoan(address indexed who);
+event DefaultLoans(uint256 totalBurned, uint256 totalLoans);
+
 event Shift();
 event Slide();
-event DefaultLoans();
-
 error Locked();
 
 /**
@@ -64,10 +64,11 @@ contract ExtVault {
      * @notice Allows anybody to default expired loans.
      */
     function defaultLoans() external lock {
+        (uint256 totalBurned, uint256 totalLoans) = 
         ILendingVault(address(this))
         .defaultLoans();
 
-        emit DefaultLoans();
+        emit DefaultLoans(totalBurned, totalLoans);
     }
 
     /**
