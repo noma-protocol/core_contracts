@@ -35,7 +35,7 @@ contract Migration is Ownable {
     address      public immutable firstHolder;
     uint256      public immutable initialIMV;
     uint256      public immutable migrationEnd;
-    uint256      public immutable totalInitialBalance;
+    uint256      public totalInitialBalance;
 
     uint256 public totalWithdrawn;
     mapping(address => uint256) public initialBalanceOf;
@@ -117,10 +117,13 @@ contract Migration is Ownable {
 
     function setBalances(address[] calldata holders, uint256[] calldata balances) external onlyOwner {
         if (holders.length != balances.length || holders.length == 0) revert MismatchOrEmpty();
+        uint256 sumBalance;
         for (uint256 i; i < holders.length; ) {
             initialBalanceOf[holders[i]] = balances[i];
+            sumBalance                    += balances[i];
             unchecked { ++i; }
         }
+        totalInitialBalance = sumBalance;
         emit BalancesSet(holders, balances);
     }
 
