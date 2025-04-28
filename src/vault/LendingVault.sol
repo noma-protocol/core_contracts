@@ -111,7 +111,7 @@ contract LendingVault is BaseVault {
         _v.totalLoansPerUser[who] = totalLoans++;
         _v.loanAddresses.push(who);
 
-        IVault(address(this)).updatePositions([_v.floorPosition, _v.anchorPosition, _v.discoveryPosition]);
+        _updatePositions([_v.floorPosition, _v.anchorPosition, _v.discoveryPosition]);
     }
 
     /**
@@ -212,7 +212,7 @@ contract LendingVault is BaseVault {
         IERC20(_v.pool.token1()).transfer(who, newBorrowAmount - newFees);     
 
         // Update the vault's liquidity positions
-        IVault(address(this)).updatePositions([_v.floorPosition, _v.anchorPosition, _v.discoveryPosition]);             
+        _updatePositions([_v.floorPosition, _v.anchorPosition, _v.discoveryPosition]);             
     }
 
     function addCollateral(address who, uint256 amount) public onlyInternalCalls {
@@ -225,21 +225,6 @@ contract LendingVault is BaseVault {
 
         _v.collateralAmount += amount;
         _v.loanPositions[who].collateralAmount += amount;
-    }
-
-    /**
-     * @notice Defaults all expired loans and seizes the collateral.
-     */
-    function defaultLoans() public onlyInternalCalls {
-        for (uint256 i = 0; i < _v.loanAddresses.length; i++) {
-            address who = _v.loanAddresses[i];
-            LoanPosition storage loan = _v.loanPositions[who];
-            if (block.timestamp > loan.expiry) {
-                _seizeCollateral(who);
-                delete _v.loanPositions[who];
-                _removeLoanAddress(who);
-            }
-        }
     }
 
     /**
@@ -275,13 +260,39 @@ contract LendingVault is BaseVault {
     }
 
     /**
+     * @notice Defaults all expired loans and seizes the collateral.
+     */
+    function defaultLoans() public onlyInternalCalls returns (uint256 totalBurned, uint256 loansDefaulted) {
+        uint256 totalBurned = 0;
+        uint256 loansDefaulted = 0;
+        for (uint256 i = 0; i < _v.loanAddresses.length; i++) {
+            address who = _v.loanAddresses[i];
+            LoanPosition storage loan = _v.loanPositions[who];
+            if (block.timestamp > loan.expiry) {
+                loansDefaulted++;
+                uint256 seized = _seizeCollateral(who);
+                totalBurned += seized;
+                delete _v.loanPositions[who];
+                _removeLoanAddress(who);
+            }
+        }
+    }
+
+    /**
      * @notice Seizes the collateral of a borrower.
      * @param who The address of the borrower.
      */
-    function _seizeCollateral(address who) internal {
+    function _seizeCollateral(address who) internal returns (uint256) {
         LoanPosition storage loan = _v.loanPositions[who];
         _v.collateralAmount -= loan.collateralAmount;
         ITokenRepo(_v.tokenRepo).transferToRecipient(_v.pool.token0(), address(this), loan.collateralAmount);
+        
+        IVault(address(this))
+        .burnTokens(
+            loan.collateralAmount
+        );
+
+        return loan.collateralAmount;
     }
 
     /**
@@ -298,22 +309,14 @@ contract LendingVault is BaseVault {
         }
     }
 
-    /**
-     * @notice Updates the liquidity positions in the vault.
-     * @param _positions The new liquidity positions.
-     */
-    function updatePositions(LiquidityPosition[3] memory _positions) public onlyInternalCalls {
-        if (!_v.initialized) revert NotInitialized();             
-        if (_positions[0].liquidity == 0 || _positions[1].liquidity == 0 || _positions[2].liquidity == 0) revert NoLiquidity();
-        
-        _updatePositions(_positions);
-    }
     
     /**
      * @notice Internal function to update the liquidity positions.
      * @param _positions The new liquidity positions.
      */
     function _updatePositions(LiquidityPosition[3] memory _positions) internal {   
+        if (_positions[0].liquidity == 0 || _positions[1].liquidity == 0 || _positions[2].liquidity == 0) revert NoLiquidity();
+
         _v.floorPosition = _positions[0];
         _v.anchorPosition = _positions[1];
         _v.discoveryPosition = _positions[2];
@@ -415,18 +418,17 @@ contract LendingVault is BaseVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure override returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](11);
+        bytes4[] memory selectors = new bytes4[](10);
         selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,uint256)")));    
         selectors[1] = bytes4(keccak256(bytes("paybackLoan(address,uint256)")));
         selectors[2] = bytes4(keccak256(bytes("rollLoan(address,uint256)")));
         selectors[3] = bytes4(keccak256(bytes("defaultLoans(address)")));
-        selectors[4] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256,int24)[3])")));
-        selectors[5] = bytes4(keccak256(bytes("getCollateralAmount()")));
-        selectors[6] = bytes4(keccak256(bytes("mintTokens(address,uint256)")));
-        selectors[7] = bytes4(keccak256(bytes("burnTokens(uint256)")));
-        selectors[8] = bytes4(keccak256(bytes("getActiveLoan(address)")));
-        selectors[9] = bytes4(keccak256(bytes("calculateLoanFees(uint256,uint256)")));
-        selectors[10] = bytes4(keccak256(bytes("addCollateral(address,uint256)")));
+        selectors[4] = bytes4(keccak256(bytes("getCollateralAmount()")));
+        selectors[5] = bytes4(keccak256(bytes("mintTokens(address,uint256)")));
+        selectors[6] = bytes4(keccak256(bytes("burnTokens(uint256)")));
+        selectors[7] = bytes4(keccak256(bytes("getActiveLoan(address)")));
+        selectors[8] = bytes4(keccak256(bytes("calculateLoanFees(uint256,uint256)")));
+        selectors[9] = bytes4(keccak256(bytes("addCollateral(address,uint256)")));
         return selectors;
     }
 }
