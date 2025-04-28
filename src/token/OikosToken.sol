@@ -64,8 +64,9 @@ contract OikosToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPS
      * @param _amount The amount of tokens to mint.
      */
     function mint(address _recipient, uint256 _amount) public onlyFactory {
-        if (totalSupply() + _amount > maxTotalSupply) revert MaxSupplyReached();
-        _mint(_recipient, _amount);
+        if (totalSupply() + _amount <= maxTotalSupply) {
+            _mint(_recipient, _amount);
+        }
     }
     
     /**
@@ -96,7 +97,7 @@ contract OikosToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPS
      * @return The UUID for the proxy implementation slot.
      */
     function proxiableUUID() public pure override returns (bytes32) {
-        bytes32 hash = keccak256("oikos.token.implementation");
+        bytes32 hash = keccak256("eip1967.proxy.implementation");
         bytes32 slot = bytes32(uint256(hash) - 1);
         return slot;
     }
