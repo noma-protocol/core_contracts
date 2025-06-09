@@ -86,7 +86,7 @@ contract LendingInvariants is Test {
         require(address(managerContract) != address(0), "Manager contract address is zero");
 
         noma = OikosToken(nomaToken);
-        require(address(noma) != address(0), "Oikos token address is zero");
+        require(address(noma) != address(0), "Noma token address is zero");
         
         modelHelper = ModelHelper(modelHelperContract);
         vaultAddress = address(managerContract.vault());
@@ -113,7 +113,7 @@ contract LendingInvariants is Test {
         vm.stopPrank();
 
         vm.prank(deployer);
-        vm.expectRevert(abi.encodeWithSignature("InsufficientFloorBalance()"));
+        vm.expectRevert(abi.encodeWithSignature("NotPermitted()"));
 
         vault.borrow(borrowAmount, duration);
     }
@@ -326,7 +326,7 @@ contract LendingInvariants is Test {
         console.log("Anchor capacity + floor balance is: ", anchorCapacity + floorBalance);
         console.log("Circulating supply is: ", circulatingSupply);
 
-        // To guarantee solvency, Oikos ensures that capacity > circulating supply each liquidity is deployed.
+        // To guarantee solvency, Noma ensures that capacity > circulating supply each liquidity is deployed.
         require(anchorCapacity + floorCapacity > circulatingSupply, "Insolvency invariant failed");
     }
 

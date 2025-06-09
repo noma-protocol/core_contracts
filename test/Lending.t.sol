@@ -86,7 +86,7 @@ contract LendingVaultTest is Test {
         require(address(managerContract) != address(0), "Manager contract address is zero");
 
         noma = OikosToken(nomaToken);
-        require(address(noma) != address(0), "Oikos token address is zero");
+        require(address(noma) != address(0), "Noma token address is zero");
         
         modelHelper = ModelHelper(modelHelperContract);
         vaultAddress = address(managerContract.vault());
@@ -285,12 +285,16 @@ contract LendingVaultTest is Test {
         return DecimalMath.divideDecimal(floorBalance, circulatingSupply > anchorCapacity ? circulatingSupply - anchorCapacity : circulatingSupply);
     }
 
-    function calculateLoanFees(uint256 borrowAmount, uint256 duration) public view returns (uint256 fees) {
-        uint256 percentage = 57; // 0.057% 
-        uint256 scaledPercentage = percentage * 10**12; 
-        fees = (borrowAmount * scaledPercentage * (duration / SECONDS_IN_DAY)) / (100 * 10**18);
-    }    
-    
+    function calculateLoanFees(
+        uint256 borrowAmount,
+        uint256 duration
+    ) internal view returns (uint256 fees) {
+        uint256 SECONDS_IN_DAY = 86400;
+        // daily rate = 0.027% -> 27 / 100_000
+        uint256 daysElapsed = duration / SECONDS_IN_DAY;
+        fees = (borrowAmount * 27 * daysElapsed) / 100_000;
+    }
+
     function solvency() public view {
         IDOManager managerContract = IDOManager(idoManager);
         AuxVault vault = AuxVault(address(managerContract.vault()));
@@ -318,7 +322,7 @@ contract LendingVaultTest is Test {
         console.log("Anchor capacity + floor balance is: ", anchorCapacity + floorBalance);
         console.log("Circulating supply is: ", circulatingSupply);
 
-        // To guarantee solvency, Oikos ensures that capacity > circulating supply each liquidity is deployed.
+        // To guarantee solvency, Noma ensures that capacity > circulating supply each liquidity is deployed.
         require(anchorCapacity + floorCapacity > circulatingSupply, "Insolvency invariant failed");
     }
 }

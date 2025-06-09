@@ -9,7 +9,7 @@ import "./token/TestMockOikosToken.sol";
 contract TestStaking is Test {
     Staking staking;
     GonsToken sOKS;
-    TestMockOikosToken OKS;
+    TestMockOikosToken NOMA;
 
     address[] users;
     uint256 constant NUM_USERS = 100;
@@ -24,22 +24,22 @@ contract TestStaking is Test {
 
     function setUp() public {
         
-        OKS = new TestMockOikosToken();
-        OKS.initialize(address(this), 1_000_000e18, 200_000_000e18, "TEST", "TEST", address(0)); // Large initial supply
+        NOMA = new TestMockOikosToken();
+        NOMA.initialize(address(this), 1_000_000e18, 200_000_000e18, "TEST", "TEST", address(0)); // Large initial supply
 
-        sOKS = new GonsToken();
+        sOKS = new GonsToken("Noma Staked Token", "sOKS");
         vm.prank(deployer);
-        staking = new Staking(address(OKS), address(sOKS), address(this));
+        staking = new Staking(address(NOMA), address(sOKS), address(this));
 
         // sOKS.initialize(address(staking));
 
-        // Create users and give them OKS tokens
+        // Create users and give them NOMA tokens
         for (uint i = 0; i < NUM_USERS; i++) {
             address user = address(uint160(i + 1000));
             users.push(user);
-            OKS.transfer(user, INITIAL_OKS_BALANCE);
+            NOMA.transfer(user, INITIAL_OKS_BALANCE);
             vm.prank(user);
-            OKS.approve(address(staking), type(uint256).max);
+            NOMA.approve(address(staking), type(uint256).max);
         }
     }
 
@@ -54,7 +54,7 @@ contract TestStaking is Test {
 
         // Check balances after staking
         for (uint i = 0; i < NUM_USERS; i++) {
-            assertEq(OKS.balanceOf(users[i]), INITIAL_OKS_BALANCE - STAKE_AMOUNT, "OKS balance incorrect after stake");
+            assertEq(NOMA.balanceOf(users[i]), INITIAL_OKS_BALANCE - STAKE_AMOUNT, "NOMA balance incorrect after stake");
             // assertEq(sOKS.balanceOf(users[i]), STAKE_AMOUNT, "sOKS balance should be slightly higher than stake amount");
         }
 
@@ -63,14 +63,14 @@ contract TestStaking is Test {
         staking.notifyRewardAmount(0);
 
         uint256 rewardAmount = 1000e18;
-        OKS.mintTest(address(staking), rewardAmount);
+        NOMA.mintTest(address(staking), rewardAmount);
         vm.prank(address(staking));
         staking.notifyRewardAmount(rewardAmount);
 
         // All users unstake
         for (uint i = 0; i < NUM_USERS; i++) {
             uint256 sOKSBalanceBefore = sOKS.balanceOf(users[i]);
-            uint256 OKSBalanceBefore = OKS.balanceOf(users[i]);
+            uint256 OKSBalanceBefore = NOMA.balanceOf(users[i]);
 
             vm.prank(users[i]);
             sOKS.approve(address(staking), type(uint256).max);
@@ -81,7 +81,7 @@ contract TestStaking is Test {
             vm.stopPrank();
 
             assertEq(sOKS.balanceOf(users[i]), 0, "sOKS balance should be 0 after unstake");
-            assertEq(OKS.balanceOf(users[i]), OKSBalanceBefore + sOKSBalanceBefore, "OKS balance incorrect after unstake");
+            assertEq(NOMA.balanceOf(users[i]), OKSBalanceBefore + sOKSBalanceBefore, "NOMA balance incorrect after unstake");
         }
 
         // testCheckSolvency();
@@ -90,18 +90,18 @@ contract TestStaking is Test {
     function testCheckSolvency() public {
         console.log("Circulating sOKS supply:", sOKS.totalSupply());
         console.log("Staking contract sOKS balance:", sOKS.balanceOf(address(staking)));
-        // Check if staking contract has enough OKS to cover all unstakes
+        // Check if staking contract has enough NOMA to cover all unstakes
         uint256 circulatingSupply = sOKS.totalSupply() - sOKS.balanceOf(address(staking));
-        uint256 stakingOKSBalance = OKS.balanceOf(address(staking));
+        uint256 stakingOKSBalance = NOMA.balanceOf(address(staking));
         uint256 initialStakingBalance = sOKS.balanceForGons(INITIAL_FRAGMENTS_SUPPLY);
         uint256 availableOKS = stakingOKSBalance > initialStakingBalance ? stakingOKSBalance - initialStakingBalance : 0;
 
         // console.log("Circulating sOKS supply:", circulatingSupply);
-        // console.log("Staking contract OKS balance:", stakingOKSBalance);
+        // console.log("Staking contract NOMA balance:", stakingOKSBalance);
         // console.log("Initial staking balance (in current sOKS terms):", initialStakingBalance);
-        // console.log("Available OKS for unstaking:", availableOKS);
+        // console.log("Available NOMA for unstaking:", availableOKS);
 
-        assertGe(availableOKS, circulatingSupply, "Staking contract should have enough OKS to cover all circulating sOKS");
+        assertGe(availableOKS, circulatingSupply, "Staking contract should have enough NOMA to cover all circulating sOKS");
     }
     
     function testStakeUnstakeWithRebases() public {
@@ -117,7 +117,7 @@ contract TestStaking is Test {
         // Simulate multiple rebases
         uint256 rewardAmount = 1000e18;
         for (uint i = 0; i < 10; i++) {
-            OKS.mintTest(address(staking), rewardAmount);
+            NOMA.mintTest(address(staking), rewardAmount);
             vm.prank(address(staking));
             staking.notifyRewardAmount(rewardAmount);
         }
@@ -125,7 +125,7 @@ contract TestStaking is Test {
         // All users unstake
         for (uint i = 0; i < NUM_USERS; i++) {
             uint256 sOKSBalanceBefore = sOKS.balanceOf(users[i]);
-            uint256 OKSBalanceBefore = OKS.balanceOf(users[i]);
+            uint256 OKSBalanceBefore = NOMA.balanceOf(users[i]);
 
             vm.prank(users[i]);
             sOKS.approve(address(staking), type(uint256).max);
@@ -136,7 +136,7 @@ contract TestStaking is Test {
             vm.stopPrank();
             
             assertEq(sOKS.balanceOf(users[i]), 0, "sOKS balance should be 0 after unstake");
-            assertEq(OKS.balanceOf(users[i]), OKSBalanceBefore + sOKSBalanceBefore, "OKS balance incorrect after unstake");
+            assertEq(NOMA.balanceOf(users[i]), OKSBalanceBefore + sOKSBalanceBefore, "NOMA balance incorrect after unstake");
         }
 
     }
@@ -153,7 +153,7 @@ contract TestStaking is Test {
         staking.notifyRewardAmount(0);
 
         uint256 rewardAmount = 500e18;
-        OKS.mintTest(address(staking), rewardAmount);
+        NOMA.mintTest(address(staking), rewardAmount);
         vm.prank(address(staking));
         staking.notifyRewardAmount(rewardAmount);
 
@@ -164,14 +164,14 @@ contract TestStaking is Test {
         }
 
         // Simulate more rewards
-        OKS.mintTest(address(staking), rewardAmount);
+        NOMA.mintTest(address(staking), rewardAmount);
         vm.prank(address(staking));
         staking.notifyRewardAmount(rewardAmount);
 
         // All users unstake
         for (uint i = 0; i < NUM_USERS; i++) {
             uint256 sOKSBalanceBefore = sOKS.balanceOf(users[i]);
-            uint256 OKSBalanceBefore = OKS.balanceOf(users[i]);
+            uint256 OKSBalanceBefore = NOMA.balanceOf(users[i]);
 
             vm.prank(users[i]);
             sOKS.approve(address(staking), type(uint256).max);
@@ -182,7 +182,7 @@ contract TestStaking is Test {
             vm.stopPrank();
 
             assertEq(sOKS.balanceOf(users[i]), 0, "sOKS balance should be 0 after unstake");
-            assertEq(OKS.balanceOf(users[i]), OKSBalanceBefore + sOKSBalanceBefore, "OKS balance incorrect after unstake");
+            assertEq(NOMA.balanceOf(users[i]), OKSBalanceBefore + sOKSBalanceBefore, "NOMA balance incorrect after unstake");
         }
     }
 
@@ -199,7 +199,7 @@ contract TestStaking is Test {
             vm.prank(users[i]);
             staking.stake(stakeAmount);
 
-            assertEq(OKS.balanceOf(users[i]), INITIAL_OKS_BALANCE - stakeAmount, "OKS balance incorrect after stake");
+            assertEq(NOMA.balanceOf(users[i]), INITIAL_OKS_BALANCE - stakeAmount, "NOMA balance incorrect after stake");
             assertGe(sOKS.balanceOf(users[i]), stakeAmount, "sOKS balance should be equal or slightly higher than stake amount");
             // console.log("User", i);
             // console.log("staked:", stakeAmount);
@@ -212,7 +212,7 @@ contract TestStaking is Test {
         for (uint i = 0; i < 5; i++) {
             uint256 rewardAmount = _randomAmount(100e18, MAX_REWARD_AMOUNT);
             totalRewards += rewardAmount;
-            OKS.mintTest(address(staking), rewardAmount);
+            NOMA.mintTest(address(staking), rewardAmount);
             vm.prank(address(staking));
             staking.notifyRewardAmount(rewardAmount);
             
@@ -222,25 +222,25 @@ contract TestStaking is Test {
         // Unstake for all users
         for (uint256 i = 0; i < NUM_USERS; i++) {
             uint256 sOikosBalanceBefore = sOKS.balanceOf(users[i]);
-            uint256 OKSBalanceBefore = OKS.balanceOf(users[i]);
+            uint256 OKSBalanceBefore = NOMA.balanceOf(users[i]);
 
             vm.startPrank(users[i]);
             sOKS.approve(address(staking), sOikosBalanceBefore);
             staking.unstake();
             vm.stopPrank();
 
-            uint256 OKSBalanceAfter = OKS.balanceOf(users[i]);
+            uint256 OKSBalanceAfter = NOMA.balanceOf(users[i]);
             int256 OKSDifference = int256(OKSBalanceAfter) - int256(OKSBalanceBefore);
 
             // console.log("User", i);
             // console.log("Initial stake:", stakeAmounts[i]);
             // console.log("sOKS balance before unstake:", sOikosBalanceBefore);
-            // console.log("OKS balance before unstake:", OKSBalanceBefore);
-            // console.log("OKS balance after unstake:", OKSBalanceAfter);
-            // console.log("OKS difference:", uint256(OKSDifference));
+            // console.log("NOMA balance before unstake:", OKSBalanceBefore);
+            // console.log("NOMA balance after unstake:", OKSBalanceAfter);
+            // console.log("NOMA difference:", uint256(OKSDifference));
             // console.log("Percentage gain:", uint256((OKSDifference * 10000) / int256(stakeAmounts[i])), "basis points");
 
-            assertGt(OKSBalanceAfter, OKSBalanceBefore, "OKS balance should be greater after unstake");
+            assertGt(OKSBalanceAfter, OKSBalanceBefore, "NOMA balance should be greater after unstake");
             assertEq(sOKS.balanceOf(users[i]), 0, "sOKS balance should be 0 after unstaking");
 
             if (i == NUM_USERS - 1) {
@@ -270,7 +270,7 @@ contract TestStaking is Test {
 
         // Simulate random rewards
         uint256 rewardAmount = _randomAmount(100e18, MAX_REWARD_AMOUNT);
-        OKS.mintTest(address(staking), rewardAmount);
+        NOMA.mintTest(address(staking), rewardAmount);
         vm.prank(address(staking));
         staking.notifyRewardAmount(rewardAmount);
         // console.log("First reward distributed:", rewardAmount);
@@ -292,7 +292,7 @@ contract TestStaking is Test {
         // Simulate more random rewards
         uint256 additionalReward = _randomAmount(100e18, MAX_REWARD_AMOUNT);
         rewardAmount += additionalReward;
-        OKS.mintTest(address(staking), additionalReward);
+        NOMA.mintTest(address(staking), additionalReward);
         vm.prank(address(staking));
         staking.notifyRewardAmount(additionalReward);
         // console.log("Second reward distributed:", additionalReward);
@@ -300,7 +300,7 @@ contract TestStaking is Test {
         // All users unstake
         for (uint i = 0; i < NUM_USERS; i++) {
             uint256 sOKSBalanceBefore = sOKS.balanceOf(users[i]);
-            uint256 OKSBalanceBefore = OKS.balanceOf(users[i]);
+            uint256 OKSBalanceBefore = NOMA.balanceOf(users[i]);
 
             vm.prank(users[i]);
             sOKS.approve(address(staking), type(uint256).max);
@@ -310,19 +310,19 @@ contract TestStaking is Test {
             staking.unstake();
             vm.stopPrank();
 
-            uint256 OKSBalanceAfter = OKS.balanceOf(users[i]);
+            uint256 OKSBalanceAfter = NOMA.balanceOf(users[i]);
             int256 OKSDifference = int256(OKSBalanceAfter) - int256(OKSBalanceBefore);
 
             // console.log("User", i);
             // console.log("Initial stake:", stakeAmounts[i]);
             // console.log("sOKS balance before unstake:", sOKSBalanceBefore);
-            // console.log("OKS balance before unstake:", OKSBalanceBefore);
-            // console.log("OKS balance after unstake:", OKSBalanceAfter);
-            // console.log("OKS difference:", uint256(OKSDifference));
+            // console.log("NOMA balance before unstake:", OKSBalanceBefore);
+            // console.log("NOMA balance after unstake:", OKSBalanceAfter);
+            // console.log("NOMA difference:", uint256(OKSDifference));
             // console.log("Percentage gain:", uint256((OKSDifference * 10000) / int256(stakeAmounts[i])), "basis points");
 
             assertEq(sOKS.balanceOf(users[i]), 0, "sOKS balance should be 0 after unstake");
-            assertGt(OKSBalanceAfter, OKSBalanceBefore, "OKS balance should be greater after unstake");
+            assertGt(OKSBalanceAfter, OKSBalanceBefore, "NOMA balance should be greater after unstake");
         }
 
     }

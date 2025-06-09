@@ -29,7 +29,7 @@ contract DeployToken is Test {
             deployer,
             1000000 ether,
             2000000 ether,
-            "Mock OKS",
+            "Mock NOMA",
             "MOKS",
             address(0)
         );

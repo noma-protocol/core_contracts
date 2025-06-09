@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import {VaultUpgradeSimple} from "./vault_upgrade/init/VaultUpgradeSimple.sol";
 import {VaultUpgradeExt} from "./vault_upgrade/init/VaultUpgradeExt.sol";
+import { VaultUpgradeAux } from "./vault_upgrade/init/VaultUpgradeAux.sol";
 import {IDiamond} from "../src/interfaces/IDiamond.sol";
 import {ModelHelper} from  "../src/model/Helper.sol";
 import {BaseVault} from "../src/vault/BaseVault.sol";
@@ -44,7 +45,7 @@ contract TestVaultUpgrade is Test {
         // Read the JSON file
         string memory json = vm.readFile(path);
 
-        string memory networkId = "1337";
+        string memory networkId = "1337"; 
         // Parse the data for network ID `1337`
         bytes memory data = vm.parseJson(json, string.concat(string("."), networkId));
 
@@ -98,6 +99,21 @@ contract TestVaultUpgrade is Test {
         vaultUpgrade.doUpgradeStart(vaultAddress);
 
         vm.stopBroadcast();
+    }
+
+    function testRealUpgrade() public {
+        // Ensure the vault is upgraded
+        vm.startPrank(deployer);
+        VaultUpgradeAux vaultUpgrade = new VaultUpgradeAux(deployer);
+        console.log("VaultUpgradeAux deployed to address: ", address(vaultUpgrade));
+
+        IDiamond diamondContract = IDiamond(vaultAddress);
+        require(diamondContract.owner() == deployer, "Deployer is not the owner of the vaultAddress");
+
+        IDiamond(vaultAddress).transferOwnership(address(vaultUpgrade));
+        vaultUpgrade.doUpgradeStart(vaultAddress);
+
+        vm.stopPrank();
     }
 
     function testDowngradeFunctionality() public {

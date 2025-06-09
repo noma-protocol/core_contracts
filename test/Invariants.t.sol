@@ -52,7 +52,7 @@ contract Invariants is Test {
     address modelHelperContract;
     address vaultAddress;
 
-    OikosToken private OKS;
+    OikosToken private NOMA;
     GonsToken sOKS;
 
     ModelHelper private modelHelper;
@@ -84,8 +84,8 @@ contract Invariants is Test {
         IDOManager managerContract = IDOManager(idoManager);
         require(address(managerContract) != address(0), "Manager contract address is zero");
 
-        OKS = OikosToken(oikosToken);
-        require(address(OKS) != address(0), "Oikos token address is zero");
+        NOMA = OikosToken(oikosToken);
+        require(address(NOMA) != address(0), "Noma token address is zero");
 
         // sOKS = GonsToken(sOikosToken);
         // require(address(sOKS) != address(0), "sOikos token address is zero");
@@ -113,7 +113,7 @@ contract Invariants is Test {
         vm.recordLogs();
         vm.startBroadcast(privateKey);
 
-        uint256 totalSupply = OKS.totalSupply();
+        uint256 totalSupply = NOMA.totalSupply();
         console.log("Total supply is %s", totalSupply);
 
         require(totalSupply >= 1e20, "Total supply is less than expected");
@@ -133,7 +133,7 @@ contract Invariants is Test {
         IWETH(WBNB).deposit{ value: 10 ether }();
         IWETH(WBNB).transfer(idoManager, tradeAmount * totalTrades);
 
-        uint256 tokenBalanceBefore = OKS.balanceOf(address(this));
+        uint256 tokenBalanceBefore = NOMA.balanceOf(address(this));
         uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault));
         console.log("Circulating supply is: ", circulatingSupplyBefore);
 
@@ -141,7 +141,7 @@ contract Invariants is Test {
             managerContract.buyTokens(spotPrice, tradeAmount, address(this));
         }
         
-        uint256 tokenBalanceAfter = OKS.balanceOf(address(this));
+        uint256 tokenBalanceAfter = NOMA.balanceOf(address(this));
         console.log("Token balance after buying is %s", tokenBalanceAfter);
 
         uint256 circulatingSupplyAfter = modelHelper.getCirculatingSupply(pool, address(vault));
@@ -162,7 +162,7 @@ contract Invariants is Test {
     //     // Simulate multiple rebases
     //     uint256 rewardAmount = 1000e18;
     //     for (uint i = 0; i < 10; i++) {
-    //         OKS.mint(address(staking), rewardAmount);
+    //         NOMA.mint(address(staking), rewardAmount);
     //         vm.prank(vault);
     //         staking.notifyRewardAmount(rewardAmount);
     //     }
@@ -170,28 +170,28 @@ contract Invariants is Test {
     //     // All users unstake
     //     for (uint i = 0; i < NUM_USERS; i++) {
     //         uint256 sNOMABalanceBefore = sOKS.balanceOf(users[i]);
-    //         uint256 NOMABalanceBefore = OKS.balanceOf(users[i]);
+    //         uint256 NOMABalanceBefore = NOMA.balanceOf(users[i]);
 
     //         vm.prank(users[i]);
     //         sOKS.approve(address(staking), type(uint256).max);
     //         staking.unstake(users[i]);
 
     //         assertEq(sOKS.balanceOf(users[i]), 0, "sOKS balance should be 0 after unstake");
-    //         assertEq(OKS.balanceOf(users[i]), NOMABalanceBefore + sNOMABalanceBefore, "OKS balance incorrect after unstake");
+    //         assertEq(NOMA.balanceOf(users[i]), NOMABalanceBefore + sNOMABalanceBefore, "NOMA balance incorrect after unstake");
     //     }
 
-    //     // Check if staking contract has enough OKS to cover all unstakes
+    //     // Check if staking contract has enough NOMA to cover all unstakes
     //     uint256 circulatingSupply = sOKS.totalSupply() - sOKS.balanceOf(address(staking));
-    //     uint256 stakingNOMABalance = OKS.balanceOf(address(staking));
+    //     uint256 stakingNOMABalance = NOMA.balanceOf(address(staking));
     //     uint256 initialStakingBalance = sOKS.balanceForGons(INITIAL_FRAGMENTS_SUPPLY);
     //     uint256 availableNOMA = stakingNOMABalance > initialStakingBalance ? stakingNOMABalance - initialStakingBalance : 0;
 
     //     // console.log("Circulating sOKS supply:", circulatingSupply);
-    //     // console.log("Staking contract OKS balance:", stakingNOMABalance);
+    //     // console.log("Staking contract NOMA balance:", stakingNOMABalance);
     //     // console.log("Initial staking balance (in current sOKS terms):", initialStakingBalance);
-    //     // console.log("Available OKS for unstaking:", availableNOMA);
+    //     // console.log("Available NOMA for unstaking:", availableNOMA);
 
-    //     assertGe(availableNOMA, circulatingSupply, "Staking contract should have enough OKS to cover all circulating sOKS");
+    //     assertGe(availableNOMA, circulatingSupply, "Staking contract should have enough NOMA to cover all circulating sOKS");
     // }
 
     function testBuyTokens() public {
@@ -210,7 +210,7 @@ contract Invariants is Test {
         IWETH(WBNB).deposit{ value:  tradeAmount * numTrades}();
         IWETH(WBNB).transfer(idoManager, tradeAmount * numTrades);
 
-        uint256 tokenBalanceBefore = OKS.balanceOf(address(deployer));
+        uint256 tokenBalanceBefore = NOMA.balanceOf(address(deployer));
         uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, 18);
         uint256 purchasePrice = spotPrice + (spotPrice * 1 / 100);
 
@@ -220,7 +220,7 @@ contract Invariants is Test {
             purchasePrice = spotPrice + (spotPrice * 1 / 100);
 
             managerContract.buyTokens(purchasePrice, tradeAmount, address(deployer));
-            uint256 tokenBalanceAfter = OKS.balanceOf(address(deployer));
+            uint256 tokenBalanceAfter = NOMA.balanceOf(address(deployer));
             
             uint256 receivedAmount = tokenBalanceAfter > tokenBalanceBefore 
                 ? tokenBalanceAfter - tokenBalanceBefore
@@ -253,7 +253,7 @@ contract Invariants is Test {
         IWETH(WBNB).deposit{ value:  tradeAmountWETH * totalTradesBuy}();
         IWETH(WBNB).transfer(idoManager, tradeAmountWETH * totalTradesBuy);
 
-        uint256 tokenBalanceBefore = OKS.balanceOf(address(deployer));
+        uint256 tokenBalanceBefore = NOMA.balanceOf(address(deployer));
         console.log("Token balance before buying is %s", tokenBalanceBefore);
 
         for (uint i = 0; i < totalTradesBuy; i++) {
@@ -272,10 +272,10 @@ contract Invariants is Test {
         spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
         console.log("Spot price is: ", spotPrice);
 
-        uint256 tokenBalanceBeforeSelling = OKS.balanceOf(address(deployer));
+        uint256 tokenBalanceBeforeSelling = NOMA.balanceOf(address(deployer));
         console.log("Token balance before selling is %s", tokenBalanceBeforeSelling);
 
-        OKS.transfer(idoManager, tokenBalanceBeforeSelling);
+        NOMA.transfer(idoManager, tokenBalanceBeforeSelling);
 
         (sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
         spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
@@ -303,7 +303,7 @@ contract Invariants is Test {
         IWETH(WBNB).deposit{ value: (tradeAmount * totalTrades)}();
         IWETH(WBNB).transfer(idoManager, tradeAmount * totalTrades);
 
-        uint256 tokenBalanceBefore = OKS.balanceOf(address(this));
+        uint256 tokenBalanceBefore = NOMA.balanceOf(address(this));
         uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault));
         console.log("Circulating supply is: ", circulatingSupplyBefore);
 
@@ -446,10 +446,10 @@ contract Invariants is Test {
             IVault(address(vault)).shift();
         }
         
-        uint256 tokenBalanceBeforeSelling = OKS.balanceOf(address(this));
+        uint256 tokenBalanceBeforeSelling = NOMA.balanceOf(address(this));
         console.log("Token balance before selling is %s", tokenBalanceBeforeSelling);
 
-        OKS.transfer(idoManager, tokenBalanceBeforeSelling);
+        NOMA.transfer(idoManager, tokenBalanceBeforeSelling);
 
         (sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
         spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
@@ -510,7 +510,7 @@ contract Invariants is Test {
         console.log("Anchor capacity + floor balance is: ", anchorCapacity + floorBalance);
         console.log("Circulating supply is: ", circulatingSupply);
 
-        // To guarantee solvency, Oikos ensures that capacity > circulating supply each liquidity is deployed.
+        // To guarantee solvency, Noma ensures that capacity > circulating supply each liquidity is deployed.
         require(anchorCapacity + floorCapacity > circulatingSupply, "Insolvency invariant failed");
     }
 

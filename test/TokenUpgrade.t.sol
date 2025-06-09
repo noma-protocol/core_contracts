@@ -13,7 +13,7 @@ struct ContractAddressesJson {
     address Proxy;
 }
 
-interface OikosFactory {
+interface NomaFactory {
     function upgradeToken(
         address _token,
         address _newImplementation
@@ -78,7 +78,7 @@ contract TestTokenUpgrade is Test {
 
         // Upgrade the proxy to use the new implementation
         vm.prank(deployer);
-        OikosFactory(factoryAddress).upgradeToken(proxyAddress, address(mockOikosTokenV2));
+        NomaFactory(factoryAddress).upgradeToken(proxyAddress, address(mockOikosTokenV2));
 
         // Cast the proxy to MockOikosTokenV2 to interact with the new implementation
         TestMockOikosTokenV2 upgraded = TestMockOikosTokenV2(proxyAddress);
@@ -94,7 +94,7 @@ contract TestTokenUpgrade is Test {
         // Try to upgrade the proxy from a non-deployer account
         vm.prank(user);
         vm.expectRevert();
-        OikosFactory(factoryAddress).upgradeToken(proxyAddress, address(mockOikosTokenV2));
+        NomaFactory(factoryAddress).upgradeToken(proxyAddress, address(mockOikosTokenV2));
         
         // Verify that the upgrade did not happen by checking the version is still V1
         assertEq(TestMockOikosToken(proxyAddress).version(), "1");

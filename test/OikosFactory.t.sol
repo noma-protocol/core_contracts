@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import { OikosFactory } from "../src/factory/OikosFactory.sol";
+import { NomaFactory } from "../src/factory/NomaFactory.sol";
 import { TestResolver } from "./resolver/Resolver.sol";
 import { DeployerFactory } from "../src/factory/DeployerFactory.sol";
 import { ExtFactory } from "../src/factory/ExtFactory.sol";
@@ -39,7 +39,7 @@ contract OikosFactoryTest is Test {
     address deployer = vm.envAddress("DEPLOYER");
     address user = address(2);
 
-    OikosFactory oikosFactory;
+    NomaFactory oikosFactory;
     TestResolver resolver;
     EtchVault etchVault;
     VaultUpgrade vaultUpgrade;
@@ -98,7 +98,7 @@ contract OikosFactoryTest is Test {
 
         vm.prank(deployer);
         // Noma Factory
-        oikosFactory = new OikosFactory(
+        oikosFactory = new NomaFactory(
             uniswapFactory,
             address(resolver),
             address(deploymentFactory),
@@ -107,7 +107,7 @@ contract OikosFactoryTest is Test {
         );
 
         expectedAddressesInResolver.push(
-            ContractInfo("OikosFactory", address(oikosFactory))
+            ContractInfo("NomaFactory", address(oikosFactory))
         );
         
         vm.prank(deployer);
@@ -167,8 +167,8 @@ contract OikosFactoryTest is Test {
     function testCreateVaultShouldRevert() public {
         VaultDeployParams memory vaultDeployParams = 
             VaultDeployParams(
-                "Oikos Token", // Name
-                "OKS",       // Symbol
+                "Noma Token", // Name
+                "NOMA",       // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
                 200e18,       // Max supply
@@ -206,8 +206,8 @@ contract OikosFactoryTest is Test {
 
         VaultDeployParams memory vaultDeployParams = 
             VaultDeployParams(
-                "Oikos Token", // Name
-                "OKS",       // Symbol
+                "Noma Token", // Name
+                "NOMA",       // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
                 200e18,       // Max supply
@@ -243,8 +243,8 @@ contract OikosFactoryTest is Test {
 
         VaultDeployParams memory vaultDeployParams = 
         VaultDeployParams(
-            "Oikos Token", // Name
-            "OKS",         // Symbol
+            "Noma Token", // Name
+            "NOMA",         // Symbol
             18,            // Decimals
             100e18,       // Total supply
             200e18,       // Max supply
@@ -273,8 +273,8 @@ contract OikosFactoryTest is Test {
 
         vaultDeployParams = 
             VaultDeployParams(
-                "Oikos Token", // Name
-                "OKS",        // Symbol
+                "Noma Token", // Name
+                "NOMA",        // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
                 200e18,       // Max supply
@@ -340,8 +340,8 @@ contract OikosFactoryTest is Test {
 
         VaultDeployParams memory vaultDeployParams = 
             VaultDeployParams(
-                "Oikos Token", // Name
-                "OKS",       // Symbol
+                "Noma Token", // Name
+                "NOMA",       // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
                 200e18,       // Max supply
@@ -377,8 +377,8 @@ contract OikosFactoryTest is Test {
 
         VaultDeployParams memory vaultDeployParams = 
             VaultDeployParams(
-                "Oikos Token", // Name
-                "OKS",        // Symbol
+                "Noma Token", // Name
+                "NOMA",        // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
                 200e18,       // Max supply
@@ -414,8 +414,8 @@ contract OikosFactoryTest is Test {
 
         VaultDeployParams memory vaultDeployParams = 
             VaultDeployParams(
-                "Oikos Token", // Name
-                "OKS",       // Symbol
+                "Noma Token", // Name
+                "NOMA",       // Symbol
                 18,           // Decimals
                 100e18,       // Total supply
                 200e18,       // Max supply
