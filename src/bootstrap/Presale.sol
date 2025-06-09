@@ -36,7 +36,7 @@
       using SafeERC20 for IERC20;
 
       /// @notice Address of the WBNB token on the BSC network.
-      address constant WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+      address constant WBNB = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
 
       /// @notice Address of the vault contract.  
       address public vaultAddress;

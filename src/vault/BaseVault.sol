@@ -290,11 +290,11 @@ contract BaseVault  {
 
     function factory() public view returns (address) {
         IAddressResolver resolver = _getResolver();
-        address _factory = resolver.getVaultAddress(address(this), Utils.stringToBytes32("OikosFactory"));
+        address _factory = resolver.getVaultAddress(address(this), Utils.stringToBytes32("NomaFactory"));
         if (_factory == address(0)) {
             _factory = resolver
                 .requireAndGetAddress(
-                    Utils.stringToBytes32("OikosFactory"), 
+                    Utils.stringToBytes32("NomaFactory"), 
                     "no Factory"
                 );
         }

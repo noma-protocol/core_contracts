@@ -53,7 +53,7 @@ contract GonsToken is ERC20Permit {
     // This is denominated in Fragments, because the gons-fragments conversion might change before it's fully paid.
     mapping (address => mapping (address => uint256)) private _allowedFragments;
 
-    constructor(string memory name, string memory symbol) ERC20(name, symbol, 18) ERC20Permit("Staked Oikos") {
+    constructor(string memory name, string memory symbol) ERC20(name, symbol, 18) ERC20Permit("Staked Noma") {
         _totalSupply = INITIAL_FRAGMENTS_SUPPLY;
         _gonBalances[address(this)] = TOTAL_GONS;
         _gonsPerFragment = TOTAL_GONS.div(_totalSupply);

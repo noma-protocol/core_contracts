@@ -116,7 +116,8 @@ library Uniswap {
                 upperTick,
                 liquidity
             );
-        } else {
+        } 
+        else {
             revert ZeroLiquidty();
         }
     }

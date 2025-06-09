@@ -294,7 +294,7 @@ contract ModelHelper {
         uint256 anchorCapacity = vaultInfo.anchorCapacity;
         uint256 floorCapacity = vaultInfo.floorCapacity;
         
-        // To guarantee solvency, Oikos ensures that capacity > circulating supply each liquidity is deployed.
+        // To guarantee solvency, Noma ensures that capacity > circulating supply each liquidity is deployed.
         if (anchorCapacity + floorCapacity <= circulatingSupply) {
             revert InsolvencyInvariant();
         }

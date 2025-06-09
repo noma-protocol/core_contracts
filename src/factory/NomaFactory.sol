@@ -66,16 +66,17 @@ error TokenAlreadyExistsError();
 error InvalidParameters();
 
 /**
- * @title OikosFactory
- * @notice This contract facilitates the deployment and management of Oikos Vaults, including associated tokens and liquidity pools.
+ * @title NomaFactory
+ * @notice This contract facilitates the deployment and management of Noma Vaults, including associated tokens and liquidity pools.
  */
-contract OikosFactory {
+contract NomaFactory {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
-
-    // Oikos Factory state
+    
+    // Noma Factory state
     IAddressResolver private resolver;
     Deployer private deployer;
+    bool bogus = false;
 
     address private presaleFactory;
     address private deployerFactory;
@@ -98,7 +99,7 @@ contract OikosFactory {
     mapping(address => VaultDeployParams) private deferredDeployParams;
 
     /**
-     * @notice Constructor to initialize the OikosFactory contract.
+     * @notice Constructor to initialize the NomaFactory contract.
      * @param _uniswapV3Factory The address of the Uniswap V3 Factory contract.
      * @param _resolver The address of the Address Resolver contract.
      * @param _deployerFactory The address of the Deployment Factory contract.
@@ -132,7 +133,7 @@ contract OikosFactory {
     function deployVault(
         PresaleUserParams memory presaleParams,
         VaultDeployParams memory vaultDeployParams
-    ) public 
+    ) public payable
     checkDeployAuthority  
     returns (address, address, address) {
         _validateToken1(vaultDeployParams.token1);
@@ -141,7 +142,7 @@ contract OikosFactory {
         bytes32 tokenHash = keccak256(abi.encodePacked(vaultDeployParams.name, vaultDeployParams.symbol));
         if (deployedTokenHashes[tokenHash]) revert TokenAlreadyExistsError();
 
-        (OikosToken oikosToken, ERC1967Proxy proxy, ) =
+        (,ERC1967Proxy proxy, ) =
         ITokenFactory(tokenFactory())
             .deployOikosToken(vaultDeployParams);
         
@@ -161,6 +162,18 @@ contract OikosFactory {
         data.pool = pool;
         data.proxy = proxy;
         data.tickSpacing = tickSpacing;
+
+        if (vaultDeployParams.presale == 1) {
+            if (msg.value < getProtocolParameters().deployFee) {
+                revert InvalidParameters();
+            } else {
+                if (teamMultisigAddress != address(0)) {
+                    payable(teamMultisigAddress).transfer(msg.value);
+                } else {
+                    payable(authority).transfer(msg.value);
+                }
+            }
+        }
 
         return _finalizeVaultDeployment(vaultDeployParams, data);
     }
@@ -305,7 +318,7 @@ contract OikosFactory {
         int24 tickSpacing = Utils._validateFeeTier(vaultDeployParams.feeTier);
 
         uint256 initialPrice = 
-            keccak256(bytes(vaultDeployParams.symbol)) == keccak256(bytes("OKS"))
+            keccak256(bytes(vaultDeployParams.symbol)) == keccak256(bytes("NOMA"))
                 ? vaultDeployParams.IDOPrice
                 : _calculatePresalePremium(vaultDeployParams.IDOPrice);
 

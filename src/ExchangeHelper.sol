@@ -27,7 +27,7 @@ contract ExchangeHelper {
     TokenInfo public tokenInfo;
     address public poolAddress;
 
-    address public WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+    address public WBNB = 0xB3D148caE2d57433e5e2279d3567efA6bA0892c8;
 
     // Lock state variable to prevent reentrancy
     bool private locked;

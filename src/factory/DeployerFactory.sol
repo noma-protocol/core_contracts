@@ -60,7 +60,7 @@ contract DeployerFactory {
      */
     modifier onlyFactory() {
         address factory = resolver.requireAndGetAddress(
-            Utils.stringToBytes32("OikosFactory"), 
+            Utils.stringToBytes32("NomaFactory"), 
             "no factory"
         );        
         if (msg.sender != factory) {

@@ -35,7 +35,7 @@ contract TokenFactory {
 
     function deployOikosToken(VaultDeployParams memory vaultDeployParams) public onlyFactory 
     returns (OikosToken, ERC1967Proxy, bytes32) {
-        // Deploy the Oikos token
+        // Deploy the Noma token
         (
             OikosToken oikosToken, 
             ERC1967Proxy proxy, 
@@ -52,7 +52,7 @@ contract TokenFactory {
     }
 
     /**
-    * @notice Deploys a new Oikos token with the specified parameters.
+    * @notice Deploys a new Noma token with the specified parameters.
     * @param name The name of the token.
     * @param symbol The symbol of the token.
     * @param _token1 The address of the paired token (token1).
@@ -115,7 +115,7 @@ contract TokenFactory {
 
     function factory() public view returns (address) {
         return resolver.requireAndGetAddress(
-            "OikosFactory",
+            "NomaFactory",
             "No factory"
         );
     }
