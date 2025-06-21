@@ -64,9 +64,7 @@ contract OikosToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPS
      * @param _amount The amount of tokens to mint.
      */
     function mint(address _recipient, uint256 _amount) public onlyFactory {
-        if (totalSupply() + _amount <= maxTotalSupply) {
-            _mint(_recipient, _amount);
-        }
+        _mint(_recipient, _amount);
     }
     
     /**
