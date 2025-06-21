@@ -35,9 +35,6 @@
   contract Presale is pAsset, Ownable {
       using SafeERC20 for IERC20;
 
-      /// @notice Address of the WBNB token on the BSC network.
-      address constant WBNB = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
-
       /// @notice Address of the vault contract.  
       address public vaultAddress;
 
@@ -172,18 +169,6 @@
           ) * params.floorPercentage / 100;
 
           if (softCap > hardCap * _protocolParams.maxSoftCap / 100) revert InvalidParameters();
-          if (softCap < hardCap / 8) {
-            revert(
-                string(
-                    abi.encodePacked(
-                        "presale(1): hardCap is : ", 
-                        Utils._uint2str(uint256(hardCap))
-                    )
-                )
-            );            
-          }
-          
-          //revert InvalidSoftCap(); // 1 / 8 of hard cap is the minimum soft cap
           if (softCap > hardCap) revert InvalidHardCap();
 
           tokenInfo = TokenInfo({
@@ -367,17 +352,21 @@
         uint256 availableBalance = IERC20(token0).balanceOf(address(this));
 
         // Ensure the available balance meets the minimum required amount
-        require(availableBalance >= minAmountOut, "Insufficient liquidity for withdrawal");
+        uint256 amountToTransfer = minAmountOut;
+
+        if (availableBalance < amountToTransfer) {
+            amountToTransfer = availableBalance;
+        }
 
         bool isMigration = migrationContract != address(0);
 
         if (isMigration) {
-            IERC20(token0).safeTransfer(migrationContract, minAmountOut);
+            IERC20(token0).safeTransfer(migrationContract, amountToTransfer);
         } else {
-            IERC20(token0).safeTransfer(msg.sender, minAmountOut);
+            IERC20(token0).safeTransfer(msg.sender, amountToTransfer);
         }
 
-        emit TokensWithdrawn(msg.sender, minAmountOut);
+        emit TokensWithdrawn(msg.sender, amountToTransfer);
       }
 
       /**
