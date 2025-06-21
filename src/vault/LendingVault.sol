@@ -263,8 +263,8 @@ contract LendingVault is BaseVault {
      * @notice Defaults all expired loans and seizes the collateral.
      */
     function defaultLoans() public onlyInternalCalls returns (uint256 totalBurned, uint256 loansDefaulted) {
-        uint256 totalBurned = 0;
-        uint256 loansDefaulted = 0;
+        totalBurned = 0;
+        loansDefaulted = 0;
         for (uint256 i = 0; i < _v.loanAddresses.length; i++) {
             address who = _v.loanAddresses[i];
             LoanPosition storage loan = _v.loanPositions[who];
@@ -321,42 +321,7 @@ contract LendingVault is BaseVault {
         _v.anchorPosition = _positions[1];
         _v.discoveryPosition = _positions[2];
     }
-
-    /**
-     * @notice Mints new tokens and distributes them to the specified address.
-     * @param to The address to receive the minted tokens.
-     * @param amount The amount of tokens to mint.
-     */
-    function mintTokens(
-        address to,
-        uint256 amount
-    ) public onlyInternalCalls {
-        
-        _v.timeLastMinted = block.timestamp;
-
-        IOikosFactory(_v.factory)
-        .mintTokens(
-            to,
-            amount
-        );
-    }
-
-    /**
-     * @notice Burns tokens from the vault.
-     * @param amount The amount of tokens to burn.
-     */
-    function burnTokens(
-        uint256 amount
-    ) public onlyInternalCalls {
-
-        IERC20(_v.pool.token0()).approve(address(_v.factory), amount);
-        IOikosFactory(_v.factory)
-        .burnFor(
-            address(this),
-            amount
-        );
-    }
-    
+   
     /**
     * @notice Retrieves the active loan details for a specific user.
     * @param who The address of the borrower.
@@ -418,17 +383,15 @@ contract LendingVault is BaseVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure override returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](10);
+        bytes4[] memory selectors = new bytes4[](8);
         selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,uint256)")));    
         selectors[1] = bytes4(keccak256(bytes("paybackLoan(address,uint256)")));
         selectors[2] = bytes4(keccak256(bytes("rollLoan(address,uint256)")));
         selectors[3] = bytes4(keccak256(bytes("defaultLoans(address)")));
         selectors[4] = bytes4(keccak256(bytes("getCollateralAmount()")));
-        selectors[5] = bytes4(keccak256(bytes("mintTokens(address,uint256)")));
-        selectors[6] = bytes4(keccak256(bytes("burnTokens(uint256)")));
-        selectors[7] = bytes4(keccak256(bytes("getActiveLoan(address)")));
-        selectors[8] = bytes4(keccak256(bytes("calculateLoanFees(uint256,uint256)")));
-        selectors[9] = bytes4(keccak256(bytes("addCollateral(address,uint256)")));
+        selectors[5] = bytes4(keccak256(bytes("getActiveLoan(address)")));
+        selectors[6] = bytes4(keccak256(bytes("calculateLoanFees(uint256,uint256)")));
+        selectors[7] = bytes4(keccak256(bytes("addCollateral(address,uint256)")));
         return selectors;
     }
 }
