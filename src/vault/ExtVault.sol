@@ -50,6 +50,7 @@ contract ExtVault {
         uint256 borrowAmount,
         uint256 duration
     ) external lock {
+
         ILendingVault(address(this))
         .borrowFromFloor(
             msg.sender,
@@ -64,6 +65,7 @@ contract ExtVault {
      * @notice Allows anybody to default expired loans.
      */
     function defaultLoans() external lock {
+
         (uint256 totalBurned, uint256 totalLoans) = 
         ILendingVault(address(this))
         .defaultLoans();
@@ -75,6 +77,7 @@ contract ExtVault {
      * @notice Allows a user to pay back a loan.
      */
     function payback(uint256 amount) external lock {
+
         ILendingVault(address(this))
         .paybackLoan(msg.sender, amount);
 
@@ -87,6 +90,7 @@ contract ExtVault {
     function roll(
         uint256 newDuration
     ) external lock {
+        
         ILendingVault(address(this))
         .rollLoan(
             msg.sender,
@@ -103,6 +107,7 @@ contract ExtVault {
     function addCollateral(
         uint256 amount
     ) external lock {
+
         ILendingVault(address(this))
         .addCollateral(msg.sender, amount);
     }
@@ -115,15 +120,21 @@ contract ExtVault {
      */
     function shift() public lock {
 
-        LiquidityPosition[3] memory positions = IVault(address(this)).getPositions();
-        ProtocolAddresses memory addresses = IVault(address(this)).getProtocolAddresses();
+        LiquidityPosition[3] memory positions = 
+        IVault(address(this))
+        .getPositions();
+
+        ProtocolAddresses memory addresses = 
+        IVault(address(this))
+        .getProtocolAddresses();
 
         LiquidityOps.shift(
             addresses,
             positions
         );
 
-        IStakingVault(address(this)).mintAndDistributeRewards(msg.sender, addresses);
+        IStakingVault(address(this))
+        .mintAndDistributeRewards(msg.sender, addresses);
         
         emit Shift();
     }    
@@ -134,8 +145,13 @@ contract ExtVault {
      */
     function slide() public lock {
 
-        LiquidityPosition[3] memory positions = IVault(address(this)).getPositions();
-        ProtocolAddresses memory addresses = IVault(address(this)).getProtocolAddresses();
+        LiquidityPosition[3] memory positions = 
+        IVault(address(this))
+        .getPositions();
+
+        ProtocolAddresses memory addresses = 
+        IVault(address(this))
+        .getProtocolAddresses();
 
         LiquidityOps.slide(
             addresses,
