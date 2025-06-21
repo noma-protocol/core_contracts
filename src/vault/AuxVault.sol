@@ -5,6 +5,11 @@ import { IUniswapV3Pool } from "v3-core/interfaces/IUniswapV3Pool.sol";
 import { VaultStorage } from "../libraries/LibAppStorage.sol";
 import { ProtocolParameters, LiquidityPosition } from "../types/Types.sol";
 import { Utils } from "../libraries/Utils.sol";
+import { IModelHelper } from "../interfaces/IModelHelper.sol";
+import { IDeployer } from "../interfaces/IDeployer.sol";
+import { LiquidityType } from "../types/Types.sol";
+import { DeployHelper } from "../libraries/DeployHelper.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface IOikosFactory {
     function deferredDeploy(address deployer) external;
@@ -26,6 +31,41 @@ error NoLiquidity();
 contract AuxVault {
     VaultStorage internal _v;
 
+    /**
+     * @notice Mints new tokens and distributes them to the specified address.
+     * @param to The address to receive the minted tokens.
+     * @param amount The amount of tokens to mint.
+     */
+    function mintTokens(
+        address to,
+        uint256 amount
+    ) public onlyInternalCalls {
+        
+        _v.timeLastMinted = block.timestamp;
+
+        IOikosFactory(_v.factory)
+        .mintTokens(
+            to,
+            amount
+        );
+    }
+
+    /**
+     * @notice Burns tokens from the vault.
+     * @param amount The amount of tokens to burn.
+     */
+    function burnTokens(
+        uint256 amount
+    ) public onlyInternalCalls {
+
+        IERC20(_v.pool.token0()).approve(address(_v.factory), amount);
+        IOikosFactory(_v.factory)
+        .burnFor(
+            address(this),
+            amount
+        );
+    }
+    
     /**
      * @notice Handles the post-presale actions.
      */
@@ -116,7 +156,6 @@ contract AuxVault {
      */
     function updatePositions(LiquidityPosition[3] memory _positions) public onlyInternalCalls {
         if (!_v.initialized) revert NotInitialized();             
-        // if (_positions[0].liquidity == 0 || _positions[1].liquidity == 0 || _positions[2].liquidity == 0) revert NoLiquidity();
         
         _updatePositions(_positions);
     }
@@ -126,8 +165,6 @@ contract AuxVault {
      * @param _positions The new liquidity positions.
      */
     function _updatePositions(LiquidityPosition[3] memory _positions) internal {   
-        if (_positions[0].liquidity == 0 || _positions[1].liquidity == 0 || _positions[2].liquidity == 0) revert NoLiquidity();
-
         _v.floorPosition = _positions[0];
         _v.anchorPosition = _positions[1];
         _v.discoveryPosition = _positions[2];
@@ -161,8 +198,7 @@ contract AuxVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](11);
-
+        bytes4[] memory selectors = new bytes4[](13);
         selectors[0] = bytes4(keccak256(bytes("teamMultiSig()")));
         selectors[1] = bytes4(keccak256(bytes("getProtocolParameters()")));  
         selectors[2] = bytes4(keccak256(bytes("getTimeSinceLastMint()")));
@@ -174,6 +210,8 @@ contract AuxVault {
         selectors[8] = bytes4(keccak256(bytes("setManager(address)")));
         selectors[9] = bytes4(keccak256(bytes("setModelHelper(address)")));
         selectors[10] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256,int24)[3])")));
+        selectors[11] = bytes4(keccak256(bytes("mintTokens(address,uint256)")));
+        selectors[12] = bytes4(keccak256(bytes("burnTokens(uint256)")));
         return selectors;
     }
 }        
