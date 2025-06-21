@@ -163,7 +163,7 @@ contract NomaFactory {
         data.proxy = proxy;
         data.tickSpacing = tickSpacing;
 
-        if (vaultDeployParams.presale == 1) {
+        if (vaultDeployParams.presale == 1 && msg.sender != authority) {
             if (msg.value < getProtocolParameters().deployFee) {
                 revert InvalidParameters();
             } else {
