@@ -111,7 +111,7 @@ interface IVault {
 
     function stakingEnabled() external view returns (bool);
 
-    function mintTokens(address to, uint256 amount) external;
+    function mintTokens(address to, uint256 amount) external returns (bool);
 
     function burnTokens(uint256 amount) external;
 

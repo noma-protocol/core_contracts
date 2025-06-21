@@ -31,7 +31,7 @@ interface IsNomaToken is IERC20 {
      * @param _amount The amount of tokens to mint.
      * @dev This function allows for the creation of new tokens, increasing the total supply.
      */
-    function mint(address _recipient, uint256 _amount) external;
+    function mint(address _recipient, uint256 _amount) external ;
 
     /**
      * @notice Burns a specified amount of tokens from a sender address.
