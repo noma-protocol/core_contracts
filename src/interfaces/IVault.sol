@@ -104,6 +104,21 @@ interface IVault {
     function getProtocolParameters() external view returns (ProtocolParameters memory);
 
     /**
+     * @notice Retrieves the circulating supply of tokens in the vault.
+     * @param pool The address of the Uniswap V3 pool.
+     * @param vault The address of the vault.
+     * @return The circulating supply of tokens
+     */
+    function getCirculatingSupply(address pool, address vault) external view returns (uint256);
+
+    /**
+     * @notice Bumps the floor liquidity of the vault.
+     * @param reserveAmount The amount of reserve to bump the floor with.
+     * @dev Adjusts the floor position based on the provided reserve amount.
+     */
+    function bumpFloor(uint256 reserveAmount) external; 
+    
+    /**
      * @notice Retrieves the address of the staking contract associated with the vault.
      * @return The address of the staking contract.
      */

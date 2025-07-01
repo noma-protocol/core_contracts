@@ -7,9 +7,17 @@ import { ProtocolParameters, LiquidityPosition } from "../types/Types.sol";
 import { Utils } from "../libraries/Utils.sol";
 import { IModelHelper } from "../interfaces/IModelHelper.sol";
 import { IDeployer } from "../interfaces/IDeployer.sol";
-import { LiquidityType } from "../types/Types.sol";
+import { LiquidityType, ProtocolAddresses, LiquidityInternalPars } from "../types/Types.sol";
 import { DeployHelper } from "../libraries/DeployHelper.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Uniswap } from "../libraries/Uniswap.sol";
+import { LiquidityOps } from "../libraries/LiquidityOps.sol";
+import { IVault } from "../interfaces/IVault.sol";
+import { DecimalMath } from "../libraries/DecimalMath.sol";
+import { Conversions } from "../libraries/Conversions.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { TickMath } from "v3-core/libraries/TickMath.sol";
 
 interface IOikosFactory {
     function deferredDeploy(address deployer) external;
@@ -29,6 +37,8 @@ error NoLiquidity();
  * @dev n/a.
  */
 contract AuxVault {
+    using SafeERC20 for IERC20;
+
     VaultStorage internal _v;
 
     /**
@@ -66,6 +76,150 @@ contract AuxVault {
         );
     }
     
+    function bumpFloor(
+        uint256 reserveAmount
+    ) public onlyManagerOrMultiSig {
+        if (!_v.initialized) revert NotInitialized();
+
+        (,,, uint256 floorToken1Balance) = IModelHelper(_v.modelHelper)
+        .getUnderlyingBalances(
+            address(_v.pool), 
+            address(this), 
+            LiquidityType.Floor
+        );
+
+        (,,, uint256 anchorToken1Balance) = IModelHelper(_v.modelHelper)
+        .getUnderlyingBalances(
+            address(_v.pool), 
+            address(this), 
+            LiquidityType.Anchor
+        );
+
+        LiquidityPosition[3] memory positions = [
+            _v.floorPosition, 
+            _v.anchorPosition, 
+            _v.discoveryPosition
+        ];
+
+        _setFees(positions);
+
+        // Collect floor liquidity
+        Uniswap.collect(
+            address(_v.pool),
+            address(this), 
+            positions[0].lowerTick, 
+            positions[0].upperTick
+        ); 
+
+        // Collect anchor liquidity
+        Uniswap.collect(
+            address(_v.pool),
+            address(this), 
+            positions[1].lowerTick, 
+            positions[1].upperTick
+        );
+
+        uint256 circulatingSupply = IVault(address(this)).getCirculatingSupply(address(_v.pool), address(this));
+
+        uint256 targetFloorPrice = DecimalMath.divideDecimal(
+            floorToken1Balance + reserveAmount, 
+            circulatingSupply
+        );
+
+        if (address(this).balance >= floorToken1Balance + reserveAmount) {
+            IERC20(
+                IUniswapV3Pool(_v.pool).token1()
+            ).safeTransfer(
+                _v.deployerContract, 
+                floorToken1Balance + reserveAmount
+            );
+        }
+
+        LiquidityPosition[3] memory newPositions = [
+            positions[0], 
+            positions[1], 
+            positions[2]
+        ];
+
+        newPositions[0] = IDeployer(_v.deployerContract) 
+        .shiftFloor(
+            address(_v.pool), 
+            address(this), 
+            Conversions
+            .sqrtPriceX96ToPrice(
+                Conversions
+                .tickToSqrtPriceX96(
+                    positions[0].upperTick
+                ), 
+            IERC20Metadata(
+                IUniswapV3Pool(_v.pool).token1()
+            ).decimals()
+            ), 
+            targetFloorPrice,
+            floorToken1Balance + reserveAmount,
+            floorToken1Balance,
+            positions[0]
+        );
+
+        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(_v.pool).slot0();
+
+        // Deploy new anchor position
+        newPositions[1] = LiquidityOps
+        .reDeploy(
+            ProtocolAddresses({
+                pool: address(_v.pool),
+                modelHelper: _v.modelHelper,
+                vault: address(this),
+                deployer: _v.deployerContract,
+                presaleContract: _v.presaleContract,
+                adaptiveSupplyController: _v.adaptiveSupplyController
+            }),
+            LiquidityInternalPars({
+                lowerTick: newPositions[0].upperTick,
+                upperTick: Utils.addBipsToTick(
+                    TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
+                    IVault(address(this))
+                    .getProtocolParameters().shiftAnchorUpperBips,
+                    IERC20Metadata(
+                        IUniswapV3Pool(_v.pool).token1()
+                    ).decimals(),
+                    positions[0].tickSpacing
+                ),
+                amount1ToDeploy: anchorToken1Balance - reserveAmount,
+                liquidityType: LiquidityType.Anchor
+            }),
+            true
+        );
+
+        IVault(address(this))
+        .updatePositions(
+            newPositions
+        ); 
+    }
+
+    function _setFees(
+        LiquidityPosition[3] memory positions
+    ) internal {
+
+        (
+            uint256 feesPosition0Token0,
+            uint256 feesPosition0Token1, 
+            uint256 feesPosition1Token0, 
+            uint256 feesPosition1Token1
+            ) = LiquidityOps._calculateFees(address(_v.pool), positions);
+
+        IVault(address(this)).setFees(
+            feesPosition0Token0, 
+            feesPosition0Token1
+        );
+
+        IVault(address(this)).setFees(
+            feesPosition1Token0, 
+            feesPosition1Token1
+        );
+        
+    }
+
     /**
      * @notice Handles the post-presale actions.
      */
@@ -198,7 +352,7 @@ contract AuxVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](13);
+        bytes4[] memory selectors = new bytes4[](14);
         selectors[0] = bytes4(keccak256(bytes("teamMultiSig()")));
         selectors[1] = bytes4(keccak256(bytes("getProtocolParameters()")));  
         selectors[2] = bytes4(keccak256(bytes("getTimeSinceLastMint()")));
@@ -212,6 +366,7 @@ contract AuxVault {
         selectors[10] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256,int24)[3])")));
         selectors[11] = bytes4(keccak256(bytes("mintTokens(address,uint256)")));
         selectors[12] = bytes4(keccak256(bytes("burnTokens(uint256)")));
+        selectors[13] = bytes4(keccak256(bytes("bumpFloor(uint256)")));
         return selectors;
     }
 }        
