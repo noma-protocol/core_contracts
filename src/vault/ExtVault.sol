@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { LiquidityOps } from "../libraries/LiquidityOpsPatched.sol"; 
+import { LiquidityOps } from "../libraries/LiquidityOps.sol"; 
 import {
     LiquidityPosition, 
     ProtocolAddresses
