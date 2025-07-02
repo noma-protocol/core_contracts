@@ -15,11 +15,11 @@ import { LiquidityOps } from "../libraries/LiquidityOps.sol";
 import { IVault } from "../interfaces/IVault.sol";
 import { DecimalMath } from "../libraries/DecimalMath.sol";
 import { Conversions } from "../libraries/Conversions.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { TickMath } from "v3-core/libraries/TickMath.sol";
 
-interface IOikosFactory {
+interface INomaFactory {
     function deferredDeploy(address deployer) external;
     function mintTokens(address to, uint256 amount) external;
     function burnFor(address from, uint256 amount) external;
@@ -49,15 +49,17 @@ contract AuxVault {
     function mintTokens(
         address to,
         uint256 amount
-    ) public onlyInternalCalls {
+    ) public onlyInternalCalls returns (bool) {
         
         _v.timeLastMinted = block.timestamp;
 
-        IOikosFactory(_v.factory)
+        INomaFactory(_v.factory)
         .mintTokens(
             to,
             amount
         );
+
+        return true;
     }
 
     /**
@@ -69,13 +71,19 @@ contract AuxVault {
     ) public onlyInternalCalls {
 
         IERC20(_v.pool.token0()).approve(address(_v.factory), amount);
-        IOikosFactory(_v.factory)
+
+        INomaFactory(_v.factory)
         .burnFor(
             address(this),
             amount
         );
     }
     
+    /**
+     * @notice Bumps the floor liquidity of the vault.
+     * @param reserveAmount The amount of reserve tokens to add to the floor.
+     * @dev This function can only be called by the manager or multisig.
+     */
     function bumpFloor(
         uint256 reserveAmount
     ) public onlyManagerOrMultiSig {
@@ -119,7 +127,11 @@ contract AuxVault {
             positions[1].upperTick
         );
 
-        uint256 circulatingSupply = IVault(address(this)).getCirculatingSupply(address(_v.pool), address(this));
+        uint256 circulatingSupply = IModelHelper(_v.modelHelper)
+        .getCirculatingSupply
+            (address(_v.pool), 
+            address(this)
+        );
 
         uint256 targetFloorPrice = DecimalMath.divideDecimal(
             floorToken1Balance + reserveAmount, 
@@ -195,6 +207,8 @@ contract AuxVault {
         .updatePositions(
             newPositions
         ); 
+
+        IModelHelper(_v.modelHelper).enforceSolvencyInvariant(address(this));
     }
 
     function _setFees(
@@ -229,7 +243,7 @@ contract AuxVault {
             Utils.stringToBytes32("Deployer"), 
             "no Deployer"
         );
-        IOikosFactory(
+        INomaFactory(
             _v.factory
         ).deferredDeploy(
             deployer
@@ -272,7 +286,7 @@ contract AuxVault {
      * @return The address of the team multisig.
      */
     function teamMultiSig() public view returns (address) {
-        return IOikosFactory(_v.factory).teamMultiSig();
+        return INomaFactory(_v.factory).teamMultiSig();
     }
 
     /**
@@ -333,7 +347,7 @@ contract AuxVault {
     }
 
     modifier onlyManagerOrMultiSig() {
-        if (msg.sender != _v.manager && msg.sender != IOikosFactory(_v.factory).teamMultiSig()) {
+        if (msg.sender != _v.manager && msg.sender != INomaFactory(_v.factory).teamMultiSig()) {
             revert NotAuthorized();
         }
         _;
