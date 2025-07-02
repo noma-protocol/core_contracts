@@ -9,11 +9,11 @@ import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
 import {Utils} from "../libraries/Utils.sol";
 
 /**
- * @title OikosToken
+ * @title NomaToken
  * @notice Noma token contract.
  * @dev This contract is upgradeable and uses the UUPS proxy pattern.
  */
-contract OikosToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
+contract NomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
 
     // State variables
     IAddressResolver public resolver; // The address resolver contract.
@@ -119,7 +119,7 @@ contract OikosToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPS
      * @notice Returns the address of the NomaFactory contract.
      * @return The address of the NomaFactory contract.
      */
-    function oikosFactory() public view returns (address) {
+    function nomaFactory() public view returns (address) {
         return resolver
         .requireAndGetAddress(
             Utils.stringToBytes32("NomaFactory"), 
@@ -131,7 +131,7 @@ contract OikosToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPS
      * @notice Modifier to restrict access to the NomaFactory contract.
      */
     modifier onlyFactory() {
-        if (msg.sender != oikosFactory()) revert OnlyFactory();
+        if (msg.sender != nomaFactory()) revert OnlyFactory();
         _;
     }
 }

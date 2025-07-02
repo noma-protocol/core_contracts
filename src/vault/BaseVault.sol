@@ -119,6 +119,7 @@ contract BaseVault  {
         _v.collateralAmount = 0;
         _v.tokenRepo = _tokenRepo;
         _v.deployerContract = _deployer;
+        _v.modelHelper = modelHelper();
         _v.protocolParameters = _params;
         _v.manager = _owner;
         _v.isLocked[address(this)] = false;
