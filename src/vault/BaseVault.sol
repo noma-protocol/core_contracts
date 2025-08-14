@@ -114,6 +114,7 @@ contract BaseVault  {
         _v.stakingEnabled = true;
         _v.timeLastMinted = 0;
         _v.loanFee = uint8(_params.loanFee);
+        _v.totalInterest = 0;
         _v.stakingContract = _stakingContract;
         _v.presaleContract = _presaleContract;
         _v.collateralAmount = 0;
@@ -207,6 +208,8 @@ contract BaseVault  {
             address(this), 
             _v.tokenInfo
         );
+
+        vaultInfo.totalInterest = _v.totalInterest;
     }
 
     /**

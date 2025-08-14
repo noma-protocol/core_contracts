@@ -11,19 +11,24 @@ import { LiquidityType, ProtocolAddresses, LiquidityInternalPars } from "../type
 import { DeployHelper } from "../libraries/DeployHelper.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Uniswap } from "../libraries/Uniswap.sol";
-import { LiquidityOps } from "../libraries/LiquidityOps.sol";
 import { IVault } from "../interfaces/IVault.sol";
 import { DecimalMath } from "../libraries/DecimalMath.sol";
 import { Conversions } from "../libraries/Conversions.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { TickMath } from "v3-core/libraries/TickMath.sol";
+import { LiquidityDeployer } from "../libraries/LiquidityDeployer.sol";
+import { LiquidityOps } from "../libraries/LiquidityOps.sol";
 
 interface INomaFactory {
     function deferredDeploy(address deployer) external;
     function mintTokens(address to, uint256 amount) external;
     function burnFor(address from, uint256 amount) external;
     function teamMultiSig() external view returns (address);
+}
+
+interface IStakingRewards {
+    function notifyRewardAmount(uint256 reward) external;
 }
 
 error NotAuthorized();
@@ -79,17 +84,16 @@ contract AuxVault {
         );
     }
     
-    /**
-     * @notice Bumps the floor liquidity of the vault.
-     * @param reserveAmount The amount of reserve tokens to add to the floor.
-     * @dev This function can only be called by the manager or multisig.
-     */
-    function bumpFloor(
-        uint256 reserveAmount
-    ) public onlyManagerOrMultiSig {
+    function bumpRewards(uint256 bnbAmount) public onlyManagerOrMultiSig {
         if (!_v.initialized) revert NotInitialized();
+        
+        LiquidityPosition[3] memory positions = [
+            _v.floorPosition, 
+            _v.anchorPosition, 
+            _v.discoveryPosition
+        ];
 
-        (,,, uint256 floorToken1Balance) = IModelHelper(_v.modelHelper)
+        (,,uint256 floorToken0Balance, uint256 floorToken1Balance) = IModelHelper(_v.modelHelper)
         .getUnderlyingBalances(
             address(_v.pool), 
             address(this), 
@@ -103,21 +107,13 @@ contract AuxVault {
             LiquidityType.Anchor
         );
 
-        LiquidityPosition[3] memory positions = [
-            _v.floorPosition, 
-            _v.anchorPosition, 
-            _v.discoveryPosition
-        ];
-
-        _setFees(positions);
-
-        // Collect floor liquidity
+        // Collect fees from the pool
         Uniswap.collect(
             address(_v.pool),
             address(this), 
             positions[0].lowerTick, 
             positions[0].upperTick
-        ); 
+        );
 
         // Collect anchor liquidity
         Uniswap.collect(
@@ -127,56 +123,53 @@ contract AuxVault {
             positions[1].upperTick
         );
 
-        uint256 circulatingSupply = IModelHelper(_v.modelHelper)
-        .getCirculatingSupply
-            (address(_v.pool), 
-            address(this)
-        );
+        _v.timeLastMinted = block.timestamp;
 
-        uint256 targetFloorPrice = DecimalMath.divideDecimal(
-            floorToken1Balance + reserveAmount, 
-            circulatingSupply
+        uint256 imv = IModelHelper(_v.modelHelper)
+        .getIntrinsicMinimumValue(address(this));
+        
+        INomaFactory(_v.factory)
+        .mintTokens(
+            address(this),
+            DecimalMath.divideDecimal(
+            bnbAmount, 
+            imv
+        )
         );
-
-        if (address(this).balance >= floorToken1Balance + reserveAmount) {
-            IERC20(
-                IUniswapV3Pool(_v.pool).token1()
-            ).safeTransfer(
-                _v.deployerContract, 
-                floorToken1Balance + reserveAmount
-            );
+        
+        if (_v.stakingContract == address(0)) {
+            revert NotInitialized();
         }
 
-        LiquidityPosition[3] memory newPositions = [
-            positions[0], 
-            positions[1], 
-            positions[2]
-        ];
-
-        newPositions[0] = IDeployer(_v.deployerContract) 
-        .shiftFloor(
-            address(_v.pool), 
-            address(this), 
-            Conversions
-            .sqrtPriceX96ToPrice(
-                Conversions
-                .tickToSqrtPriceX96(
-                    positions[0].upperTick
-                ), 
-            IERC20Metadata(
-                IUniswapV3Pool(_v.pool).token1()
-            ).decimals()
-            ), 
-            targetFloorPrice,
-            floorToken1Balance + reserveAmount,
-            floorToken1Balance,
-            positions[0]
+        IERC20(_v.tokenInfo.token0).transfer(
+            _v.stakingContract,
+            DecimalMath.divideDecimal(
+            bnbAmount, 
+            imv
+        )
         );
 
-        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(_v.pool).slot0();
+        IStakingRewards(_v.stakingContract)
+            .notifyRewardAmount(
+            DecimalMath.divideDecimal(
+                bnbAmount, 
+                imv
+            )
+        );     
 
+        LiquidityPosition memory newFloorPos = LiquidityDeployer
+        .reDeployFloor(
+            address(_v.pool), 
+            address(this), 
+            floorToken0Balance, 
+            floorToken1Balance + bnbAmount, 
+            positions
+        );     
+
+        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(_v.pool).slot0();
+                  
         // Deploy new anchor position
-        newPositions[1] = LiquidityOps
+        LiquidityPosition memory newAnchorPos = LiquidityOps
         .reDeploy(
             ProtocolAddresses({
                 pool: address(_v.pool),
@@ -187,7 +180,7 @@ contract AuxVault {
                 adaptiveSupplyController: _v.adaptiveSupplyController
             }),
             LiquidityInternalPars({
-                lowerTick: newPositions[0].upperTick,
+                lowerTick: positions[0].upperTick,
                 upperTick: Utils.addBipsToTick(
                     TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
                     IVault(address(this))
@@ -197,18 +190,21 @@ contract AuxVault {
                     ).decimals(),
                     positions[0].tickSpacing
                 ),
-                amount1ToDeploy: anchorToken1Balance - reserveAmount,
+                amount1ToDeploy: anchorToken1Balance - bnbAmount,
                 liquidityType: LiquidityType.Anchor
             }),
             true
         );
 
-        IVault(address(this))
-        .updatePositions(
-            newPositions
-        ); 
+        positions = [
+            newFloorPos, 
+            newAnchorPos, 
+            positions[2]
+        ];
 
+        _updatePositions(positions);
         IModelHelper(_v.modelHelper).enforceSolvencyInvariant(address(this));
+
     }
 
     function _setFees(
@@ -380,7 +376,7 @@ contract AuxVault {
         selectors[10] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256,int24)[3])")));
         selectors[11] = bytes4(keccak256(bytes("mintTokens(address,uint256)")));
         selectors[12] = bytes4(keccak256(bytes("burnTokens(uint256)")));
-        selectors[13] = bytes4(keccak256(bytes("bumpFloor(uint256)")));
+        selectors[13] = bytes4(keccak256(bytes("bumpRewards(uint256)")));
         return selectors;
     }
 }        

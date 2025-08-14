@@ -24,6 +24,9 @@ contract NomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSU
     error CannotInitializeLogicContract();
     error MaxSupplyReached();
 
+    // --- Storage ---
+    mapping(address => bool) public isBackLogAddress;
+
     /**
      * @notice Constructor to disable initializers for the logic contract.
      */
@@ -107,6 +110,7 @@ contract NomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSU
     function setOwner(address _owner) external onlyOwner {
         super.transferOwnership(_owner);
     }
+    
 
     /**
      * @notice Renounces ownership of the contract.

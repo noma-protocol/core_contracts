@@ -59,7 +59,7 @@ contract StakingVault is BaseVault {
         if (toMint == 0) revert NoStakingRewards();
 
         // 2) mint
-        IVault(address(this)).mintTokens(address(this), toMint);
+        bool ret = IVault(address(this)).mintTokens(address(this), toMint);
 
         // 3) distribute fees, returns post-fee amount
         uint256 postFee = _distributeInflationFees(
@@ -102,6 +102,7 @@ contract StakingVault is BaseVault {
             );
         toMint = DecimalMath.divideDecimal(toMintEth, intrinsicMin);
     }
+
 
     function _distributeInflationFees(
         address caller,
@@ -158,17 +159,19 @@ contract StakingVault is BaseVault {
             uint256 floor0,
             uint256 floor1
         ) = IModelHelper(modelHelper())
-            .getUnderlyingBalances(
-                poolAddr,
-                address(this),
-                LiquidityType.Floor
-            );
+        .getUnderlyingBalances(
+            poolAddr,
+            address(this),
+            LiquidityType.Floor
+        );
+            
         Uniswap.collect(
             poolAddr,
             address(this),
             _v.floorPosition.lowerTick,
             _v.floorPosition.upperTick
         );
+
         LiquidityDeployer.reDeployFloor(
             poolAddr,
             address(this),

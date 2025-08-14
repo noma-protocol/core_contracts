@@ -20,14 +20,14 @@ interface ILendingVault {
     function paybackLoan(address who, uint256 amount) external;
     function rollLoan(address who, uint256 newDuration) external;
     function addCollateral(address who, uint256 amount) external;
-    function defaultLoans() external returns (uint256 totalBurned, uint256 totalLoans);
+    function vaultDefaultLoans() external returns (uint256 totalBurned, uint256 loansDefaulted);
 }
 
 // Events
 event Borrow(address indexed who, uint256 borrowAmount, uint256 duration);
 event Payback(address indexed who);
 event RollLoan(address indexed who);
-event DefaultLoans(uint256 totalBurned, uint256 totalLoans);
+event DefaultLoans(uint256 totalBurned, uint256 loansDefaulted);
 
 event Shift();
 event Slide();
@@ -49,7 +49,7 @@ contract ExtVault {
     function borrow(
         uint256 borrowAmount,
         uint256 duration
-    ) external lock {
+    ) external {
 
         ILendingVault(address(this))
         .borrowFromFloor(
@@ -61,22 +61,26 @@ contract ExtVault {
         emit Borrow(msg.sender, borrowAmount, duration);
     }
 
+    function lol() external {
+
+    }
+
     /**
      * @notice Allows anybody to default expired loans.
      */
-    function defaultLoans() external lock {
+    function defaultLoans() external {
 
-        (uint256 totalBurned, uint256 totalLoans) = 
+        (uint256 totalBurned, uint256 loansDefaulted) = 
         ILendingVault(address(this))
-        .defaultLoans();
+        .vaultDefaultLoans();
 
-        emit DefaultLoans(totalBurned, totalLoans);
+        emit DefaultLoans(totalBurned, loansDefaulted);
     }
 
     /**
      * @notice Allows a user to pay back a loan.
      */
-    function payback(uint256 amount) external lock {
+    function payback(uint256 amount) external  {
 
         ILendingVault(address(this))
         .paybackLoan(msg.sender, amount);
@@ -89,7 +93,7 @@ contract ExtVault {
      */
     function roll(
         uint256 newDuration
-    ) external lock {
+    ) external  {
         
         ILendingVault(address(this))
         .rollLoan(
@@ -106,7 +110,7 @@ contract ExtVault {
      */
     function addCollateral(
         uint256 amount
-    ) external lock {
+    ) external  {
 
         ILendingVault(address(this))
         .addCollateral(msg.sender, amount);
@@ -118,7 +122,7 @@ contract ExtVault {
      * @dev This function adjusts the liquidity positions and distributes staking rewards.
      * @dev It also pays rewards to the caller.
      */
-    function shift() public lock {
+    function shift() public {
 
         LiquidityPosition[3] memory positions = 
         IVault(address(this))
@@ -143,7 +147,7 @@ contract ExtVault {
      * @notice Slides the liquidity positions in the vault.
      * @dev This function adjusts the liquidity positions without distributing staking rewards.
      */
-    function slide() public lock {
+    function slide() public {
 
         LiquidityPosition[3] memory positions = 
         IVault(address(this))

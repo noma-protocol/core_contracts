@@ -77,6 +77,7 @@ struct VaultInfo {
     address token0;
     address token1;
     uint256 newFloor;
+    uint256 totalInterest;
 }
 
 /// @notice Parameters for deploying a vault.

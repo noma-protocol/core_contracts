@@ -243,7 +243,9 @@ library LiquidityOps {
             ); 
 
             if (params.floorToken1Balance + params.toSkim > params.floorToken1Balance) {
-                IERC20(IUniswapV3Pool(params.pool).token1()).safeTransfer(
+                IERC20(
+                    IUniswapV3Pool(params.pool).token1()
+                ).safeTransfer(
                     params.deployer, 
                     params.floorToken1Balance + params.toSkim
                 );
