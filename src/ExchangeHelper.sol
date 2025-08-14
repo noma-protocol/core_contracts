@@ -21,13 +21,11 @@ interface IWETH {
 
 contract ExchangeHelper {
 
-    int24 public constant tickSpacing = 60;
-
     // TokenInfo state variable
     TokenInfo public tokenInfo;
     address public poolAddress;
 
-    address public WBNB = 0xB3D148caE2d57433e5e2279d3567efA6bA0892c8;
+    address public WMON = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
 
     // Lock state variable to prevent reentrancy
     bool private locked;
@@ -51,6 +49,8 @@ contract ExchangeHelper {
     ) public payable lock {
         require(msg.value > 0, "ExchangeHelper: No ETH sent");
 
+        int24 tickSpacing = IUniswapV3Pool(pool).tickSpacing();
+
         // Set tokenInfo and poolAddress
         tokenInfo = TokenInfo({
             token0: IUniswapV3Pool(pool).token0(),
@@ -59,11 +59,11 @@ contract ExchangeHelper {
         poolAddress = pool;
         uint8 decimals = IERC20Metadata(tokenInfo.token0).decimals();
 
-        // --- Record the initial WBNB balance to avoid refunding extra ---
-        uint256 initialWETHBalance = IWETH(WBNB).balanceOf(address(this));
+        // --- Record the initial WMON balance to avoid refunding extra ---
+        uint256 initialWETHBalance = IWETH(WMON).balanceOf(address(this));
 
-        // Deposit ETH into WBNB (this increases the balance by msg.value)
-        IWETH(WBNB).deposit{value: msg.value}();
+        // Deposit ETH into WMON (this increases the balance by msg.value)
+        IWETH(WMON).deposit{value: msg.value}();
 
         // Swap Params
         SwapParams memory swapParams = SwapParams({
@@ -82,7 +82,7 @@ contract ExchangeHelper {
             isLimitOrder: isLimitOrder
         });
         
-        // Perform the swap using the newly deposited WBNB
+        // Perform the swap using the newly deposited WMON
         (int256 amount0, int256 amount1) = Uniswap
         .swap(
             swapParams
@@ -94,11 +94,11 @@ contract ExchangeHelper {
         require(amount0 < 0, "ExchangeHelper: No token0 received");
         // uint256 tokensReceived = uint256(-amount0);
 
-        uint256 refundAmount = IWETH(WBNB).balanceOf(address(this)) - initialWETHBalance;
+        uint256 refundAmount = IWETH(WMON).balanceOf(address(this)) - initialWETHBalance;
         
         if (refundAmount > 0) {
-            // Withdraw the excess WBNB into ETH
-            IWETH(WBNB).withdraw(refundAmount);
+            // Withdraw the excess WMON into ETH
+            IWETH(WMON).withdraw(refundAmount);
             // Refund the caller with the excess ETH
             payable(receiver).transfer(refundAmount);
         }
@@ -113,6 +113,9 @@ contract ExchangeHelper {
         bool isLimitOrder
     ) public lock {
         require(amount > 0, "ExchangeHelper: Amount must be greater than 0");
+
+        int24 tickSpacing = IUniswapV3Pool(pool).tickSpacing();
+
         tokenInfo = TokenInfo({
             token0: IUniswapV3Pool(pool).token0(),
             token1: IUniswapV3Pool(pool).token1()
@@ -121,8 +124,8 @@ contract ExchangeHelper {
         IERC20(tokenInfo.token1).transferFrom(msg.sender, address(this), amount);
         uint8 decimals = IERC20Metadata(tokenInfo.token1).decimals();
 
-        // track balance of WBNB before swap
-        uint256 initialWETHBalance = IWETH(WBNB).balanceOf(address(this));
+        // track balance of WMON before swap
+        uint256 initialWETHBalance = IWETH(WMON).balanceOf(address(this));
 
         // Swap Params
         SwapParams memory swapParams = SwapParams({
@@ -141,7 +144,7 @@ contract ExchangeHelper {
             isLimitOrder: isLimitOrder
         });
         
-        // Perform the swap using the newly deposited WBNB
+        // Perform the swap using the newly deposited WMON
         (int256 amount0, ) = Uniswap
         .swap(
             swapParams
@@ -160,6 +163,9 @@ contract ExchangeHelper {
         bool isLimitOrder
     ) public lock {
         require(amount > 0, "ExchangeHelper: Amount must be greater than 0");
+        
+        int24 tickSpacing = IUniswapV3Pool(pool).tickSpacing();
+
         tokenInfo = TokenInfo({
             token0: IUniswapV3Pool(pool).token0(),
             token1: IUniswapV3Pool(pool).token1()
@@ -209,6 +215,9 @@ contract ExchangeHelper {
         bool isLimitOrder
     ) public lock {
         require(amount > 0, "ExchangeHelper: Amount must be greater than 0");
+        
+        int24 tickSpacing = IUniswapV3Pool(pool).tickSpacing();
+
         tokenInfo = TokenInfo({
             token0: IUniswapV3Pool(pool).token0(),
             token1: IUniswapV3Pool(pool).token1()
@@ -240,7 +249,7 @@ contract ExchangeHelper {
         require(amount1 < 0, "ExchangeHelper: Invalid swap");
         
         uint256 bnbReceived = uint256(-amount1);
-        IWETH(WBNB).withdraw(bnbReceived);
+        IWETH(WMON).withdraw(bnbReceived);
         payable(receiver).transfer(bnbReceived);
 
         uint256 balanceAfterSwap = IERC20Metadata(token0).balanceOf(address(this));
@@ -253,7 +262,6 @@ contract ExchangeHelper {
             IERC20(token0).transfer(msg.sender, refund);
         }
     }
-
 
         /**
          * @notice Uniswap v3 callback function, called back on pool.swap
