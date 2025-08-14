@@ -220,6 +220,7 @@ contract ModelHelper {
                 amount0CurrentDiscovery + 
                 protocolUnusedBalanceToken0 + 
                 staked + 
+                IVault(vault).getCollateralAmount() +
                 feesPosition0Token0
             )
         );
@@ -261,11 +262,17 @@ contract ModelHelper {
     ) public view returns (uint256) {
         ERC20 token = ERC20(isToken0 ? IUniswapV3Pool(pool).token0() : IUniswapV3Pool(pool).token1());
         uint256 protocolUnusedBalance = token.balanceOf(vault);
-    
+
+        VaultInfo memory vaultInfo = IVault(vault).getVaultInfo();
         (uint256 accumulatedFeesToken0, uint256 accumulatedFeesToken1) = IVault(vault).getAccumulatedFees();
         uint256 fees = isToken0 ? accumulatedFeesToken0 : accumulatedFeesToken1;
+        uint256 amountToSubtract = fees + vaultInfo.totalInterest;
 
-        return protocolUnusedBalance - fees;
+        if (protocolUnusedBalance <= amountToSubtract) {
+            return 0;
+        } else {
+            return protocolUnusedBalance - amountToSubtract;
+        }
     }
 
     /**
