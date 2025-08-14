@@ -16,7 +16,7 @@ import { Conversions } from "../libraries/Conversions.sol";
 import { Utils } from "../libraries/Utils.sol";
 
 import { BaseVault } from "../vault/BaseVault.sol";
-import { OikosToken } from "../token/OikosToken.sol";
+import { NomaToken } from "../token/NomaToken.sol";
 import { Deployer } from "../Deployer.sol";
 
 import {
@@ -53,7 +53,7 @@ interface IPresaleFactory {
 }  
 
 interface ITokenFactory {
-    function deployOikosToken(VaultDeployParams memory vaultDeployParams) external returns (OikosToken, ERC1967Proxy, bytes32);
+    function deployOikosToken(VaultDeployParams memory vaultDeployParams) external returns (NomaToken, ERC1967Proxy, bytes32);
 }
 
 error OnlyVaultsError();
@@ -548,13 +548,13 @@ contract NomaFactory {
     * @param _token The address of the token to upgrade.
     * @param _newImplementation The address of the new implementation contract.
     * @dev This function can only be called by the authority.
-    * It uses the `upgradeToAndCall` function of the OikosToken contract to perform the upgrade.
+    * It uses the `upgradeToAndCall` function of the NomaToken contract to perform the upgrade.
     */
     function upgradeToken(
         address _token,
         address _newImplementation
     ) public isAuthority {
-        OikosToken(_token).upgradeToAndCall(_newImplementation, new bytes(0));
+        NomaToken(_token).upgradeToAndCall(_newImplementation, new bytes(0));
     }
 
     /**

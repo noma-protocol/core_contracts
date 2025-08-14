@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import { OikosToken } from "../token/OikosToken.sol";
+import { NomaToken } from "../token/NomaToken.sol";
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
 
 import {
@@ -34,10 +34,10 @@ contract TokenFactory {
     }
 
     function deployOikosToken(VaultDeployParams memory vaultDeployParams) public onlyFactory 
-    returns (OikosToken, ERC1967Proxy, bytes32) {
+    returns (NomaToken, ERC1967Proxy, bytes32) {
         // Deploy the Noma token
         (
-            OikosToken oikosToken, 
+            NomaToken oikosToken, 
             ERC1967Proxy proxy, 
             bytes32 tokenHash
         ) = _deployOikosToken(
@@ -58,8 +58,8 @@ contract TokenFactory {
     * @param _token1 The address of the paired token (token1).
     * @param initialSupply The initial supply of the token.
     * @param maxTotalSupply The max total supply of the token.
-    * @return oikosImpl The address of the newly deployed OikosToken.
-    * @return proxy The address of the ERC1967Proxy for the OikosToken.
+    * @return oikosImpl The address of the newly deployed NomaToken.
+    * @return proxy The address of the ERC1967Proxy for the NomaToken.
     * @return tokenHash The hash of the token, used for uniqueness.
     * @dev This internal function ensures the token does not already exist, generates a unique address using a salt, and initializes the token.
     * It reverts if the token address is invalid or if the token already exists.
@@ -73,7 +73,7 @@ contract TokenFactory {
     )
         internal
         returns (
-            OikosToken oikosImpl,
+            NomaToken oikosImpl,
             ERC1967Proxy proxy,
             bytes32 tokenHash
         )
@@ -83,14 +83,14 @@ contract TokenFactory {
         uint256 nonce = uint256(tokenHash);
 
         // deploy implementation
-        oikosImpl = new OikosToken{salt: bytes32(nonce)}();
+        oikosImpl = new NomaToken{salt: bytes32(nonce)}();
 
         do {
             // deploy proxy, with inline data encoding (no `data` local)
             proxy = new ERC1967Proxy{salt: bytes32(nonce)}(
                 address(oikosImpl),
                 abi.encodeWithSelector(
-                    OikosToken.initialize.selector,
+                    NomaToken.initialize.selector,
                     msg.sender,
                     initialSupply,
                     maxTotalSupply,
