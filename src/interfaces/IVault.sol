@@ -67,6 +67,7 @@ interface IVault {
      */
     function updatePositions(LiquidityPosition[3] memory newPositions) external;
 
+    function bumpRewards(uint256 bnbAmount) external;
     /**
      * @notice Retrieves detailed information about the vault.
      * @return A `VaultInfo` object containing detailed vault information.
@@ -104,27 +105,67 @@ interface IVault {
     function getProtocolParameters() external view returns (ProtocolParameters memory);
 
     /**
-     * @notice Bumps the floor liquidity of the vault.
-     * @param reserveAmount The amount of reserve to bump the floor with.
-     * @dev Adjusts the floor position based on the provided reserve amount.
-     */
+    * @notice Bumps the floor liquidity of the vault.
+    * @param reserveAmount The amount of reserve to bump the floor with.
+    * @dev Adjusts the floor position based on the provided reserve amount.
+    */
     function bumpFloor(uint256 reserveAmount) external; 
-    
+        
     /**
-     * @notice Retrieves the address of the staking contract associated with the vault.
-     * @return The address of the staking contract.
-     */
+    * @notice Defaults outstanding unpaid loans.
+    * @dev Marks overdue loans as defaulted and burns associated tokens per vault policy.
+    */
+    function defaultLoans() external;
+        
+    /**
+    * @notice Retrieves the address of the staking contract associated with the vault.
+    * @return The address of the staking contract.
+    */
     function getStakingContract() external view returns (address);
 
+    /**
+    * @notice Returns whether staking is currently enabled for this vault.
+    * @dev Useful for front-ends and integrations to gate staking-related actions.
+    * @return enabled True if staking is enabled, false otherwise.
+    */
     function stakingEnabled() external view returns (bool);
 
+    /**
+    * @notice Mints vault tokens to a recipient.
+    * @dev MAY be restricted to vault/manager roles. Implementations SHOULD emit a Transfer event.
+    * @param to The recipient address that will receive the newly minted tokens.
+    * @param amount The amount of tokens to mint.
+    * @return success True if minting succeeded.
+    */
     function mintTokens(address to, uint256 amount) external returns (bool);
 
+    /**
+    * @notice Burns vault tokens from the caller.
+    * @dev Caller MUST have at least `amount` balance. Implementations SHOULD emit a Transfer event to address(0).
+    * @param amount The amount of tokens to burn.
+    */
     function burnTokens(uint256 amount) external;
 
+    /**
+    * @notice Sets the accumulated fee amounts for the vault’s accounting.
+    * @dev Typically callable by the vault/fee collector after harvesting. Values are denominated in token0/token1 units.
+    * @param _feesAccumulatedToken0 The total accumulated fees for token0.
+    * @param _feesAccumulatedToken1 The total accumulated fees for token1.
+    */
     function setFees(uint256 _feesAccumulatedToken0, uint256 _feesAccumulatedToken1) external;
 
+    /**
+    * @notice Returns the number of seconds elapsed since the last token mint operation.
+    * @dev Implementations SHOULD return 0 if no mint has occurred yet.
+    * @return secondsElapsed Seconds since the last mint.
+    */
     function getTimeSinceLastMint() external view returns (uint256);
 
+    /**
+    * @notice Returns the address of the team-controlled multisig for administrative actions.
+    * @dev This address MAY be used for restricted operations such as parameter updates.
+    * @return multisig The team multisig address.
+    */
     function teamMultiSig() external view returns (address);
+
 }
