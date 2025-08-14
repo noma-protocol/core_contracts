@@ -26,6 +26,7 @@ struct VaultStorage {
     uint256 totalLoans;
     uint256 collateralAmount;
     uint8 loanFee;    
+    uint256 totalInterest;
     mapping(address => LoanPosition) loanPositions;
     mapping(address => uint256) totalLoansPerUser;
 
