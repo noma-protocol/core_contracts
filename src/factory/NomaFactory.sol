@@ -53,7 +53,7 @@ interface IPresaleFactory {
 }  
 
 interface ITokenFactory {
-    function deployOikosToken(VaultDeployParams memory vaultDeployParams) external returns (NomaToken, ERC1967Proxy, bytes32);
+    function deployNomaToken(VaultDeployParams memory vaultDeployParams) external returns (NomaToken, ERC1967Proxy, bytes32);
 }
 
 error OnlyVaultsError();
@@ -144,7 +144,7 @@ contract NomaFactory {
 
         (,ERC1967Proxy proxy, ) =
         ITokenFactory(tokenFactory())
-            .deployOikosToken(vaultDeployParams);
+            .deployNomaToken(vaultDeployParams);
         
         deployedTokenHashes[tokenHash] = true;
 

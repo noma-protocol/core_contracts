@@ -1,130 +1,187 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
+
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { NomaToken } from "../token/NomaToken.sol";
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
-
-import {
-    VaultDeployParams
-} from "../types/Types.sol";
+import { VaultDeployParams } from "../types/Types.sol";
+import "../libraries/Utils.sol";
 
 /**
  * @title IERC20
- * @notice Interface for the ERC20 standard token, including a mint function.
+ * @notice Minimal interface used for sanity checks after deployment.
  */
 interface IERC20 {
-    /**
-     * @notice Mints new tokens to a specified address.
-     * @param to The address to receive the newly minted tokens.
-     * @param amount The amount of tokens to be minted.
-     */
     function mint(address to, uint256 amount) external;
     function burn(address from, uint256 amount) external;
     function totalSupply() external view returns (uint256);
 }
 
 error InvalidTokenAddressError();
+error PredictionNotFoundWithinLimit();
 
 contract TokenFactory {
-    
     IAddressResolver public resolver;
-    
+
+    // Upper bound to avoid unbounded work in prediction loops.
+    uint256 private constant MAX_TRIES = 10_000;
+
     constructor(address _resolver) {
         resolver = IAddressResolver(_resolver);
     }
 
-    function deployOikosToken(VaultDeployParams memory vaultDeployParams) public onlyFactory 
-    returns (NomaToken, ERC1967Proxy, bytes32) {
-        // Deploy the Noma token
-        (
-            NomaToken oikosToken, 
-            ERC1967Proxy proxy, 
-            bytes32 tokenHash
-        ) = _deployOikosToken(
-            vaultDeployParams.name,
-            vaultDeployParams.symbol,
-            vaultDeployParams.token1,
-            vaultDeployParams.initialSupply,
-            vaultDeployParams.maxTotalSupply
-        );
-
-        return (oikosToken, proxy, tokenHash);
-    }
+    // ===========
+    //  PREDICTOR
+    // ===========
 
     /**
-    * @notice Deploys a new Noma token with the specified parameters.
-    * @param name The name of the token.
-    * @param symbol The symbol of the token.
-    * @param _token1 The address of the paired token (token1).
-    * @param initialSupply The initial supply of the token.
-    * @param maxTotalSupply The max total supply of the token.
-    * @return oikosImpl The address of the newly deployed NomaToken.
-    * @return proxy The address of the ERC1967Proxy for the NomaToken.
-    * @return tokenHash The hash of the token, used for uniqueness.
-    * @dev This internal function ensures the token does not already exist, generates a unique address using a salt, and initializes the token.
-    * It reverts if the token address is invalid or if the token already exists.
-    */
-    function _deployOikosToken(
-        string memory name,
-        string memory symbol,
-        address _token1,
-        uint256 initialSupply,
-        uint256 maxTotalSupply
+     * @notice Pure prediction (no deploy): compute the implementation & proxy addresses and salts.
+     * @dev IMPORTANT: The deployer assumed in CREATE2 is this contract (address(this)).
+     *      The `initialOwner` must match the value you will pass to initialize() at deploy time
+     *      (you used msg.sender before; pass the same when calling the deploy function).
+     */
+    function predictNomaToken(
+        VaultDeployParams memory p,
+        address initialOwner
     )
-        internal
+        public
+        view
         returns (
-            NomaToken oikosImpl,
-            ERC1967Proxy proxy,
-            bytes32 tokenHash
+            address implAddr,
+            address proxyAddr,
+            bytes32 tokenHash,
+            bytes32 implSalt,
+            bytes32 proxySalt
         )
     {
-        // compute these once
-        tokenHash = keccak256(abi.encodePacked(name, symbol));
-        uint256 nonce = uint256(tokenHash);
+        // 1) Implementation salt & predicted address
+        tokenHash = keccak256(abi.encodePacked(p.name, p.symbol));
+        implSalt = bytes32(uint256(tokenHash));
+        implAddr = Utils.getAddress(type(NomaToken).creationCode, uint256(implSalt));
 
-        // deploy implementation
-        oikosImpl = new NomaToken{salt: bytes32(nonce)}();
-
-        do {
-            // deploy proxy, with inline data encoding (no `data` local)
-            proxy = new ERC1967Proxy{salt: bytes32(nonce)}(
-                address(oikosImpl),
-                abi.encodeWithSelector(
-                    NomaToken.initialize.selector,
-                    msg.sender,
-                    initialSupply,
-                    maxTotalSupply,
-                    name,
-                    symbol,
-                    address(resolver)
-                )
-            );
-            nonce++;
-        } while (address(proxy) >= _token1);
-
-        // address check
-        if (address(proxy) >= _token1) revert InvalidTokenAddressError();
-
-        // sanity checks
-        require(
-           IERC20(address(proxy)).totalSupply() == initialSupply,
-           "wrong parameters"
+        // 2) Proxy creation code (constructor(impl, data))
+        bytes memory initCalldata = abi.encodeWithSelector(
+            NomaToken.initialize.selector,
+            initialOwner,
+            p.initialSupply,
+            p.maxTotalSupply,
+            p.name,
+            p.symbol,
+            address(resolver)
         );
+
+        bytes memory proxyBytecode = abi.encodePacked(
+            type(ERC1967Proxy).creationCode,
+            abi.encode(implAddr, initCalldata)
+        );
+
+        // 3) Find salt such that predicted proxy < p.token1
+        uint256 nonce = uint256(implSalt);
+        address candidate;
+
+        for (uint256 i = 0; i < MAX_TRIES; i++) {
+            candidate = Utils.getAddress(proxyBytecode, nonce);
+            if (candidate != address(0) && candidate < p.token1) {
+                proxyAddr = candidate;
+                proxySalt = bytes32(nonce);
+                break;
+            }
+            unchecked { nonce++; }
+        }
+
+        if (proxyAddr == address(0)) {
+            revert PredictionNotFoundWithinLimit();
+        }
+    }
+
+    // =========
+    //  DEPLOY
+    // =========
+
+    /**
+     * @notice Deploy NomaToken implementation and its ERC1967Proxy using salts chosen by the same prediction loop.
+     * @dev Uses CREATE2 and verifies deployed addresses match the predictions.
+     *      Owner passed to initialize() is msg.sender (the factory) to mirror your original code.
+     */
+    function deployNomaToken(
+        VaultDeployParams memory p
+    )
+        external
+        onlyFactory
+        returns (NomaToken oikosImpl, ERC1967Proxy proxy, bytes32 tokenHash)
+    {
+        // 1) Predict the addresses & salts (using msg.sender as initialize() owner)
+        (
+            address predictedImpl,
+            address predictedProxy,
+            bytes32 _tokenHash,
+            bytes32 implSalt,
+            bytes32 proxySalt
+        ) = predictNomaToken(p, msg.sender);
+
+        tokenHash = _tokenHash;
+
+        // 2) Deploy the implementation at predictedImpl
+        //    (init code: type(NomaToken).creationCode, no constructor args)
+        {
+            bytes memory implCode = type(NomaToken).creationCode;
+            address implAddr = _doDeploy(implCode, uint256(implSalt));
+            require(implAddr == predictedImpl, "Impl address mismatch");
+            oikosImpl = NomaToken(implAddr);
+        }
+
+        // 3) Build proxy bytecode with the *actual* impl address (should equal predictedImpl)
+        bytes memory initCalldata = abi.encodeWithSelector(
+            NomaToken.initialize.selector,
+            msg.sender,                // owner (same as used in prediction)
+            p.initialSupply,
+            p.maxTotalSupply,
+            p.name,
+            p.symbol,
+            address(resolver)
+        );
+
+        bytes memory proxyBytecode = abi.encodePacked(
+            type(ERC1967Proxy).creationCode,
+            abi.encode(address(oikosImpl), initCalldata)
+        );
+
+        // 4) Deploy proxy at predictedProxy using proxySalt
+        {
+            address proxyAddr = _doDeploy(proxyBytecode, uint256(proxySalt));
+            require(proxyAddr == predictedProxy, "Proxy address mismatch");
+            require(proxyAddr < p.token1, "Proxy address fails token1 constraint");
+            proxy = ERC1967Proxy(payable(proxyAddr));
+        }
+
+        // 5) Sanity checks (same as your original)
+        require(IERC20(address(proxy)).totalSupply() == p.initialSupply, "wrong parameters");
         require(address(proxy) != address(0), "Token deploy failed");
     }
 
+    // Low-level CREATE2 deployer
+    function _doDeploy(bytes memory bytecode, uint256 salt) internal returns (address addr) {
+        assembly {
+            addr := create2(
+                callvalue(),              // pass through any ETH (usually 0)
+                add(bytecode, 0x20),      // code start
+                mload(bytecode),          // code length
+                salt
+            )
+            if iszero(extcodesize(addr)) { revert(0, 0) }
+        }
+    }
+
+    // =========
+    //  ACCESS
+    // =========
+
     function factory() public view returns (address) {
-        return resolver.requireAndGetAddress(
-            "NomaFactory",
-            "No factory"
-        );
+        return resolver.requireAndGetAddress("NomaFactory", "No factory");
     }
 
     modifier onlyFactory() {
-        require(
-            msg.sender == factory(),
-            "Only factory allowed"
-        );
+        require(msg.sender == factory(), "Only factory allowed");
         _;
     }
 }
