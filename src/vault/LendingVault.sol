@@ -171,7 +171,8 @@ contract LendingVault is BaseVault {
      * @notice Allows a user to roll over a loan.
      * @param who The address of the borrower.
      */
-    function rollLoan(address who, uint256 newDuration) public onlyInternalCalls {
+    function rollLoan(address who, uint256 newDuration) public onlyInternalCalls 
+    returns (uint256 newBorrowAmount) {
         if (_v.timeLastMinted == 0) revert NotPermitted();
         // Fetch the loan position
         LoanPosition storage loan = _v.loanPositions[who];
@@ -197,7 +198,7 @@ contract LendingVault is BaseVault {
         if (newCollateralValue <= loan.borrowAmount) revert CantRollLoan();
 
         // Calculate the new borrow amount and fees
-        uint256 newBorrowAmount = newCollateralValue - loan.borrowAmount;
+        newBorrowAmount = newCollateralValue - loan.borrowAmount;
 
         // Calculate the new fees
         uint256 newFees = _calculateLoanFees(newBorrowAmount, currentDuration + newDuration);

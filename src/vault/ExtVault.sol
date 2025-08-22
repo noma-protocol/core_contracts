@@ -18,15 +18,15 @@ interface IStakingVault {
 interface ILendingVault {
     function borrowFromFloor(address who, uint256 borrowAmount, uint256 duration) external;
     function paybackLoan(address who, uint256 amount) external;
-    function rollLoan(address who, uint256 newDuration) external;
+    function rollLoan(address who, uint256 newDuration) external returns (uint256 amount);
     function addCollateral(address who, uint256 amount) external;
     function vaultDefaultLoans() external returns (uint256 totalBurned, uint256 loansDefaulted);
 }
 
 // Events
 event Borrow(address indexed who, uint256 borrowAmount, uint256 duration);
-event Payback(address indexed who);
-event RollLoan(address indexed who);
+event Payback(address indexed who, uint256 amount);
+event RollLoan(address indexed who, uint256 amount, uint256 newDuration);
 event DefaultLoans(uint256 totalBurned, uint256 loansDefaulted);
 
 event Shift();
@@ -61,10 +61,6 @@ contract ExtVault {
         emit Borrow(msg.sender, borrowAmount, duration);
     }
 
-    function lol() external {
-
-    }
-
     /**
      * @notice Allows anybody to default expired loans.
      */
@@ -85,7 +81,7 @@ contract ExtVault {
         ILendingVault(address(this))
         .paybackLoan(msg.sender, amount);
 
-        emit Payback(msg.sender);
+        emit Payback(msg.sender, amount);
     }
 
     /**
@@ -95,13 +91,14 @@ contract ExtVault {
         uint256 newDuration
     ) external  {
         
+        uint256 amount = 
         ILendingVault(address(this))
         .rollLoan(
             msg.sender,
             newDuration
         );
 
-        emit RollLoan(msg.sender);
+        emit RollLoan(msg.sender, amount, newDuration);
     }
 
     /**
