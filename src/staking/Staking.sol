@@ -108,7 +108,7 @@ contract Staking is ReentrancyGuard {
             revert InvalidParameters();
         }
 
-        if (IVault(vault).stakingEnabled() == false) {
+        if (IVault(vault).stakingEnabled() == false || epoch.number == 0) {
             revert StakingNotEnabled();
         }
         
