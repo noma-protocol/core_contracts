@@ -7,7 +7,7 @@ import {stdJson} from "forge-std/StdJson.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../src/interfaces/IVault.sol";
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
-import {OikosToken} from  "../src/token/OikosToken.sol";
+import {NomaToken} from  "../src/token/NomaToken.sol";
 import {ModelHelper} from  "../src/model/Helper.sol";
 import {BaseVault} from  "../src/vault/BaseVault.sol";
 import {AuxVault} from  "../src/vault/AuxVault.sol";
@@ -50,7 +50,7 @@ contract LendingVaultTest is Test {
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address deployer = vm.envAddress("DEPLOYER");
 
-    OikosToken private noma;
+    NomaToken private noma;
     ModelHelper private modelHelper;
 
     address WBNB = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
@@ -85,7 +85,7 @@ contract LendingVaultTest is Test {
         IDOManager managerContract = IDOManager(idoManager);
         require(address(managerContract) != address(0), "Manager contract address is zero");
 
-        noma = OikosToken(nomaToken);
+        noma = NomaToken(nomaToken);
         require(address(noma) != address(0), "Noma token address is zero");
         
         modelHelper = ModelHelper(modelHelperContract);
@@ -232,8 +232,8 @@ contract LendingVaultTest is Test {
         uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
         uint256 purchasePrice = spotPrice + (spotPrice * 1 / 100);
 
-        uint16 totalTrades = 50;
-        uint256 tradeAmount = 2 ether;
+        uint16 totalTrades = 500;
+        uint256 tradeAmount = 20 ether;
 
         IWETH(WBNB).deposit{ value: (tradeAmount * totalTrades)}();
         IWETH(WBNB).transfer(idoManager, tradeAmount * totalTrades);
@@ -274,6 +274,65 @@ contract LendingVaultTest is Test {
                 )
             );
         }
+    }
+    
+    function testDefaultLoans_ExpiredLoanThenPaybackReverts() public {
+        uint256 borrowAmount = 1 ether;
+        uint256 duration = 30 days;
+
+        // Approve collateral and borrow
+        vm.prank(deployer);
+        token0.approve(vaultAddress, MAX_INT);
+        vm.prank(deployer);
+        vault.borrow(borrowAmount, duration);
+
+        // Move past due date
+        vm.warp(block.timestamp + duration + 1);
+
+        // Anyone can trigger defaults (if authorization is required, swap to the allowed caller)
+        vault.defaultLoans();
+
+        // Attempt to repay after default should revert
+        vm.prank(deployer);
+        token1.approve(vaultAddress, MAX_INT);
+
+        vm.prank(deployer);
+        IWETH(WBNB).deposit{ value: borrowAmount }();
+
+        vm.prank(deployer);
+        vm.expectRevert(); // loan should no longer be repayable once defaulted
+        vault.payback(borrowAmount);
+    }
+
+    function testDefaultLoans_HealthyLoanUnaffected() public {
+        uint256 borrowAmount = 1 ether;
+        uint256 duration = 30 days;
+
+        // Approve collateral and borrow
+        vm.prank(deployer);
+        token0.approve(vaultAddress, MAX_INT);
+        vm.prank(deployer);
+        vault.borrow(borrowAmount, duration);
+
+        // Run defaults BEFORE maturity — should be a no-op for this loan
+        vm.warp(block.timestamp + 1 days);
+        vault.defaultLoans();
+
+        // Repay a partial amount should still succeed
+        uint256 repay = 0.1 ether;
+
+        vm.prank(deployer);
+        token1.approve(vaultAddress, MAX_INT);
+
+        vm.prank(deployer);
+        IWETH(WBNB).deposit{ value: repay }();
+
+        uint256 balBefore = token1.balanceOf(deployer);
+
+        vm.prank(deployer);
+        vault.payback(repay);
+
+        assertEq(balBefore - repay, token1.balanceOf(deployer), "repay should deduct token1");
     }
 
     function getNextFloorPrice(address pool, address vault) public view returns (uint256) {

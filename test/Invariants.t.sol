@@ -10,7 +10,7 @@ import {Deployer} from "../src/Deployer.sol";
 import {BaseVault} from  "../src/vault/BaseVault.sol";
 import {ExtVault} from  "../src/vault/ExtVault.sol";
 import {IVault} from  "../src/interfaces/IVault.sol";
-import {OikosToken} from  "../src/token/OikosToken.sol";
+import {NomaToken} from  "../src/token/NomaToken.sol";
 import {ModelHelper} from  "../src/model/Helper.sol";
 import {Underlying } from  "../src/libraries/Underlying.sol";
 import {LiquidityType, LiquidityPosition} from "../src/types/Types.sol";
@@ -48,11 +48,11 @@ contract Invariants is Test {
 
     address WBNB = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
     address payable idoManager;
-    address oikosToken;
+    address nomaToken;
     address modelHelperContract;
     address vaultAddress;
 
-    OikosToken private NOMA;
+    NomaToken private NOMA;
     GonsToken sOKS;
 
     ModelHelper private modelHelper;
@@ -78,20 +78,14 @@ contract Invariants is Test {
 
         // Extract addresses from JSON
         idoManager = payable(addresses.IDOHelper);
-        oikosToken = addresses.Proxy;
+        nomaToken = addresses.Proxy;
         modelHelperContract = addresses.ModelHelper;
 
         IDOManager managerContract = IDOManager(idoManager);
         require(address(managerContract) != address(0), "Manager contract address is zero");
 
-        NOMA = OikosToken(oikosToken);
+        NOMA = NomaToken(nomaToken);
         require(address(NOMA) != address(0), "Noma token address is zero");
-
-        // sOKS = GonsToken(sOikosToken);
-        // require(address(sOKS) != address(0), "sOikos token address is zero");
-
-        // staking = Staking(stakingContract);
-        // require(address(staking) != address(0), "Staking contract address is zero");
         
         modelHelper = ModelHelper(modelHelperContract);
     }
@@ -297,8 +291,8 @@ contract Invariants is Test {
         uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
         uint256 purchasePrice = spotPrice + (spotPrice * 1 / 100);
 
-        uint16 totalTrades = 50;
-        uint256 tradeAmount = 2 ether;
+        uint16 totalTrades = 500;
+        uint256 tradeAmount = 10 ether;
 
         IWETH(WBNB).deposit{ value: (tradeAmount * totalTrades)}();
         IWETH(WBNB).transfer(idoManager, tradeAmount * totalTrades);
@@ -420,8 +414,8 @@ contract Invariants is Test {
         uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
         uint256 purchasePrice = spotPrice + (spotPrice * 1 / 100);
 
-        uint16 totalTrades = 100;
-        uint256 tradeAmount = 1 ether;
+        uint16 totalTrades = 500;
+        uint256 tradeAmount = 20 ether;
 
         IWETH(WBNB).deposit{ value: tradeAmount * totalTrades }();
         IWETH(WBNB).transfer(idoManager, tradeAmount * totalTrades);
@@ -460,6 +454,9 @@ contract Invariants is Test {
             address(deployer)
         );
 
+        uint256 tokenBalanceAfterSelling = NOMA.balanceOf(address(this));
+        console.log("Token balance after selling is %s", tokenBalanceAfterSelling);
+
         liquidityRatio = modelHelper.getLiquidityRatio(pool, address(vault));
         console.log("Liquidity ratio is: ", liquidityRatio);
 
@@ -473,6 +470,52 @@ contract Invariants is Test {
         }
 
     }
+
+    // function testBumpFloor() public {
+    //     IDOManager managerContract = IDOManager(idoManager);
+    //     IVault vault = IVault(address(managerContract.vault()));
+    //     address pool = address(vault.pool());
+
+    //     uint256 imvBeforeShift = modelHelper.getIntrinsicMinimumValue(address(vault));
+
+    //     testLargePurchaseTriggerShift();
+    //     testLargePurchaseTriggerShift();
+    //     testLargePurchaseTriggerShift();
+    //     testLargePurchaseTriggerShift();
+
+    //     uint256 imvAfterShift = modelHelper.getIntrinsicMinimumValue(address(vault));
+
+    //     assertGe(imvAfterShift, imvBeforeShift, "IMV should not decrease after shift");
+
+    //     (,,, uint256 anchorToken1Balance) = modelHelper
+    //     .getUnderlyingBalances(
+    //         address(pool), 
+    //         address(vault), 
+    //         LiquidityType.Anchor
+    //     );
+
+    //     vm.prank(deployer);
+    //     IVault(address(vault)).bumpFloor(
+    //         anchorToken1Balance / 2
+    //     );
+
+    //     uint256 imvAfterBump = modelHelper.getIntrinsicMinimumValue(address(vault));
+
+    //     assertGe(imvAfterBump, imvAfterShift, "IMV should not decrease after bump");
+
+        
+    //     // test should fail 
+    //     vm.prank(address(modelHelper));
+    //     vm.expectRevert("NotAuthorized()");
+    //     IVault(address(vault)).bumpFloor(
+    //         anchorToken1Balance / 2
+    //     );
+
+    //     console.log("IMV after bump is: ", imvAfterBump);
+    //     console.log("IMV before bump is: ", imvBeforeShift);
+    //     console.log("IMV after shift is: ", imvAfterShift);
+    //     console.log("Anchor token1 balance is: ", anchorToken1Balance);
+    // }
 
     function getNextFloorPrice(address pool, address vault) public view returns (uint256) {
         LiquidityPosition[3] memory positions = IVault(vault).getPositions();
