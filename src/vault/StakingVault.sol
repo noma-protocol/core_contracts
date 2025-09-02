@@ -269,6 +269,14 @@ contract StakingVault is BaseVault {
         return _v.stakingEnabled;
     }
 
+    function getVNOMAContract() external view returns (address) {
+        return _v.vNOMAContract;
+    }
+
+    function setvNOMAContract(address _vNOMAContract) external onlyManager() {
+        _v.vNOMAContract = _vNOMAContract;
+    }
+
     /**
      * @notice Modifier to restrict access to the manager.
      */
