@@ -202,44 +202,49 @@
           }
       }
 
-      /**
-       * @notice Allows users to contribute ETH to the presale.
-       * @param referralCode Referral code used for this deposit (optional).
-       */
-      function deposit(bytes32 referralCode) external payable lock {
-          if (hasExpired()) revert PresaleEnded();
-          if (finalized) revert AlreadyFinalized();
-          if (msg.value == 0 || msg.sender == address(uint160(uint256(referralCode)))) revert InvalidParameters();
+    /**
+    * @notice Allows users to contribute ETH to the presale.
+    * @param referralCode Referral code used for this deposit (optional).
+    */
+    function deposit(bytes32 referralCode) external payable lock {
+        if (hasExpired()) revert PresaleEnded();
+        if (finalized) revert AlreadyFinalized();
+        if (msg.value == 0) revert InvalidParameters();
 
-          if (migrationContract == address(0)) {
+        // Prevent self-referrals by checking if the referral code is the sender's own code
+        if (referralCode != bytes32(0) && referralCode == keccak256(abi.encodePacked(msg.sender))) {
+            revert InvalidParameters();
+        }
+
+        if (migrationContract == address(0)) {
             if (msg.value < MIN_CONTRIBUTION || msg.value > MAX_CONTRIBUTION) revert InvalidParameters();
-          }
+        }
 
-          uint256 balance = address(this).balance;
-          if (balance > hardCap) revert HardCapExceeded();
+        uint256 balance = address(this).balance;
+        if (balance > hardCap) revert HardCapExceeded();
 
-          // Track contributions
-          contributions[msg.sender] += msg.value;
-          totalRaised += msg.value;
+        // Track contributions
+        contributions[msg.sender] += msg.value;
+        totalRaised += msg.value;
 
-          // Mint p-assets based on ETH deposited at the presale price
-          uint256 amountToMint = (msg.value * 1e18) / initialPrice;
-          _mint(msg.sender, amountToMint);
+        // Mint p-assets based on ETH deposited at the presale price
+        uint256 amountToMint = (msg.value * 1e18) / initialPrice;
+        _mint(msg.sender, amountToMint);
 
-          // Add to contributors array if not already added
-          if (!isContributor[msg.sender]) {
-              contributors.push(msg.sender);
-              isContributor[msg.sender] = true;
-          }
+        // Add to contributors array if not already added
+        if (!isContributor[msg.sender]) {
+            contributors.push(msg.sender);
+            isContributor[msg.sender] = true;
+        }
 
-          // Handle referrals
-          if (referralCode != bytes32(0)) {
-              uint256 referralFee = (msg.value * referralPercentage) / 100;
-              referralEarnings[referralCode] += referralFee;
-          }
+        // Handle referrals
+        if (referralCode != bytes32(0)) {
+            uint256 referralFee = (msg.value * referralPercentage) / 100;
+            referralEarnings[referralCode] += referralFee;
+        }
 
-          emit Deposit(msg.sender, msg.value, referralCode);
-      }
+        emit Deposit(msg.sender, msg.value, referralCode);
+    }
 
       /**
        * @notice Finalizes the presale and buys tokens.
