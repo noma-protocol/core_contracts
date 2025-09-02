@@ -20,25 +20,24 @@ interface IWETH {
 }
 
 contract ExchangeHelper {
+    
+    error NoETHSent();
+    error NoToken0Received();
+    error InvalidAmount();
+    error InvalidSwap();
 
     // TokenInfo state variable
     TokenInfo public tokenInfo;
     address public poolAddress;
 
-    address public WMON = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
+    address public WMON = address(0);
 
     // Lock state variable to prevent reentrancy
     bool private locked;
 
-    // Modifier to prevent reentrancy
-    modifier lock() {
-        require(!locked, "ExchangeHelper: Reentrant call");
-        locked = true;
-        _;
-        locked = false;
+    constructor(address wrappedMonAddress) {
+        WMON = wrappedMonAddress;
     }
-
-    constructor() {}
 
     function buyTokens(
         address pool, 
@@ -47,7 +46,10 @@ contract ExchangeHelper {
         address receiver,
         bool isLimitOrder
     ) public payable lock {
-        require(msg.value > 0, "ExchangeHelper: No ETH sent");
+
+        if (msg.value <= 0) {
+            revert NoETHSent();
+        }
 
         int24 tickSpacing = IUniswapV3Pool(pool).tickSpacing();
 
@@ -83,16 +85,16 @@ contract ExchangeHelper {
         });
         
         // Perform the swap using the newly deposited WMON
-        (int256 amount0, int256 amount1) = Uniswap
+        (int256 amount0, ) = Uniswap
         .swap(
             swapParams
         );
 
-
         // Ensure the swap was successful and tokens were received.
         // (amount0 should be negative, meaning token0 was sold)
-        require(amount0 < 0, "ExchangeHelper: No token0 received");
-        // uint256 tokensReceived = uint256(-amount0);
+        if (amount0 >= 0) {
+            revert NoToken0Received();
+        }
 
         uint256 refundAmount = IWETH(WMON).balanceOf(address(this)) - initialWETHBalance;
         
@@ -112,7 +114,9 @@ contract ExchangeHelper {
         address receiver,
         bool isLimitOrder
     ) public lock {
-        require(amount > 0, "ExchangeHelper: Amount must be greater than 0");
+        if (amount <= 0) {
+            revert InvalidAmount();
+        }
 
         int24 tickSpacing = IUniswapV3Pool(pool).tickSpacing();
 
@@ -123,9 +127,6 @@ contract ExchangeHelper {
         poolAddress = pool;    
         IERC20(tokenInfo.token1).transferFrom(msg.sender, address(this), amount);
         uint8 decimals = IERC20Metadata(tokenInfo.token1).decimals();
-
-        // track balance of WMON before swap
-        uint256 initialWETHBalance = IWETH(WMON).balanceOf(address(this));
 
         // Swap Params
         SwapParams memory swapParams = SwapParams({
@@ -151,8 +152,9 @@ contract ExchangeHelper {
         );       
 
         // Ensure the swap was successful and tokens were received.
-        require(amount0 < 0, "ExchangeHelper: Invalid swap");
-
+        if (amount0 >= 0) {
+            revert InvalidSwap();
+        }
     }
     
     function sellTokens(
@@ -162,8 +164,10 @@ contract ExchangeHelper {
         address receiver,
         bool isLimitOrder
     ) public lock {
-        require(amount > 0, "ExchangeHelper: Amount must be greater than 0");
-        
+        if (amount <= 0) {
+            revert InvalidAmount();
+        }
+
         int24 tickSpacing = IUniswapV3Pool(pool).tickSpacing();
 
         tokenInfo = TokenInfo({
@@ -194,7 +198,9 @@ contract ExchangeHelper {
             
         // Perform the swap
         (int256 amount0, int256 amount1) = Uniswap.swap(swapParams);
-        require(amount1 < 0, "ExchangeHelper: Invalid swap");
+        if (amount1 >= 0) {
+            revert InvalidSwap();
+        }
         
         uint256 balanceAfterSwap = IERC20Metadata(token0).balanceOf(address(this));
 
@@ -285,6 +291,14 @@ contract ExchangeHelper {
             token1: address(0)
         });
         poolAddress = address(0);
+    }
+
+    // Modifier to prevent reentrancy
+    modifier lock() {
+        require(!locked, "ExchangeHelper: Reentrant call");
+        locked = true;
+        _;
+        locked = false;
     }
 
     receive() external payable {}

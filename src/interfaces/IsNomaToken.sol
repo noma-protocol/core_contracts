@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title IsNomaToken
- * @notice Interface for the sOikosToken, extending the standard ERC20 interface with additional functionalities.
+ * @notice Interface for the sNomaToken, extending the standard ERC20 interface with additional functionalities.
  */
 interface IsNomaToken is IERC20 {
 

@@ -312,7 +312,7 @@ struct DeploymentData {
     int24 tickSpacing;
     address vaultAddress;
     address vaultUpgrade;
-    address sOKS;
+    address sNOMA;
     address stakingContract;
     address presaleContract;
     address tokenRepo;

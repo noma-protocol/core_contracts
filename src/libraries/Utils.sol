@@ -90,7 +90,7 @@ library Utils {
         address resolverAddress,
         address vaultAddress,
         address stakingContract,
-        address sOKS,
+        address sNOMA,
         address presaleContract,
         address adaptiveSupply,
         address modelHelper,
@@ -100,7 +100,7 @@ library Utils {
         names[0] = Utils.stringToBytes32("AdaptiveSupply");
         names[1] = Utils.stringToBytes32("ModelHelper");
         names[2] = Utils.stringToBytes32("Staking");
-        names[3] = Utils.stringToBytes32("sOKS");
+        names[3] = Utils.stringToBytes32("sNOMA");
         names[4] = Utils.stringToBytes32("Deployer");
         names[5] = Utils.stringToBytes32("Presale");
 
@@ -109,7 +109,7 @@ library Utils {
         destinations[0] = adaptiveSupply;
         destinations[1] = modelHelper;
         destinations[2] = stakingContract;
-        destinations[3] = sOKS;
+        destinations[3] = sNOMA;
         destinations[4] = deployer;
         destinations[5] = presaleContract;
 
@@ -278,5 +278,20 @@ library Utils {
 
         return code;
     }
-    
+     
+
+    function getAddress(bytes memory bytecode, uint256 _salt)
+        public
+        view
+        returns (address)
+    {
+        bytes32 hash = keccak256(
+            abi.encodePacked(
+                bytes1(0xff), address(this), _salt, keccak256(bytecode)
+            )
+        );
+
+        // NOTE: cast last 20 bytes of hash to address
+        return address(uint160(uint256(hash)));
+    }    
 }

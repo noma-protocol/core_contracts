@@ -30,7 +30,7 @@ contract Staking is ReentrancyGuard {
 
     // State variables
     IERC20 public NOMA; // The NOMA token contract.
-    IsNomaToken public sOKS; // The staked NOMA token contract.
+    IsNomaToken public sNOMA; // The staked NOMA token contract.
     
     address public authority; // The address with authority over the contract.
     address public vault; // The address of the vault contract.
@@ -72,20 +72,20 @@ contract Staking is ReentrancyGuard {
 
     /**
      * @notice Constructor to initialize the Staking contract.
-     * @param _oikos The address of the NOMA token.
-     * @param _sOikos The address of the staked NOMA token.
+     * @param _noma The address of the NOMA token.
+     * @param _sNoma The address of the staked NOMA token.
      * @param _vault The address of the vault contract.
      */
     constructor(    
-        address _oikos,
-        address _sOikos,
+        address _noma,
+        address _sNoma,
         address _vault
     ) {
-        NOMA = IERC20(_oikos);
-        sOKS = IsNomaToken(_sOikos);
+        NOMA = IERC20(_noma);
+        sNOMA = IsNomaToken(_sNoma);
         vault = _vault;
         
-        sOKS.initialize(address(this));
+        sNOMA.initialize(address(this));
 
         // Initialize first epoch with distribute 0
         epoch = Epoch({
@@ -113,9 +113,9 @@ contract Staking is ReentrancyGuard {
         }
         
         // Ensure 3 days have passed since the user's last stake/unstake operation
-        if (block.timestamp < lastOperationTimestamp[msg.sender] + 3 days) {
-            revert CooldownNotElapsed();
-        }
+        // if (block.timestamp < lastOperationTimestamp[msg.sender] + 3 days) {
+        //     revert CooldownNotElapsed();
+        // }
         
         // Update the last operation timestamp for the user
         lastOperationTimestamp[msg.sender] = block.timestamp;
@@ -123,8 +123,8 @@ contract Staking is ReentrancyGuard {
         // Transfer NOMA tokens from the user to the staking contract
         NOMA.transferFrom(msg.sender, address(this), _amount);
 
-        // Mint rebase-adjusted sOKS to the staker
-        sOKS.mint(msg.sender, _amount);
+        // Mint rebase-adjusted sNOMA to the staker
+        sNOMA.mint(msg.sender, _amount);
         
         // Track the originally staked amount and the epoch number when staked
         stakedBalances[msg.sender] += _amount;
@@ -143,11 +143,11 @@ contract Staking is ReentrancyGuard {
         }
 
         // Check if the user's tokens are locked in the lock-in period
-        if (epoch.number < stakedEpochs[msg.sender] + lockInEpochs) {
-            revert LockInPeriodNotElapsed();
-        }
+        // if (epoch.number < stakedEpochs[msg.sender] + lockInEpochs) {
+        //     revert LockInPeriodNotElapsed();
+        // }
 
-        uint256 balance = Math.min(sOKS.balanceOf(msg.sender), NOMA.balanceOf(address(this)));
+        uint256 balance = Math.min(sNOMA.balanceOf(msg.sender), NOMA.balanceOf(address(this)));
 
         if (balance == 0) {
             revert NotEnoughBalance(0);
@@ -157,7 +157,7 @@ contract Staking is ReentrancyGuard {
             revert NotEnoughBalance(balance); 
         }
 
-        sOKS.burn(sOKS.balanceOf(msg.sender), msg.sender);
+        sNOMA.burn(sNOMA.balanceOf(msg.sender), msg.sender);
         NOMA.safeTransfer(msg.sender, balance);
 
         totalStaked -= stakedBalances[msg.sender];
@@ -196,8 +196,8 @@ contract Staking is ReentrancyGuard {
             distribute: 0
         });
 
-        // Update total rewards and rebase sOKS
-        sOKS.rebase(_reward);
+        // Update total rewards and rebase sNOMA
+        sNOMA.rebase(_reward);
         totalRewards += _reward;
 
         emit NotifiedReward(_reward);

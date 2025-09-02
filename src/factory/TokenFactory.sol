@@ -108,7 +108,7 @@ contract TokenFactory {
     )
         external
         onlyFactory
-        returns (NomaToken oikosImpl, ERC1967Proxy proxy, bytes32 tokenHash)
+        returns (NomaToken nomaImpl, ERC1967Proxy proxy, bytes32 tokenHash)
     {
         // 1) Predict the addresses & salts (using msg.sender as initialize() owner)
         (
@@ -127,7 +127,7 @@ contract TokenFactory {
             bytes memory implCode = type(NomaToken).creationCode;
             address implAddr = _doDeploy(implCode, uint256(implSalt));
             require(implAddr == predictedImpl, "Impl address mismatch");
-            oikosImpl = NomaToken(implAddr);
+            nomaImpl = NomaToken(implAddr);
         }
 
         // 3) Build proxy bytecode with the *actual* impl address (should equal predictedImpl)
@@ -143,7 +143,7 @@ contract TokenFactory {
 
         bytes memory proxyBytecode = abi.encodePacked(
             type(ERC1967Proxy).creationCode,
-            abi.encode(address(oikosImpl), initCalldata)
+            abi.encode(address(nomaImpl), initCalldata)
         );
 
         // 4) Deploy proxy at predictedProxy using proxySalt
@@ -154,7 +154,7 @@ contract TokenFactory {
             proxy = ERC1967Proxy(payable(proxyAddr));
         }
 
-        // 5) Sanity checks (same as your original)
+        // 5) Sanity checks
         require(IERC20(address(proxy)).totalSupply() == p.initialSupply, "wrong parameters");
         require(address(proxy) != address(0), "Token deploy failed");
     }

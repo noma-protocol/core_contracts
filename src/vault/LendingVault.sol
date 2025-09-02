@@ -17,7 +17,7 @@ import {
     LoanPosition
 } from "../types/Types.sol";
 
-interface IOikosFactory {
+interface INomaFactory {
     function deferredDeploy(address deployer) external;
     function mintTokens(address to, uint256 amount) external;
     function burnFor(address from, uint256 amount) external;
