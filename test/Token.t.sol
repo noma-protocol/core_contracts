@@ -2,13 +2,13 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "./token/TestMockOikosToken.sol";
-import "./token/TestMockOikosTokenV2.sol";
+import "./token/TestMockNomaToken.sol";
+import "./token/TestMockNomaTokenV2.sol";
 import "openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-contract MockOikosTokenTest is Test {
-    TestMockOikosToken public mockOikosToken;
-    TestMockOikosTokenV2 public mockOikosTokenV2;
+contract MockNomaTokenTest is Test {
+    TestMockNomaToken public mockNomaToken;
+    TestMockNomaTokenV2 public mockNomaTokenV2;
     ERC1967Proxy public proxy;
 
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
@@ -22,33 +22,33 @@ contract MockOikosTokenTest is Test {
         vm.startPrank(deployer);
 
         // Deploy the implementation contract
-        mockOikosToken = new TestMockOikosToken();
+        mockNomaToken = new TestMockNomaToken();
         // Encode the initialize function call
         bytes memory data = abi.encodeWithSelector(
-            mockOikosToken.initialize.selector,
+            mockNomaToken.initialize.selector,
             deployer,
             1000000 ether,
             2000000 ether,
             "Mock NOMA",
-            "MOKS",
+            "MNOMA",
             address(0)
         );
 
-        // mockOikosToken.initialize(deployer, 1000000 ether, "Mock NOMA", "MNOMA", address(0));
+        // mockNomaToken.initialize(deployer, 1000000 ether, "Mock NOMA", "MNOMA", address(0));
 
         // Deploy the proxy contract
         proxy = new ERC1967Proxy(
-            address(mockOikosToken),
+            address(mockNomaToken),
             data
         );
 
-        // Cast the proxy to MockOikosToken to interact with it
-        mockOikosToken = TestMockOikosToken(address(proxy));
-        mockOikosToken.setOwner(deployer);
+        // Cast the proxy to MockNomaToken to interact with it
+        mockNomaToken = TestMockNomaToken(address(proxy));
+        mockNomaToken.setOwner(deployer);
 
-        mockOikosToken.mintTest(deployer, 100 ether);
+        mockNomaToken.mintTest(deployer, 100 ether);
         // Mint some tokens to user
-        mockOikosToken.transfer(user, 100 ether);
+        mockNomaToken.transfer(user, 100 ether);
 
         vm.stopPrank();
     }
@@ -57,30 +57,30 @@ contract MockOikosTokenTest is Test {
         vm.startPrank(deployer);
         // Attempt to mint more than the max total supply
         vm.expectRevert(abi.encodeWithSignature("MaxSupplyReached()"));
-        mockOikosToken.mintTest(deployer, 2000000 ether);
+        mockNomaToken.mintTest(deployer, 2000000 ether);
         vm.stopPrank();
     }
     
     function testInitialSupply() public {
-        uint256 deployerBalance = mockOikosToken.balanceOf(deployer);
+        uint256 deployerBalance = mockNomaToken.balanceOf(deployer);
         assertEq(deployerBalance, 1000000 ether);
     }
 
     function testTransfer() public {
-        uint256 userBalance = mockOikosToken.balanceOf(user);
+        uint256 userBalance = mockNomaToken.balanceOf(user);
         assertEq(userBalance, 100 ether);
     }
 
     function testUpgrade() public {
         // Deploy new implementation
-        mockOikosTokenV2 = new TestMockOikosTokenV2();
+        mockNomaTokenV2 = new TestMockNomaTokenV2();
 
         // Upgrade the proxy to use the new implementation
         vm.prank(deployer);
-        TestMockOikosToken(address(proxy)).upgradeToAndCall(address(mockOikosTokenV2), new bytes(0));
+        TestMockNomaToken(address(proxy)).upgradeToAndCall(address(mockNomaTokenV2), new bytes(0));
 
-        // Cast the proxy to MockOikosTokenV2 to interact with the new implementation
-        TestMockOikosTokenV2 upgraded = TestMockOikosTokenV2(address(proxy));
+        // Cast the proxy to MockNomaTokenV2 to interact with the new implementation
+        TestMockNomaTokenV2 upgraded = TestMockNomaTokenV2(address(proxy));
 
         // Check if the new implementation is in use
         assertEq(upgraded.version(), "V2");
@@ -88,10 +88,10 @@ contract MockOikosTokenTest is Test {
 
     function testOnlyUniswapV3Restriction() public {
         // Deploy new implementation and upgrade the proxy
-        mockOikosTokenV2 = new TestMockOikosTokenV2();
+        mockNomaTokenV2 = new TestMockNomaTokenV2();
         vm.prank(deployer);
-        TestMockOikosToken(address(proxy)).upgradeToAndCall(address(mockOikosTokenV2), new bytes(0));
-        TestMockOikosTokenV2 upgraded = TestMockOikosTokenV2(address(proxy));
+        TestMockNomaToken(address(proxy)).upgradeToAndCall(address(mockNomaTokenV2), new bytes(0));
+        TestMockNomaTokenV2 upgraded = TestMockNomaTokenV2(address(proxy));
 
         // Allow uniswapV3Pool to perform transfers
         vm.prank(deployer);

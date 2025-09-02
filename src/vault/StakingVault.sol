@@ -60,7 +60,7 @@ contract StakingVault is BaseVault {
 
         // 2) mint
         bool ret = IVault(address(this)).mintTokens(address(this), toMint);
-
+        
         // 3) distribute fees, returns post-fee amount
         uint256 postFee = _distributeInflationFees(
             caller,
@@ -74,6 +74,8 @@ contract StakingVault is BaseVault {
 
         // 5) redeploy floor liquidity
         _redeployFloor(addresses.pool, toMintEth);
+
+
     }
 
     function _calculateMint(
@@ -109,34 +111,49 @@ contract StakingVault is BaseVault {
         address poolAddr,
         uint256 toMint
     ) internal returns (uint256 remain) {
-        uint256 inflationFee = IVault(address(this))
-            .getProtocolParameters()
-            .inflationFee;
-        address teamMultisig = IVault(address(this)).teamMultiSig();
+        IVault v = IVault(address(this));
 
-        uint256 inflation = (toMint * inflationFee) / 100;
-        if (inflation == 0) return toMint;
+        // vNOMA share set to inflation fee for now
+        uint256 vNomaShare = (toMint * v.getProtocolParameters().inflationFee) / 100;
 
-        // 1.25% caller fee
+        uint256 inflationFeePct = v.getProtocolParameters().inflationFee; // e.g. 5 means 5%
+        address teamMultisig = v.teamMultiSig();
+
+        uint256 baseAfterVnoma = toMint - vNomaShare;
+
+        uint256 inflation = (baseAfterVnoma * inflationFeePct) / 100;
+        if (inflation == 0) {
+            if (_v.vNOMAContract != address(0)) {
+                IERC20(IUniswapV3Pool(poolAddr).token0()).safeTransfer(_v.vNOMAContract, vNomaShare);
+            }
+            return baseAfterVnoma; // all else remains
+        }
+
+        // 1.25% caller fee out of inflation
         uint256 callerFee = (inflation * 125) / 10_000;
-        // remaining after caller
-        uint256 rem = inflation - callerFee;
-        // split team/creator
-        uint256 teamFee = rem / 2;
-        uint256 creatorFee = rem - teamFee;
+        uint256 remAfterCaller = inflation - callerFee;
+
+        // split remaining inflation pot equally between team + creator
+        uint256 teamFee = remAfterCaller / 2;
+        uint256 creatorFee = remAfterCaller - teamFee;
 
         address token0 = IUniswapV3Pool(poolAddr).token0();
-        if (caller != address(0)) {
+
+        if (caller != address(0) && callerFee > 0) {
             IERC20(token0).safeTransfer(caller, callerFee);
         }
-        if (teamMultisig != address(0)) {
+        if (teamMultisig != address(0) && teamFee > 0) {
             IERC20(token0).safeTransfer(teamMultisig, teamFee);
         }
-        if (_v.manager != address(0)) {
+        if (_v.manager != address(0) && creatorFee > 0) {
             IERC20(token0).safeTransfer(_v.manager, creatorFee);
         }
+        if (_v.vNOMAContract != address(0) && vNomaShare > 0) {
+            IERC20(token0).safeTransfer(_v.vNOMAContract, vNomaShare);
+        }
 
-        remain = toMint - inflation;
+        // remain is the base minus inflation 
+        remain = baseAfterVnoma - inflation;
     }
 
     function _notifyStaking(uint256 amount) internal {

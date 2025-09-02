@@ -34,12 +34,12 @@ struct ContractInfo {
     address addr;
 }
 
-contract OikosFactoryTest is Test {
+contract NomaFactoryTest is Test {
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address deployer = vm.envAddress("DEPLOYER");
     address user = address(2);
 
-    NomaFactory oikosFactory;
+    NomaFactory nomaFactory;
     TestResolver resolver;
     EtchVault etchVault;
     VaultUpgrade vaultUpgrade;
@@ -98,7 +98,7 @@ contract OikosFactoryTest is Test {
 
         vm.prank(deployer);
         // Noma Factory
-        oikosFactory = new NomaFactory(
+        nomaFactory = new NomaFactory(
             uniswapFactory,
             address(resolver),
             address(deploymentFactory),
@@ -107,12 +107,12 @@ contract OikosFactoryTest is Test {
         );
 
         expectedAddressesInResolver.push(
-            ContractInfo("NomaFactory", address(oikosFactory))
+            ContractInfo("NomaFactory", address(nomaFactory))
         );
         
         vm.prank(deployer);
-        etchVault = new EtchVault(address(oikosFactory), address(resolver));
-        vaultUpgrade = new VaultUpgrade(deployer, address(oikosFactory));
+        etchVault = new EtchVault(address(nomaFactory), address(resolver));
+        vaultUpgrade = new VaultUpgrade(deployer, address(nomaFactory));
         VaultUpgradeStep1 vaultUpgradeStep1 = new VaultUpgradeStep1(deployer);
         VaultUpgradeStep2 vaultUpgradeStep2 = new VaultUpgradeStep2(deployer);        
         VaultFinalize vaultFinalize = new VaultFinalize(deployer);
@@ -161,7 +161,7 @@ contract OikosFactoryTest is Test {
         );
 
         vm.prank(deployer);
-        oikosFactory.setProtocolParameters(_params);
+        nomaFactory.setProtocolParameters(_params);
     }
 
     function testCreateVaultShouldRevert() public {
@@ -190,7 +190,7 @@ contract OikosFactoryTest is Test {
 
         // 1. Call the function
         vm.prank(deployer);
-        oikosFactory.deployVault(
+        nomaFactory.deployVault(
             presaleParams,
             vaultDeployParams
         );
@@ -226,7 +226,7 @@ contract OikosFactoryTest is Test {
 
         // 1. Call the function
         vm.prank(deployer);
-        oikosFactory.deployVault(
+        nomaFactory.deployVault(
             presaleParams,
             vaultDeployParams
         );
@@ -263,13 +263,13 @@ contract OikosFactoryTest is Test {
 
         // 1. Call the function
         vm.prank(deployer);
-        oikosFactory.deployVault(
+        nomaFactory.deployVault(
             presaleParams,
             vaultDeployParams
         );
 
         vm.prank(deployer);
-        oikosFactory.setPermissionlessDeploy(true);
+        nomaFactory.setPermissionlessDeploy(true);
 
         vaultDeployParams = 
             VaultDeployParams(
@@ -289,7 +289,7 @@ contract OikosFactoryTest is Test {
 
         // 1. Call the function
         vm.prank(user);
-        oikosFactory.deployVault(
+        nomaFactory.deployVault(
             presaleParams,
             vaultDeployParams
         );
@@ -317,9 +317,9 @@ contract OikosFactoryTest is Test {
         );
 
         vm.prank(deployer);
-        oikosFactory.setProtocolParameters(_params);
+        nomaFactory.setProtocolParameters(_params);
 
-        ProtocolParameters memory _params2 = oikosFactory.getProtocolParameters();
+        ProtocolParameters memory _params2 = nomaFactory.getProtocolParameters();
 
         assertEq(_params.floorPercentage, _params2.floorPercentage);
         assertEq(_params.anchorPercentage, _params2.anchorPercentage);
@@ -361,7 +361,7 @@ contract OikosFactoryTest is Test {
         );
 
         // 1. Call the function
-        oikosFactory.deployVault(
+        nomaFactory.deployVault(
             presaleParams,
             vaultDeployParams
         );
@@ -390,7 +390,7 @@ contract OikosFactoryTest is Test {
             );
 
         vm.prank(deployer);
-        oikosFactory.setPermissionlessDeploy(true);
+        nomaFactory.setPermissionlessDeploy(true);
 
         PresaleUserParams memory presaleParams =
         PresaleUserParams(
@@ -399,7 +399,7 @@ contract OikosFactoryTest is Test {
         );
 
         // 1. Call the function
-        oikosFactory.deployVault(
+        nomaFactory.deployVault(
             presaleParams,
             vaultDeployParams
         );
@@ -427,7 +427,7 @@ contract OikosFactoryTest is Test {
             );
 
         vm.prank(deployer);
-        oikosFactory.setPermissionlessDeploy(true);
+        nomaFactory.setPermissionlessDeploy(true);
 
         PresaleUserParams memory presaleParams =
         PresaleUserParams(
@@ -437,18 +437,18 @@ contract OikosFactoryTest is Test {
 
         // 1. Call the function
         vm.prank(deployer);
-        oikosFactory.deployVault(
+        nomaFactory.deployVault(
             presaleParams,
             vaultDeployParams
         );
         // Check deployers
-        address[] memory deployersList = oikosFactory.getDeployers();
+        address[] memory deployersList = nomaFactory.getDeployers();
 
         // Get Vaults
-        address[] memory vaults = oikosFactory.getVaults(deployer);
+        address[] memory vaults = nomaFactory.getVaults(deployer);
 
         // Check vaults
-        VaultDescription memory vaultDesc = oikosFactory.getVaultDescription(vaults[0]);     
+        VaultDescription memory vaultDesc = nomaFactory.getVaultDescription(vaults[0]);     
 
         assertEq(deployersList.length, 1);
         assertEq(vaultDesc.deployer, deployersList[0]);
@@ -471,19 +471,19 @@ contract OikosFactoryTest is Test {
 
         // 1. Call the function
         vm.prank(user);
-        oikosFactory.deployVault(
+        nomaFactory.deployVault(
             presaleParams,
             vaultDeployParams
         );
 
         // Check deployers
-        deployersList = oikosFactory.getDeployers();
+        deployersList = nomaFactory.getDeployers();
 
         // Get Vaults
-        vaults = oikosFactory.getVaults(user);
+        vaults = nomaFactory.getVaults(user);
 
         // Check vaults
-        vaultDesc = oikosFactory.getVaultDescription(vaults[0]); 
+        vaultDesc = nomaFactory.getVaultDescription(vaults[0]); 
 
         assertEq(deployersList.length, 2);
         assertEq(vaultDesc.deployer, deployersList[1]);
@@ -529,7 +529,7 @@ contract OikosFactoryTest is Test {
 
         // Set permissionless deploy to allow multiple vaults
         vm.prank(deployer);
-        oikosFactory.setPermissionlessDeploy(true);
+        nomaFactory.setPermissionlessDeploy(true);
 
         PresaleUserParams memory presaleParams1 =
         PresaleUserParams(
@@ -539,7 +539,7 @@ contract OikosFactoryTest is Test {
 
         // 1. Call the function
         vm.prank(deployer);
-        oikosFactory.deployVault(
+        nomaFactory.deployVault(
             presaleParams1,
             vault1Params
         );
@@ -552,29 +552,29 @@ contract OikosFactoryTest is Test {
         );
 
         vm.prank(deployer);
-        oikosFactory.deployVault(
+        nomaFactory.deployVault(
             presaleParams2,
             vault2Params
         );
 
         // Retrieve deployer's vaults
-        address[] memory vaults = oikosFactory.getVaults(deployer);
+        address[] memory vaults = nomaFactory.getVaults(deployer);
 
         // Validate number of vaults
         assertEq(vaults.length, 2);
 
         // Validate Vault 1 details
-        VaultDescription memory vault1Desc = oikosFactory.getVaultDescription(vaults[0]);
+        VaultDescription memory vault1Desc = nomaFactory.getVaultDescription(vaults[0]);
 
         assertEq(vault1Desc.token1, WBNB);
 
         // Validate Vault 2 details
-        VaultDescription memory vault2Desc = oikosFactory.getVaultDescription(vaults[1]);
+        VaultDescription memory vault2Desc = nomaFactory.getVaultDescription(vaults[1]);
 
         assertEq(vault2Desc.token1, WBNB);
 
         // Validate deployers list
-        address[] memory deployersList = oikosFactory.getDeployers();
+        address[] memory deployersList = nomaFactory.getDeployers();
         assertEq(deployersList.length, 1);
         assertEq(deployersList[0], deployer);
     }

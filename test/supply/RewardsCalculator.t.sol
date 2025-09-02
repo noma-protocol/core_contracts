@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 
-import {TestMockOikosToken} from "../token/TestMockOikosToken.sol";
+import {TestMockNomaToken} from "../token/TestMockNomaToken.sol";
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {RewardParams} from "../../src/types/Types.sol";
 import {Math} from "openzeppelin/contracts/utils/math/Math.sol";
@@ -45,17 +45,17 @@ interface IVault {
 //     using FixedPointMathLib for int256;
 
 //     RewardsCalculatorTest calculator;
-//     TestMockOikosToken mockOikosToken;
+//     TestMockNomaToken mockNomaToken;
 
 //     function setUp() public {
 //         // Initialize the contract
 //         calculator = new RewardsCalculatorTest();
 //         // Deploy the implementation contract
-//         mockOikosToken = new TestMockOikosToken();
+//         mockNomaToken = new TestMockNomaToken();
 
 //         // Encode the initialize function call
 //         bytes memory data = abi.encodeWithSelector(
-//             mockOikosToken.initialize.selector,
+//             mockNomaToken.initialize.selector,
 //             address(this),
 //             1000000 ether,
 //             "Mock NOMA",
@@ -65,12 +65,12 @@ interface IVault {
 
 //         // Deploy the proxy contract
 //         ERC1967Proxy proxy = new ERC1967Proxy(
-//             address(mockOikosToken),
+//             address(mockNomaToken),
 //             data
 //         );
 
-//         // Cast the proxy to MockOikosToken to interact with it
-//         mockOikosToken = TestMockOikosToken(address(proxy));
+//         // Cast the proxy to MockNomaToken to interact with it
+//         mockNomaToken = TestMockNomaToken(address(proxy));
 //     }
 
 //     function testCalculateRewards() public {
@@ -84,7 +84,7 @@ interface IVault {
 //             kr: 10e18          // Sensitivity for sigmoid
 //         });
 
-//         uint256 tMint = calculator.calculateRewards(params, 1 days, address(mockOikosToken));
+//         uint256 tMint = calculator.calculateRewards(params, 1 days, address(mockNomaToken));
 
 //         console.log("tMint:", tMint);
 //         assertGt(tMint, 0, "Final rewards should be greater than zero");
@@ -102,7 +102,7 @@ interface IVault {
 //             kr: 10e18
 //         });
 
-//         uint256 tMint = calculator.calculateRewards(params, 1 days, address(mockOikosToken));
+//         uint256 tMint = calculator.calculateRewards(params, 1 days, address(mockNomaToken));
 //         console.log("tMint (low volatility):", tMint);
 //         assertGt(tMint, 0, "Final rewards should be greater than zero with low volatility");
 //     }
@@ -119,7 +119,7 @@ interface IVault {
 //             kr: 10e18
 //         });
 
-//         uint256 tMint =  calculator.calculateRewards(params, 1 days, address(mockOikosToken));
+//         uint256 tMint =  calculator.calculateRewards(params, 1 days, address(mockNomaToken));
 //         console.log("tMint (high circulating):", tMint);
 //         // assertGt(tMint, 0, "Final rewards should be greater than zero with high circulating supply");
 //     }
@@ -136,7 +136,7 @@ interface IVault {
 //             kr: 10e18
 //         });
 
-//         uint256 tMint = calculator.calculateRewards(params, 1 days, address(mockOikosToken));
+//         uint256 tMint = calculator.calculateRewards(params, 1 days, address(mockNomaToken));
 //         console.log("tMint (high volatility):", tMint);
 //         assertGt(tMint, 0, "Final rewards should be greater than zero with high volatility");
 //     }

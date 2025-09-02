@@ -53,7 +53,7 @@ contract Invariants is Test {
     address vaultAddress;
 
     NomaToken private NOMA;
-    GonsToken sOKS;
+    GonsToken sNOMA;
 
     ModelHelper private modelHelper;
     Staking staking;
@@ -163,29 +163,29 @@ contract Invariants is Test {
 
     //     // All users unstake
     //     for (uint i = 0; i < NUM_USERS; i++) {
-    //         uint256 sNOMABalanceBefore = sOKS.balanceOf(users[i]);
+    //         uint256 sNOMABalanceBefore = sNOMA.balanceOf(users[i]);
     //         uint256 NOMABalanceBefore = NOMA.balanceOf(users[i]);
 
     //         vm.prank(users[i]);
-    //         sOKS.approve(address(staking), type(uint256).max);
+    //         sNOMA.approve(address(staking), type(uint256).max);
     //         staking.unstake(users[i]);
 
-    //         assertEq(sOKS.balanceOf(users[i]), 0, "sOKS balance should be 0 after unstake");
+    //         assertEq(sNOMA.balanceOf(users[i]), 0, "sNOMA balance should be 0 after unstake");
     //         assertEq(NOMA.balanceOf(users[i]), NOMABalanceBefore + sNOMABalanceBefore, "NOMA balance incorrect after unstake");
     //     }
 
     //     // Check if staking contract has enough NOMA to cover all unstakes
-    //     uint256 circulatingSupply = sOKS.totalSupply() - sOKS.balanceOf(address(staking));
+    //     uint256 circulatingSupply = sNOMA.totalSupply() - sNOMA.balanceOf(address(staking));
     //     uint256 stakingNOMABalance = NOMA.balanceOf(address(staking));
-    //     uint256 initialStakingBalance = sOKS.balanceForGons(INITIAL_FRAGMENTS_SUPPLY);
+    //     uint256 initialStakingBalance = sNOMA.balanceForGons(INITIAL_FRAGMENTS_SUPPLY);
     //     uint256 availableNOMA = stakingNOMABalance > initialStakingBalance ? stakingNOMABalance - initialStakingBalance : 0;
 
-    //     // console.log("Circulating sOKS supply:", circulatingSupply);
+    //     // console.log("Circulating sNOMA supply:", circulatingSupply);
     //     // console.log("Staking contract NOMA balance:", stakingNOMABalance);
-    //     // console.log("Initial staking balance (in current sOKS terms):", initialStakingBalance);
+    //     // console.log("Initial staking balance (in current sNOMA terms):", initialStakingBalance);
     //     // console.log("Available NOMA for unstaking:", availableNOMA);
 
-    //     assertGe(availableNOMA, circulatingSupply, "Staking contract should have enough NOMA to cover all circulating sOKS");
+    //     assertGe(availableNOMA, circulatingSupply, "Staking contract should have enough NOMA to cover all circulating sNOMA");
     // }
 
     function testBuyTokens() public {

@@ -61,7 +61,7 @@ contract DeployFactory is Script {
 
     Resolver private resolver;
     ModelHelper private modelHelper;
-    NomaFactory private oikosFactory;
+    NomaFactory private nomaFactory;
     EtchVault private etchVault;
     GonsToken private sNoma;
     AdaptiveSupply private adaptiveSupply;
@@ -139,7 +139,7 @@ contract DeployFactory is Script {
         ExtFactory extFactory = new ExtFactory(address(resolver));
 
         // Noma Factory
-        oikosFactory = new NomaFactory(
+        nomaFactory = new NomaFactory(
             uniswapFactory,
             address(resolver),
             address(deploymentFactory),
@@ -148,7 +148,7 @@ contract DeployFactory is Script {
         );
         
         expectedAddressesInResolver.push(
-            ContractInfo("NomaFactory", address(oikosFactory))
+            ContractInfo("NomaFactory", address(nomaFactory))
         );
 
         ProtocolParameters memory _params =
@@ -172,9 +172,9 @@ contract DeployFactory is Script {
 
         PresaleProtocolParams memory _presaleParams =
         PresaleProtocolParams(
-            100,        // Max soft cap (60%)
-            100,        // Min contribution ratio 
-            25,         // Max contribution ratio 
+            60,         // Max soft cap (60%)
+            25,          // Min contribution ratio 
+            8,          // Max contribution ratio 
             20,         // Percentage of funds kept from presale (20%)
             30 days,    // Min deadline
             180 days,   // Max deadline
@@ -182,17 +182,17 @@ contract DeployFactory is Script {
             5           // Team fee (5%)
         );
 
-        oikosFactory.setProtocolParameters(_params);
-        oikosFactory.setPresaleProtocolParams(_presaleParams);
+        nomaFactory.setProtocolParameters(_params);
+        nomaFactory.setPresaleProtocolParams(_presaleParams);
 
-        resolver.initFactory(address(oikosFactory));
-        etchVault = new EtchVault(address(oikosFactory), address(resolver));
+        resolver.initFactory(address(nomaFactory));
+        etchVault = new EtchVault(address(nomaFactory), address(resolver));
 
         expectedAddressesInResolver.push(
             ContractInfo("EtchVault", address(etchVault))
         );
         
-        VaultUpgrade vaultUpgrade = new VaultUpgrade(deployer, address(oikosFactory));
+        VaultUpgrade vaultUpgrade = new VaultUpgrade(deployer, address(nomaFactory));
         VaultUpgradeStep1 vaultUpgradeStep1 = new VaultUpgradeStep1(deployer);
         VaultUpgradeStep2 vaultUpgradeStep2 = new VaultUpgradeStep2(deployer);
         VaultAux vaultAux = new VaultAux(deployer);
@@ -219,7 +219,7 @@ contract DeployFactory is Script {
         // Configure resolver
         configureResolver();
 
-        console.log("Factory deployed to address: ", address(oikosFactory));
+        console.log("Factory deployed to address: ", address(nomaFactory));
         console.log("ModelHelper deployed to address: ", address(modelHelper));
         console.log("AdaptiveSupply deployed to address: ", address(adaptiveSupply));
         console.log("RewardsCalculator deployed to address: ", address(rewardsCalculator));
