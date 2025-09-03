@@ -326,6 +326,7 @@ struct SwapParams {
     address token1;
     uint160 basePriceX96; 
     uint256 amountToSwap; 
+    uint256 slippageTolerance;
     bool zeroForOne; 
     bool isLimitOrder;
 }
