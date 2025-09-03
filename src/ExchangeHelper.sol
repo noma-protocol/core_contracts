@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
+import {SignedMath} from "@openzeppelin/contracts/utils/math/SignedMath.sol";
 import {IERC20} from "openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Conversions} from "../src/libraries/Conversions.sol";
@@ -20,7 +21,12 @@ interface IWETH {
 }
 
 contract ExchangeHelper {
-    
+
+    event BoughtTokensETH(address who, uint256 amount);
+    event BoughtTokensWETH(address who, uint256 amount);
+    event SoldTokensETH(address who, uint256 amount);
+    event SoldTokensWETH(address who, uint256 amount);
+
     error NoETHSent();
     error NoToken0Received();
     error InvalidAmount();
@@ -42,7 +48,7 @@ contract ExchangeHelper {
     function buyTokens(
         address pool, 
         uint256 price, 
-        uint256 amount, 
+        // uint256 amount, 
         address receiver,
         bool isLimitOrder
     ) public payable lock {
@@ -64,7 +70,7 @@ contract ExchangeHelper {
         // --- Record the initial WMON balance to avoid refunding extra ---
         uint256 initialWETHBalance = IWETH(WMON).balanceOf(address(this));
 
-        // Deposit ETH into WMON (this increases the balance by msg.value)
+        // Deposit MON into WMON (this increases the balance by msg.value)
         IWETH(WMON).deposit{value: msg.value}();
 
         // Swap Params
@@ -80,6 +86,7 @@ contract ExchangeHelper {
                 decimals
             ),
             amountToSwap: msg.value,
+            slippageTolerance: 1,
             zeroForOne: false,
             isLimitOrder: isLimitOrder
         });
@@ -91,7 +98,6 @@ contract ExchangeHelper {
         );
 
         // Ensure the swap was successful and tokens were received.
-        // (amount0 should be negative, meaning token0 was sold)
         if (amount0 >= 0) {
             revert NoToken0Received();
         }
@@ -99,11 +105,13 @@ contract ExchangeHelper {
         uint256 refundAmount = IWETH(WMON).balanceOf(address(this)) - initialWETHBalance;
         
         if (refundAmount > 0) {
-            // Withdraw the excess WMON into ETH
+            // Withdraw the excess WMON into MON
             IWETH(WMON).withdraw(refundAmount);
-            // Refund the caller with the excess ETH
+            // Refund the caller with the excess MON
             payable(receiver).transfer(refundAmount);
         }
+
+        emit BoughtTokensETH(receiver, SignedMath.abs(amount0));
     }
 
     // Requires approval for the token0 token
@@ -141,6 +149,7 @@ contract ExchangeHelper {
                 decimals
             ),
             amountToSwap: amount,
+            slippageTolerance: 1,
             zeroForOne: false,
             isLimitOrder: isLimitOrder
         });
@@ -155,6 +164,8 @@ contract ExchangeHelper {
         if (amount0 >= 0) {
             revert InvalidSwap();
         }
+        
+        emit  BoughtTokensWETH(receiver, SignedMath.abs(amount0));
     }
     
     function sellTokens(
@@ -192,6 +203,7 @@ contract ExchangeHelper {
                 decimals
             ),
             amountToSwap: amount,
+            slippageTolerance: 1,
             zeroForOne: true,
             isLimitOrder: isLimitOrder
         });
@@ -211,6 +223,8 @@ contract ExchangeHelper {
         if (refund > 0) {
             IERC20(token0).transfer(msg.sender, refund);
         }
+
+        emit SoldTokensETH(receiver, SignedMath.abs(amount1));
     }
 
     function sellTokensETH(
@@ -246,6 +260,7 @@ contract ExchangeHelper {
                 decimals
             ),
             amountToSwap: amount,
+            slippageTolerance: 1,
             zeroForOne: true,
             isLimitOrder: isLimitOrder
         });
@@ -254,9 +269,9 @@ contract ExchangeHelper {
         (int256 amount0, int256 amount1) = Uniswap.swap(swapParams);
         require(amount1 < 0, "ExchangeHelper: Invalid swap");
         
-        uint256 bnbReceived = uint256(-amount1);
-        IWETH(WMON).withdraw(bnbReceived);
-        payable(receiver).transfer(bnbReceived);
+        uint256 ethReceived = uint256(-amount1);
+        IWETH(WMON).withdraw(ethReceived);
+        payable(receiver).transfer(ethReceived);
 
         uint256 balanceAfterSwap = IERC20Metadata(token0).balanceOf(address(this));
 
@@ -267,6 +282,8 @@ contract ExchangeHelper {
         if (refund > 0) {
             IERC20(token0).transfer(msg.sender, refund);
         }
+
+        emit SoldTokensETH(receiver, SignedMath.abs(amount1));
     }
 
         /**

@@ -48,7 +48,7 @@ contract NomaFactoryTest is Test {
     TokenFactory tokenFactory;
 
     // Constants
-    address WBNB = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
+    address WMON = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
     address private uniswapFactory = 0x961235a9020B05C44DF1026D956D1F4D78014276;
 
     ContractInfo[] private expectedAddressesInResolver;
@@ -174,7 +174,7 @@ contract NomaFactoryTest is Test {
                 200e18,       // Max supply
                 1e18,         // IDO Price
                 0,
-                WBNB,         // Token1 address
+                WMON,         // Token1 address
                 3000,         // Uniswap V3 Fee tier
                 0             // Presale
             );
@@ -199,7 +199,7 @@ contract NomaFactoryTest is Test {
     function testCreateVaultShouldSucceed() public {
 
         expectedAddressesInResolver.push(
-            ContractInfo("WMON", WBNB)
+            ContractInfo("WMON", WMON)
         );
 
         configureResolver();    
@@ -213,7 +213,7 @@ contract NomaFactoryTest is Test {
                 200e18,       // Max supply
                 1e18,         // IDO Price
                 0,
-                WBNB,         // Token1 address
+                WMON,         // Token1 address
                 3000,         // Uniswap V3 Fee tier
                 0             // Presale
             );
@@ -236,7 +236,7 @@ contract NomaFactoryTest is Test {
     function testCreateDuplicateVault() public {
 
         expectedAddressesInResolver.push(
-            ContractInfo("WMON", WBNB)
+            ContractInfo("WMON", WMON)
         );
 
         configureResolver();    
@@ -250,7 +250,7 @@ contract NomaFactoryTest is Test {
             200e18,       // Max supply
             1e18,          // IDO Price
             0,
-            WBNB,          // Token1 address
+            WMON,          // Token1 address
             3000,          // Uniswap V3 Fee tier
             0              // Presale
         );
@@ -280,7 +280,7 @@ contract NomaFactoryTest is Test {
                 200e18,       // Max supply
                 1e18,         // IDO Price
                 0,
-                WBNB,         // Token1 address
+                WMON,         // Token1 address
                 3000,         // Uniswap V3 Fee tier
                 0             // Presale
             );
@@ -333,7 +333,7 @@ contract NomaFactoryTest is Test {
     function testPermissionlessDeployNotEnabled() public {
 
         expectedAddressesInResolver.push(
-            ContractInfo("WMON", WBNB)
+            ContractInfo("WMON", WMON)
         );
 
         configureResolver();    
@@ -347,7 +347,7 @@ contract NomaFactoryTest is Test {
                 200e18,       // Max supply
                 1e18,         // IDO Price
                 0,
-                WBNB,         // Token1 address
+                WMON,         // Token1 address
                 3000,         // Uniswap V3 Fee tier
                 0             // Presale
             );
@@ -370,7 +370,7 @@ contract NomaFactoryTest is Test {
     function testPermissionlessDeployEnabled() public {
 
         expectedAddressesInResolver.push(
-            ContractInfo("WMON", WBNB)
+            ContractInfo("WMON", WMON)
         );
 
         configureResolver();    
@@ -384,7 +384,7 @@ contract NomaFactoryTest is Test {
                 200e18,       // Max supply
                 1e18,         // IDO Price
                 0,
-                WBNB,         // Token1 address
+                WMON,         // Token1 address
                 3000,         // Uniswap V3 Fee tier
                 0             // Presale
             );
@@ -407,7 +407,7 @@ contract NomaFactoryTest is Test {
 
     function testEnumerateVaults() public {
         expectedAddressesInResolver.push(
-            ContractInfo("WMON", WBNB)
+            ContractInfo("WMON", WMON)
         );
 
         configureResolver();    
@@ -421,7 +421,7 @@ contract NomaFactoryTest is Test {
                 200e18,       // Max supply
                 1e18,         // IDO Price
                 0,
-                WBNB,         // Token1 address
+                WMON,         // Token1 address
                 3000,         // Uniswap V3 Fee tier
                 0             // Presale
             );
@@ -453,7 +453,7 @@ contract NomaFactoryTest is Test {
         assertEq(deployersList.length, 1);
         assertEq(vaultDesc.deployer, deployersList[0]);
         assertEq(deployersList[0], deployer);
-        assertEq(vaultDesc.token1, WBNB);
+        assertEq(vaultDesc.token1, WMON);
 
         vaultDeployParams = 
             VaultDeployParams(
@@ -464,7 +464,7 @@ contract NomaFactoryTest is Test {
                 200e18,       // Max supply
                 1e18,         // IDO Price
                 0,
-                WBNB,         // Token1 address
+                WMON,         // Token1 address
                 3000,         // Uniswap V3 Fee tier
                 0             // Presale
             );
@@ -488,14 +488,14 @@ contract NomaFactoryTest is Test {
         assertEq(deployersList.length, 2);
         assertEq(vaultDesc.deployer, deployersList[1]);
         assertEq(deployersList[1], user);
-        assertEq(vaultDesc.token1, WBNB);
+        assertEq(vaultDesc.token1, WMON);
 
     }
 
     function testDeployerCanDeployMultipleVaults() public {
         // Prepare Resolver
         expectedAddressesInResolver.push(
-            ContractInfo("WMON", WBNB)
+            ContractInfo("WMON", WMON)
         );
         configureResolver();
 
@@ -508,7 +508,7 @@ contract NomaFactoryTest is Test {
             200e18,             // Max supply
             1e18,               // IDO Price
             0,
-            WBNB,               // Token1 address
+            WMON,               // Token1 address
             3000,               // Uniswap V3 Fee tier
             0                   // Presale
         );
@@ -522,7 +522,7 @@ contract NomaFactoryTest is Test {
             400e18,             // Max supply
             2e18,               // IDO Price
             0,
-            WBNB,               // Token1 address
+            WMON,               // Token1 address
             3000,               // Uniswap V3 Fee tier
             0                   // Presale
         );
@@ -566,12 +566,12 @@ contract NomaFactoryTest is Test {
         // Validate Vault 1 details
         VaultDescription memory vault1Desc = nomaFactory.getVaultDescription(vaults[0]);
 
-        assertEq(vault1Desc.token1, WBNB);
+        assertEq(vault1Desc.token1, WMON);
 
         // Validate Vault 2 details
         VaultDescription memory vault2Desc = nomaFactory.getVaultDescription(vaults[1]);
 
-        assertEq(vault2Desc.token1, WBNB);
+        assertEq(vault2Desc.token1, WMON);
 
         // Validate deployers list
         address[] memory deployersList = nomaFactory.getDeployers();

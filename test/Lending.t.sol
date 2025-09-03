@@ -53,7 +53,7 @@ contract LendingVaultTest is Test {
     NomaToken private noma;
     ModelHelper private modelHelper;
 
-    address WBNB = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
+    address WMON = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
     address payable idoManager;
     address nomaToken;
     address modelHelperContract;
@@ -135,7 +135,7 @@ contract LendingVaultTest is Test {
         token1.approve(vaultAddress, MAX_INT);
 
         vm.prank(deployer);
-        IWETH(WBNB).deposit{ value: borrowAmount}();
+        IWETH(WMON).deposit{ value: borrowAmount}();
 
         uint256 token1Balance = token1.balanceOf(deployer);
         console.log("Token1 balance before payback is: ", token1Balance);
@@ -235,8 +235,8 @@ contract LendingVaultTest is Test {
         uint16 totalTrades = 500;
         uint256 tradeAmount = 20 ether;
 
-        IWETH(WBNB).deposit{ value: (tradeAmount * totalTrades)}();
-        IWETH(WBNB).transfer(idoManager, tradeAmount * totalTrades);
+        IWETH(WMON).deposit{ value: (tradeAmount * totalTrades)}();
+        IWETH(WMON).transfer(idoManager, tradeAmount * totalTrades);
 
         uint256 tokenBalanceBefore = noma.balanceOf(address(this));
         uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault));
@@ -297,7 +297,7 @@ contract LendingVaultTest is Test {
         token1.approve(vaultAddress, MAX_INT);
 
         vm.prank(deployer);
-        IWETH(WBNB).deposit{ value: borrowAmount }();
+        IWETH(WMON).deposit{ value: borrowAmount }();
 
         vm.prank(deployer);
         vm.expectRevert(); // loan should no longer be repayable once defaulted
@@ -325,7 +325,7 @@ contract LendingVaultTest is Test {
         token1.approve(vaultAddress, MAX_INT);
 
         vm.prank(deployer);
-        IWETH(WBNB).deposit{ value: repay }();
+        IWETH(WMON).deposit{ value: repay }();
 
         uint256 balBefore = token1.balanceOf(deployer);
 

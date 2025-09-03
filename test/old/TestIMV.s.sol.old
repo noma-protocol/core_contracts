@@ -44,7 +44,7 @@ contract TestIMV is Test {
     bytes32 salt = keccak256(bytes(vm.envString("SALT")));
 
     // Constants
-    address WETH = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+    address WMON = 0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd;
     address payable idoManagerAddress;
     uint256 public result;
 
@@ -60,8 +60,8 @@ contract TestIMV is Test {
         // Read the JSON file
         string memory json = vm.readFile(path);
 
-        string memory networkId = "56";
-        // Parse the data for network ID `56`
+        string memory networkId = "1337";
+        // Parse the data for network ID `1337`
         bytes memory data = vm.parseJson(json, string.concat(string("."), networkId));
 
         // Decode the data into the ContractAddresses struct

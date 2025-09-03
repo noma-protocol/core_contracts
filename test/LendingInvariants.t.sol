@@ -53,7 +53,7 @@ contract LendingInvariants is Test {
     NomaToken private noma;
     ModelHelper private modelHelper;
 
-    address WBNB = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
+    address WMON = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
     address payable idoManager;
     address nomaToken;
     address modelHelperContract;
@@ -201,8 +201,8 @@ contract LendingInvariants is Test {
         uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
         uint256 purchasePrice = spotPrice + (spotPrice * 5 / 100);
 
-        IWETH(WBNB).deposit{ value: (tradeAmount * totalTrades)}();
-        IWETH(WBNB).transfer(idoManager, tradeAmount * totalTrades);
+        IWETH(WMON).deposit{ value: (tradeAmount * totalTrades)}();
+        IWETH(WMON).transfer(idoManager, tradeAmount * totalTrades);
 
         uint256 tokenBalanceBefore = noma.balanceOf(address(this));
         uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault));
@@ -241,8 +241,8 @@ contract LendingInvariants is Test {
         uint16 totalTrades = 500;
         uint256 tradeAmount = 10 ether;
 
-        IWETH(WBNB).deposit{ value: (tradeAmount * totalTrades)}();
-        IWETH(WBNB).transfer(idoManager, tradeAmount * totalTrades);
+        IWETH(WMON).deposit{ value: (tradeAmount * totalTrades)}();
+        IWETH(WMON).transfer(idoManager, tradeAmount * totalTrades);
 
         uint256 tokenBalanceBefore = noma.balanceOf(address(this));
         uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault));

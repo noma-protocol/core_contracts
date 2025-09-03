@@ -59,6 +59,7 @@ contract IDOHelper {
                 decimals
             ),
             amountToSwap: amount,
+            slippageTolerance: 1,
             zeroForOne: false,
             isLimitOrder: false
         });
@@ -81,6 +82,7 @@ contract IDOHelper {
                 decimals
             ),
             amountToSwap: amount,
+            slippageTolerance: 1,
             zeroForOne: true,
             isLimitOrder: false
         });

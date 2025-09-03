@@ -46,7 +46,7 @@ contract Invariants is Test {
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address deployer = vm.envAddress("DEPLOYER");
 
-    address WBNB = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
+    address WMON = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
     address payable idoManager;
     address nomaToken;
     address modelHelperContract;
@@ -124,8 +124,8 @@ contract Invariants is Test {
         uint8 totalTrades = 2;
         uint256 tradeAmount = 0.005 ether;
 
-        IWETH(WBNB).deposit{ value: 10 ether }();
-        IWETH(WBNB).transfer(idoManager, tradeAmount * totalTrades);
+        IWETH(WMON).deposit{ value: 10 ether }();
+        IWETH(WMON).transfer(idoManager, tradeAmount * totalTrades);
 
         uint256 tokenBalanceBefore = NOMA.balanceOf(address(this));
         uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault));
@@ -201,8 +201,8 @@ contract Invariants is Test {
         uint8 numTrades = 1;
         uint256 tradeAmount = 0.00003785 ether;
         
-        IWETH(WBNB).deposit{ value:  tradeAmount * numTrades}();
-        IWETH(WBNB).transfer(idoManager, tradeAmount * numTrades);
+        IWETH(WMON).deposit{ value:  tradeAmount * numTrades}();
+        IWETH(WMON).transfer(idoManager, tradeAmount * numTrades);
 
         uint256 tokenBalanceBefore = NOMA.balanceOf(address(deployer));
         uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, 18);
@@ -244,8 +244,8 @@ contract Invariants is Test {
         uint8 totalTradesBuy = 24;
         uint256 tradeAmountWETH = 2 ether;
 
-        IWETH(WBNB).deposit{ value:  tradeAmountWETH * totalTradesBuy}();
-        IWETH(WBNB).transfer(idoManager, tradeAmountWETH * totalTradesBuy);
+        IWETH(WMON).deposit{ value:  tradeAmountWETH * totalTradesBuy}();
+        IWETH(WMON).transfer(idoManager, tradeAmountWETH * totalTradesBuy);
 
         uint256 tokenBalanceBefore = NOMA.balanceOf(address(deployer));
         console.log("Token balance before buying is %s", tokenBalanceBefore);
@@ -294,8 +294,8 @@ contract Invariants is Test {
         uint16 totalTrades = 500;
         uint256 tradeAmount = 10 ether;
 
-        IWETH(WBNB).deposit{ value: (tradeAmount * totalTrades)}();
-        IWETH(WBNB).transfer(idoManager, tradeAmount * totalTrades);
+        IWETH(WMON).deposit{ value: (tradeAmount * totalTrades)}();
+        IWETH(WMON).transfer(idoManager, tradeAmount * totalTrades);
 
         uint256 tokenBalanceBefore = NOMA.balanceOf(address(this));
         uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault));
@@ -345,8 +345,8 @@ contract Invariants is Test {
         uint8 totalTrades = 2;
         uint256 tradeAmount = 0.005 ether;
 
-        IWETH(WBNB).deposit{ value: 10 ether }();
-        IWETH(WBNB).transfer(idoManager, tradeAmount * totalTrades);
+        IWETH(WMON).deposit{ value: 10 ether }();
+        IWETH(WMON).transfer(idoManager, tradeAmount * totalTrades);
 
         for (uint i = 0; i < totalTrades; i++) {
             managerContract.buyTokens(spotPrice, tradeAmount, address(deployer));
@@ -377,8 +377,8 @@ contract Invariants is Test {
         uint8 totalTrades = 5;
         uint256 tradeAmount = 0.05 ether;
 
-        IWETH(WBNB).deposit{ value: 10 ether }();
-        IWETH(WBNB).transfer(idoManager, tradeAmount * totalTrades);
+        IWETH(WMON).deposit{ value: 10 ether }();
+        IWETH(WMON).transfer(idoManager, tradeAmount * totalTrades);
 
         for (uint i = 0; i < totalTrades; i++) {
             managerContract.buyTokens(spotPrice, tradeAmount, address(deployer));
@@ -417,8 +417,8 @@ contract Invariants is Test {
         uint16 totalTrades = 500;
         uint256 tradeAmount = 20 ether;
 
-        IWETH(WBNB).deposit{ value: tradeAmount * totalTrades }();
-        IWETH(WBNB).transfer(idoManager, tradeAmount * totalTrades);
+        IWETH(WMON).deposit{ value: tradeAmount * totalTrades }();
+        IWETH(WMON).transfer(idoManager, tradeAmount * totalTrades);
 
         uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault));
         console.log("Circulating supply is: ", circulatingSupplyBefore);
