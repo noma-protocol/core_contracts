@@ -44,9 +44,6 @@
       /// @notice Hard cap for the presale in ETH.
       uint256 public hardCap;
 
-      /// @notice Total amount of ETH raised during the presale.
-      uint256 private totalRaised;
-
       /// @notice Initial price of the token in ETH.
       uint256 public initialPrice;
 
@@ -89,6 +86,9 @@
       /// @notice Tracks if an address has already been added as a contributor.
       mapping(address => bool) public isContributor;
 
+        uint256 public totalRaised;      // net: deposits minus any emergency refunds
+        uint256 public totalDeposited;   // gross: sum of all deposits ever received
+
       /// @dev Stores token information
       TokenInfo private tokenInfo;
 
@@ -99,7 +99,7 @@
 
       uint256 public MIN_CONTRIBUTION;
       uint256 public MAX_CONTRIBUTION;
-      uint256 teamFee;
+      uint256 public teamFeePct;
 
       bool public emergencyWithdrawalFlag;
       bool private locked;
@@ -154,7 +154,7 @@
           protocolParams = _protocolParams;
           referralPercentage = _protocolParams.referralPercentage;
           factory = _factory;
-          teamFee = _protocolParams.teamFee;
+          teamFeePct = _protocolParams.teamFee;
 
           uint256 launchSupplyDecimals = IERC20Metadata(pool.token0()).decimals(); 
           uint256 initialPriceDecimals = 18; 
@@ -225,7 +225,9 @@
 
         // Track contributions
         contributions[msg.sender] += msg.value;
-        totalRaised += msg.value;
+        totalDeposited += msg.value;
+        totalRaised    += msg.value;
+
 
         // Mint p-assets based on ETH deposited at the presale price
         uint256 amountToMint = (msg.value * 1e18) / initialPrice;
@@ -250,8 +252,10 @@
        * @notice Finalizes the presale and buys tokens.
        */
         function finalize() external lock {
+            bool reachedSoftCap = address(this).balance >= softCap;
+
             if (finalized) revert AlreadyFinalized();
-            if (!hasExpired()) revert PresaleOngoing();
+            if (!hasExpired() && !reachedSoftCap) revert PresaleOngoing();
 
             // 1) load & validate parameters
             PresaleProtocolParams memory p = protocolParams;
@@ -259,9 +263,9 @@
             if (pct == 0 || pct > 100) revert InvalidParameters();
 
             // 2) compute amounts
-            uint256 totalRaised       = address(this).balance;
-            uint256 feeTaken          = (totalRaised * pct) / 100;
-            uint256 contributionAmount = migrationContract != address(0) ? totalRaised : totalRaised - feeTaken;
+            uint256 raisedBalance        = address(this).balance;
+            uint256 feeTaken             = (raisedBalance * pct) / 100;
+            uint256 contributionAmount   = migrationContract != address(0) ? raisedBalance : raisedBalance - feeTaken;
 
             // 3) enforce soft-cap after fee
             uint256 requiredAfterFee = migrationContract != address(0)
@@ -298,6 +302,7 @@
                                     18
                                 ),
                     amountToSwap:  contributionAmount,
+                    slippageTolerance: 1,
                     zeroForOne:    false,
                     isLimitOrder:  true
                 })
@@ -305,7 +310,7 @@
 
             // 8) emit for off-chain indexing, then payouts
             emit Finalized(
-                totalRaised,
+                raisedBalance,
                 feeTaken,
                 contributionAmount,
                 slippagePriceX96
@@ -391,7 +396,7 @@
           _burn(msg.sender, pAssetAmount);
 
           contributions[msg.sender] = 0;
-          totalRaised -= amount; // Fix: Decrement totalRaised when emergency withdrawal occurs
+          totalRaised -= amount; 
           payable(msg.sender).transfer(amount);
 
           emit TokenBurned(msg.sender, pAssetAmount);
@@ -411,15 +416,15 @@
         uint256 balance = address(this).balance;
          
         // calculate fee
-        uint256 teamFee = (balance * teamFee) / 100;
+        uint256 fee = (balance * teamFeePct) / 100;
 
         address teamMultiSig = IFactory(factory).teamMultiSig();
 
         if (teamMultiSig != address(0)) {
             // transfer fee to team multisig
-            payable(teamMultiSig).transfer(teamFee);
+            payable(teamMultiSig).transfer(fee);
         }
-        payable(owner()).transfer(balance - teamFee);
+        payable(owner()).transfer(balance - fee);
       }
     
       /**
@@ -450,17 +455,6 @@
        */
       function setMigrationContract(address _migrationContract) external isFactoryOwner {
         migrationContract = _migrationContract;
-      }
-
-
-      // ==================== New Functions ====================
-
-      /**
-       * @notice Returns the total ETH raised during the presale.
-       * @return Total ETH raised.
-       */
-      function getTotalRaised() external view returns (uint256) {
-          return totalRaised;
       }
 
       /**

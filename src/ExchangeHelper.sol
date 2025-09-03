@@ -48,9 +48,9 @@ contract ExchangeHelper {
     function buyTokens(
         address pool, 
         uint256 price, 
-        // uint256 amount, 
         address receiver,
-        bool isLimitOrder
+        bool isLimitOrder,
+        uint256 slippageTolerance
     ) public payable lock {
 
         if (msg.value <= 0) {
@@ -86,7 +86,7 @@ contract ExchangeHelper {
                 decimals
             ),
             amountToSwap: msg.value,
-            slippageTolerance: 1,
+            slippageTolerance: slippageTolerance,
             zeroForOne: false,
             isLimitOrder: isLimitOrder
         });
@@ -120,7 +120,8 @@ contract ExchangeHelper {
         uint256 price, 
         uint256 amount, 
         address receiver,
-        bool isLimitOrder
+        bool isLimitOrder,
+        uint256 slippageTolerance
     ) public lock {
         if (amount <= 0) {
             revert InvalidAmount();
@@ -149,7 +150,7 @@ contract ExchangeHelper {
                 decimals
             ),
             amountToSwap: amount,
-            slippageTolerance: 1,
+            slippageTolerance: slippageTolerance,
             zeroForOne: false,
             isLimitOrder: isLimitOrder
         });
@@ -173,7 +174,8 @@ contract ExchangeHelper {
         uint256 price, 
         uint256 amount, 
         address receiver,
-        bool isLimitOrder
+        bool isLimitOrder,
+        uint256 slippageTolerance
     ) public lock {
         if (amount <= 0) {
             revert InvalidAmount();
@@ -203,7 +205,7 @@ contract ExchangeHelper {
                 decimals
             ),
             amountToSwap: amount,
-            slippageTolerance: 1,
+            slippageTolerance: slippageTolerance,
             zeroForOne: true,
             isLimitOrder: isLimitOrder
         });
@@ -232,7 +234,8 @@ contract ExchangeHelper {
         uint256 price, 
         uint256 amount, 
         address receiver,
-        bool isLimitOrder
+        bool isLimitOrder,
+        uint256 slippageTolerance
     ) public lock {
         require(amount > 0, "ExchangeHelper: Amount must be greater than 0");
         
@@ -260,7 +263,7 @@ contract ExchangeHelper {
                 decimals
             ),
             amountToSwap: amount,
-            slippageTolerance: 1,
+            slippageTolerance: slippageTolerance,
             zeroForOne: true,
             isLimitOrder: isLimitOrder
         });
