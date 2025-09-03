@@ -252,10 +252,20 @@
        * @notice Finalizes the presale and buys tokens.
        */
         function finalize() external lock {
+            if (finalized) revert AlreadyFinalized();
+
+            bool expired = hasExpired();
             bool reachedSoftCap = address(this).balance >= softCap;
 
-            if (finalized) revert AlreadyFinalized();
-            if (!hasExpired() && !reachedSoftCap) revert PresaleOngoing();
+            // must be either expired OR have reached soft cap early
+            if (!expired && !reachedSoftCap) revert PresaleOngoing();
+
+            // if we're past the deadline, restrict caller during the first 30 days
+            if (expired) {
+                if (block.timestamp <= deadline + 30 days && msg.sender != owner()) {
+                    revert NotAuthorized();
+                }
+            }
 
             // 1) load & validate parameters
             PresaleProtocolParams memory p = protocolParams;
@@ -263,9 +273,9 @@
             if (pct == 0 || pct > 100) revert InvalidParameters();
 
             // 2) compute amounts
-            uint256 raisedBalance        = address(this).balance;
-            uint256 feeTaken             = (raisedBalance * pct) / 100;
-            uint256 contributionAmount   = migrationContract != address(0) ? raisedBalance : raisedBalance - feeTaken;
+            uint256 raisedBalance      = address(this).balance;
+            uint256 feeTaken           = (raisedBalance * pct) / 100;
+            uint256 contributionAmount = migrationContract != address(0) ? raisedBalance : raisedBalance - feeTaken;
 
             // 3) enforce soft-cap after fee
             uint256 requiredAfterFee = migrationContract != address(0)
@@ -273,20 +283,16 @@
                 : (softCap * (100 - pct)) / 100;
             if (contributionAmount < requiredAfterFee) revert SoftCapNotMet();
 
-            // 4) mark finalized _before_ external calls (checks‐effects)
+            // 4) mark finalized before external calls
             finalized = true;
 
-            // 5) deploy liquidity and wrap BNB
+            // 5) deploy liquidity and wrap
             IVault(vaultAddress).afterPresale();
             IWETH(tokenInfo.token1).deposit{value: contributionAmount}();
 
             // 6) compute slippage-adjusted price
             (uint160 sqrt0,,,,,,) = pool.slot0();
-            uint256 spotPriceX96 = Conversions.sqrtPriceX96ToPrice(
-                sqrt0,
-                18
-            );
-            // add 0.5% slippage tolerance
+            uint256 spotPriceX96 = Conversions.sqrtPriceX96ToPrice(sqrt0, 18);
             uint256 slippagePriceX96 = spotPriceX96 + (spotPriceX96 * 5) / 1000;
 
             // 7) swap with a limit order at slippagePriceX96
@@ -296,11 +302,7 @@
                     receiver:      address(this),
                     token0:        tokenInfo.token0,
                     token1:        tokenInfo.token1,
-                    basePriceX96:  Conversions.priceToSqrtPriceX96(
-                                    int256(slippagePriceX96),
-                                    tickSpacing,
-                                    18
-                                ),
+                    basePriceX96:  Conversions.priceToSqrtPriceX96(int256(slippagePriceX96), tickSpacing, 18),
                     amountToSwap:  contributionAmount,
                     slippageTolerance: 1,
                     zeroForOne:    false,
@@ -308,14 +310,8 @@
                 })
             );
 
-            // 8) emit for off-chain indexing, then payouts
-            emit Finalized(
-                raisedBalance,
-                feeTaken,
-                contributionAmount,
-                slippagePriceX96
-            );
-
+            // 8) emit + payouts
+            emit Finalized(raisedBalance, feeTaken, contributionAmount, slippagePriceX96);
             _payReferrals();
             _withdrawExcessEth();
         }
@@ -495,6 +491,15 @@
               }
           }
           return count;
+      }
+
+      function canFinalize() external view returns (bool allowed, bool needsOwner) {
+          if (finalized) return (false, false);
+          bool expired = hasExpired();
+          bool reachedSoftCap = address(this).balance >= softCap;
+          if (!expired && !reachedSoftCap) return (false, false);
+          bool ownerWindow = expired && block.timestamp <= deadline + 30 days;
+          return (true, ownerWindow);
       }
 
       function getTimeLeft() external view returns (uint256) {
