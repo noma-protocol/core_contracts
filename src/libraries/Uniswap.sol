@@ -130,8 +130,13 @@ library Uniswap {
         int24  tickSpacing   = IUniswapV3Pool(params.poolAddress).tickSpacing(); 
         // Convert basePriceX96 before slippage calculation
         uint256 basePrice = Conversions.sqrtPriceX96ToPrice(params.basePriceX96, IERC20Metadata(params.zeroForOne ? params.token1 : params.token0).decimals());
-        uint160 slippagePrice = Conversions.priceToSqrtPriceX96(
-            int256(params.zeroForOne ? basePrice - (basePrice * 5 / 100) : basePrice + (basePrice * 5 / 100)), 
+        uint160 slippagePrice = Conversions
+        .priceToSqrtPriceX96(
+            int256(
+                params.zeroForOne ? 
+                basePrice - (basePrice * params.slippageTolerance / 100) : 
+                basePrice + (basePrice * params.slippageTolerance / 100)
+            ), 
             tickSpacing, 
             IERC20Metadata(params.zeroForOne ? params.token1 : params.token0).decimals()
         );
