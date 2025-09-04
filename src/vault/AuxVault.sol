@@ -31,10 +31,16 @@ interface IStakingRewards {
     function notifyRewardAmount(uint256 reward) external;
 }
 
+interface ILendingVault {
+    function vaultSelfRepayLoans(uint256 fundsToPull,uint256 start,uint256 limit) external returns (uint256 totalLoans, uint256 collateralToReturn);
+}
+
 error NotAuthorized();
 error OnlyInternalCalls();
 error NotInitialized();
 error NoLiquidity();
+
+event LoanRepaidOnBehalf(address indexed who, uint256 amount, uint256 collateralReleased);
 
 /**
  * @title AuxVault
@@ -244,6 +250,21 @@ contract AuxVault {
         ).deferredDeploy(
             deployer
         );
+    }
+
+    /**
+     * @notice Triggers self repayment of qualified loans.
+     */
+    function selfRepayLoans(
+        uint256 amountToPull, 
+        uint256 start, 
+        uint256 limit
+    ) public onlyManagerOrMultiSig {
+
+        (uint256 collateralToReturn, uint256 totalRepaid) = 
+        ILendingVault(address(this)).vaultSelfRepayLoans(amountToPull, start, limit);
+
+        emit LoanRepaidOnBehalf(msg.sender, totalRepaid, collateralToReturn);
     }
 
     function setProtocolParameters(

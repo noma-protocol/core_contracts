@@ -29,6 +29,10 @@ interface IRewardsCalculator {
     function calculateRewards(RewardParams memory params) external pure returns (uint256);
 }
 
+interface ILendingVault {
+    function vaultSelfRepayLoans(uint256 fundsToPull, uint256 start, uint256 limit) external;
+}
+
 // Custom errors
 error StakingContractNotSet();
 error Unauthorized();
@@ -41,6 +45,7 @@ error NoStakingRewards();
  */
 contract StakingVault is BaseVault {
     using SafeERC20 for IERC20;
+
     /**
      * @notice Mints and distributes staking rewards to the staking contract.
      * @param caller    entity to receive caller fee
@@ -55,32 +60,50 @@ contract StakingVault is BaseVault {
         if (!_v.stakingEnabled) return;
 
         // 1) calculate base mint amounts
-        (uint256 toMintEth, uint256 toMint) = _calculateMint(addresses);
-        if (toMint == 0) revert NoStakingRewards();
+        (
+            uint256 toMintEth, 
+            uint256 toMint, 
+            uint256 selfRepayingLoansEth
+        ) = _calculateMint(addresses);
 
-        // 2) mint
-        bool ret = IVault(address(this)).mintTokens(address(this), toMint);
-        
-        // 3) distribute fees, returns post-fee amount
-        uint256 postFee = _distributeInflationFees(
-            caller,
-            addresses.pool,
-            toMint
+        ILendingVault(address(this))
+        .vaultSelfRepayLoans(
+            selfRepayingLoansEth,
+            0,
+            0
         );
-        _v.totalMinted += postFee;
 
-        // 4) send to staking & notify
-        _notifyStaking(postFee);
+        if (toMint > 0) {
+            bool ret = IVault(address(this)).mintTokens(address(this), toMint);
+            
+            if (ret) {
+                // 3) distribute fees, returns post-fee amount
+                uint256 postFee = _distributeInflationFees(
+                    caller,
+                    addresses.pool,
+                    toMint
+                );
+                _v.totalMinted += postFee;
 
-        // 5) redeploy floor liquidity
-        _redeployFloor(addresses.pool, toMintEth);
+                // 4) send to staking & notify
+                _notifyStaking(postFee);
 
-
+                // 5) redeploy floor liquidity
+                _redeployFloor(addresses.pool, toMintEth);            
+            }            
+        }
     }
 
     function _calculateMint(
         ProtocolAddresses memory addresses
-    ) internal view returns (uint256 toMintEth, uint256 toMint) {
+    ) internal view 
+    returns (
+        uint256 toMintEth, 
+        uint256 toMint, 
+        uint256 selfRepayingLoansEth
+    ) {
+        IVault v = IVault(address(this));
+
         // fetch data
         uint256 excessReserves = IModelHelper(modelHelper())
             .getExcessReserveBalance(
@@ -88,6 +111,10 @@ contract StakingVault is BaseVault {
                 address(this),
                 false
             );
+
+        selfRepayingLoansEth = excessReserves * (2 * v.getProtocolParameters().inflationFee) / 100; 
+        excessReserves -= selfRepayingLoansEth;
+
         uint256 totalStaked = IERC20(_v.tokenInfo.token0)
             .balanceOf(_v.stakingContract);
         uint256 intrinsicMin = IModelHelper(modelHelper())

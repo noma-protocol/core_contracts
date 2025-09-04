@@ -286,6 +286,7 @@ struct ProtocolParameters {
     uint256 loanFee;
     uint256 deployFee;
     uint256 presalePremium;
+    uint256 selfRepayLtvTreshold;
 }
 
 /// @notice Parameters for structuring liquidity.
@@ -329,4 +330,9 @@ struct SwapParams {
     uint256 slippageTolerance;
     bool zeroForOne; 
     bool isLimitOrder;
+}
+
+struct OutstandingLoan {
+    address who;
+    uint256 borrowAmount;
 }

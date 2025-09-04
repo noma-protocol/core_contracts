@@ -17,10 +17,12 @@ interface IStakingVault {
 
 interface ILendingVault {
     function borrowFromFloor(address who, uint256 borrowAmount, uint256 duration) external;
-    function paybackLoan(address who, uint256 amount) external;
+    function paybackLoan(address who, uint256 amount, bool isSelfRepaying) external;
     function rollLoan(address who, uint256 newDuration) external returns (uint256 amount);
     function addCollateral(address who, uint256 amount) external;
     function vaultDefaultLoans() external returns (uint256 totalBurned, uint256 loansDefaulted);
+    function vaultDefaultLoansRange(uint256 start, uint256 limit) external returns (uint256 totalBurned, uint256 loansDefaulted);
+    function vaultSelfRepayLoans(uint256 fundsToPull,uint256 start,uint256 limit) external returns (uint256 totalLoans, uint256 collateralToReturn);
 }
 
 // Events
@@ -64,11 +66,19 @@ contract ExtVault {
     /**
      * @notice Allows anybody to default expired loans.
      */
-    function defaultLoans() external {
+    function defaultLoans(uint256 start, uint256 limit) external {
+        uint256 totalBurned = 0;
+        uint256 loansDefaulted = 0;
 
-        (uint256 totalBurned, uint256 loansDefaulted) = 
-        ILendingVault(address(this))
-        .vaultDefaultLoans();
+        if (start == 0 && limit == 0) {
+            (totalBurned, loansDefaulted) = 
+            ILendingVault(address(this))
+            .vaultDefaultLoans();
+        } else {
+            (totalBurned, loansDefaulted) = 
+            ILendingVault(address(this))
+            .vaultDefaultLoansRange(start, limit);            
+        }
 
         emit DefaultLoans(totalBurned, loansDefaulted);
     }
@@ -79,7 +89,7 @@ contract ExtVault {
     function payback(uint256 amount) external  {
 
         ILendingVault(address(this))
-        .paybackLoan(msg.sender, amount);
+        .paybackLoan(msg.sender, amount, false);
 
         emit Payback(msg.sender, amount);
     }
@@ -162,13 +172,6 @@ contract ExtVault {
         emit Slide();
     }
 
-    /// @dev Reentrancy lock modifier.
-    modifier lock() {
-        if (_v.isLocked[address(this)]) revert Locked();
-        _v.isLocked[address(this)] = true;
-        _;
-        _v.isLocked[address(this)] = false;
-    }
 
     /**
      * @notice Retrieves the function selectors for this contract.
@@ -176,14 +179,15 @@ contract ExtVault {
      */
      // TODO add defaultLoans to selectors
     function getFunctionSelectors() external pure  returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](7);
+        bytes4[] memory selectors = new bytes4[](8);
         selectors[0] = bytes4(keccak256(bytes("shift()")));
         selectors[1] = bytes4(keccak256(bytes("slide()")));  
         selectors[2] = bytes4(keccak256(bytes("borrow(uint256,uint256)")));  
         selectors[3] = bytes4(keccak256(bytes("payback(uint256)")));
         selectors[4] = bytes4(keccak256(bytes("roll(uint256)")));  
         selectors[5] = bytes4(keccak256(bytes("addCollateral(uint256)")));           
-        selectors[6] = bytes4(keccak256(bytes("defaultLoans()"))); 
+        selectors[6] = bytes4(keccak256(bytes("defaultLoans(uint256,uint256)"))); 
+        selectors[7] = bytes4(keccak256(bytes("selfRepayLoans(uint256,uint256,uint256)"))); 
         return selectors;
     }
 }
