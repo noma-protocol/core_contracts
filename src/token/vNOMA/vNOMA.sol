@@ -25,4 +25,9 @@ contract VNoma is ERC20, AccessControl {
     function burn(address from, uint256 amount) external onlyRole(MINTER_ROLE) {
         _burn(from, amount);
     }
+    
+    function burnFrom(address account, uint256 amount) external onlyRole(MINTER_ROLE) {
+        // For redeemer contract - burns without requiring approval since caller has MINTER_ROLE
+        _burn(account, amount);
+    }
 }
