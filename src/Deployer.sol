@@ -168,10 +168,40 @@ contract Deployer is Ownable {
         }
     }
 
+    /// @notice Callback function called by Uniswap V3 during mint operations.
+    /// @dev Transfers owed amounts of token0 and token1 to the pool.
+    /// @param amount0Owed Amount of token0 owed to the pool.
+    /// @param amount1Owed Amount of token1 owed to the pool.
+    /// @param data Additional callback data.
+    function pancakeV3MintCallback(
+        uint256 amount0Owed, 
+        uint256 amount1Owed, 
+        bytes calldata data
+    ) external {
+        if (msg.sender != address(pool)) revert CallBackCaller();
+
+        uint256 token0Balance = IERC20(token0).balanceOf(address(this));
+        uint256 token1Balance = IERC20(token1).balanceOf(address(this));
+
+        if (token0Balance >= amount0Owed) {
+            if (amount0Owed > 0) IERC20(token0).safeTransfer(msg.sender, amount0Owed);
+        } else {
+            IERC20(token0).safeTransferFrom(vault, address(this), amount0Owed);
+            IERC20(token0).safeTransfer(msg.sender, amount0Owed);
+        }
+
+        if (token1Balance >= amount1Owed) {
+            if (amount1Owed > 0) IERC20(token1).safeTransfer(msg.sender, amount1Owed);
+        } else {
+            IERC20(token1).safeTransferFrom(vault, address(this), amount1Owed);
+            IERC20(token1).safeTransfer(msg.sender, amount1Owed);
+        }
+    }
+
     /// @notice Deploys a floor liquidity position.
     /// @param _floorPrice The target floor price.
     /// @param _amount0 The amount of token0 to allocate.
-    function deployFloor(uint256 _floorPrice, uint256 _amount0, int24 tickSpacing) public lock onlyFactory {
+    function deployFloor(uint256 _floorPrice, uint256 _amount0, int24 tickSpacing) public onlyFactory {
         (LiquidityPosition memory newPosition, ) = DeployHelper.deployFloor(
             pool, 
             vault, 
@@ -188,7 +218,7 @@ contract Deployer is Ownable {
     /// @param _bipsBelowSpot Basis points below the spot price.
     /// @param _bipsWidth Width of the position in basis points.
     /// @param _amount0 Amount of token0 to allocate.
-    function deployAnchor(uint256 _bipsBelowSpot, uint256 _bipsWidth, uint256 _amount0) public lock onlyFactory {
+    function deployAnchor(uint256 _bipsBelowSpot, uint256 _bipsWidth, uint256 _amount0) public onlyFactory {
         (LiquidityPosition memory newPosition,) = LiquidityDeployer.deployAnchor(
             address(pool),
             vault,
@@ -211,7 +241,7 @@ contract Deployer is Ownable {
     /// @param _upperDiscoveryPrice The upper discovery price.
     /// @return newPosition The deployed liquidity position.
     /// @return liquidityType The type of liquidity deployed.
-    function deployDiscovery(uint256 _upperDiscoveryPrice, bool isShiftOrSlide) public lock onlyFactory returns (
+    function deployDiscovery(uint256 _upperDiscoveryPrice, bool isShiftOrSlide) public onlyFactory returns (
         LiquidityPosition memory newPosition, 
         LiquidityType liquidityType
     ) {
@@ -319,7 +349,7 @@ contract Deployer is Ownable {
     }
 
     /// @notice Finalizes the deployment and transfers remaining balances back to the vault.
-    function finalize() public onlyFactory lock {
+    function finalize() public onlyFactory {
         if (
             floorPosition.upperTick == 0 || 
             anchorPosition.upperTick == 0 || 

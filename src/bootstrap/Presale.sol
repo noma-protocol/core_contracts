@@ -164,7 +164,7 @@
 
         hardCap = (
             (
-            normalizedLaunchSupply * normalizedInitialPrice
+                normalizedLaunchSupply * normalizedInitialPrice
             ) / 1e18
         ) * params.floorPercentage / 100;
 
@@ -183,7 +183,6 @@
         emergencyWithdrawalFlag = true;
     }
 
-
     /**
     * @notice Callback function for Uniswap v3 swaps.
     * @param amount0Delta Change in token0 balance.
@@ -201,52 +200,70 @@
             IERC20(tokenInfo.token1).safeTransfer(msg.sender, uint256(amount1Delta));
         }
     }
+    
+    /**
+    * @notice Callback function for Uniswap v3 swaps.
+    * @param amount0Delta Change in token0 balance.
+    * @param amount1Delta Change in token1 balance.
+    * @param data Additional data for the callback.
+    */
+    function pancakeV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data)
+        external
+    {
+        if (msg.sender != address(pool)) revert CallbackCaller();
 
-/**
-* @notice Allows users to contribute ETH to the presale.
-* @param referralCode Referral code used for this deposit (optional).
-*/
-function deposit(bytes32 referralCode) external payable lock {
-    if (hasExpired()) revert PresaleEnded();
-    if (finalized) revert AlreadyFinalized();
-    if (msg.value == 0) revert InvalidParameters();
-
-    // Prevent self-referrals by checking if the referral code is the sender's own code
-    if (referralCode != bytes32(0) && referralCode == keccak256(abi.encodePacked(msg.sender))) {
-        revert InvalidParameters();
+        if (amount0Delta > 0) {
+            IERC20(tokenInfo.token0).safeTransfer(msg.sender, uint256(amount0Delta));
+        } else if (amount1Delta > 0) {
+            IERC20(tokenInfo.token1).safeTransfer(msg.sender, uint256(amount1Delta));
+        }
     }
 
-    if (migrationContract == address(0)) {
-        if (msg.value < MIN_CONTRIBUTION || msg.value > MAX_CONTRIBUTION) revert InvalidParameters();
+    /**
+    * @notice Allows users to contribute ETH to the presale.
+    * @param referralCode Referral code used for this deposit (optional).
+    */
+    function deposit(bytes32 referralCode) external payable lock {
+        if (hasExpired()) revert PresaleEnded();
+        if (finalized) revert AlreadyFinalized();
+        if (msg.value == 0) revert InvalidParameters();
+
+        // Prevent self-referrals by checking if the referral code is the sender's own code
+        if (referralCode != bytes32(0) && referralCode == keccak256(abi.encodePacked(msg.sender))) {
+            revert InvalidParameters();
+        }
+
+        if (migrationContract == address(0)) {
+            if (msg.value < MIN_CONTRIBUTION || msg.value > MAX_CONTRIBUTION) revert InvalidParameters();
+        }
+
+        uint256 balance = address(this).balance;
+        if (balance > hardCap) revert HardCapExceeded();
+
+        // Track contributions
+        contributions[msg.sender] += msg.value;
+        totalDeposited += msg.value;
+        totalRaised    += msg.value;
+
+
+        // Mint p-assets based on ETH deposited at the presale price
+        uint256 amountToMint = (msg.value * 1e18) / initialPrice;
+        _mint(msg.sender, amountToMint);
+
+        // Add to contributors array if not already added
+        if (!isContributor[msg.sender]) {
+            contributors.push(msg.sender);
+            isContributor[msg.sender] = true;
+        }
+
+        // Handle referrals
+        if (referralCode != bytes32(0)) {
+            uint256 referralFee = (msg.value * referralPercentage) / 100;
+            referralEarnings[referralCode] += referralFee;
+        }
+
+        emit Deposit(msg.sender, msg.value, referralCode);
     }
-
-    uint256 balance = address(this).balance;
-    if (balance > hardCap) revert HardCapExceeded();
-
-    // Track contributions
-    contributions[msg.sender] += msg.value;
-    totalDeposited += msg.value;
-    totalRaised    += msg.value;
-
-
-    // Mint p-assets based on ETH deposited at the presale price
-    uint256 amountToMint = (msg.value * 1e18) / initialPrice;
-    _mint(msg.sender, amountToMint);
-
-    // Add to contributors array if not already added
-    if (!isContributor[msg.sender]) {
-        contributors.push(msg.sender);
-        isContributor[msg.sender] = true;
-    }
-
-    // Handle referrals
-    if (referralCode != bytes32(0)) {
-        uint256 referralFee = (msg.value * referralPercentage) / 100;
-        referralEarnings[referralCode] += referralFee;
-    }
-
-    emit Deposit(msg.sender, msg.value, referralCode);
-}
 
     /**
     * @notice Finalizes the presale and buys tokens.
@@ -336,40 +353,40 @@ function deposit(bytes32 referralCode) external payable lock {
     }
 
     function withdraw() external lock {
-    if (!finalized) revert NotFinalized();
+        if (!finalized) revert NotFinalized();
 
-    // Check if pAsset balance is greater than 0
-    uint256 balance = balanceOf(msg.sender);
+        // Check if pAsset balance is greater than 0
+        uint256 balance = balanceOf(msg.sender);
 
-    if (balance == 0) revert NoContributionsToWithdraw();
+        if (balance == 0) revert NoContributionsToWithdraw();
 
-    // Burn p-assets
-    _burn(msg.sender, balance);
+        // Burn p-assets
+        _burn(msg.sender, balance);
 
-    address token0 = pool.token0();
+        address token0 = pool.token0();
 
-    // Account for slippage due to floor tick width (max 1.5%)
-    uint256 minAmountOut = (balance * 985) / 1000;
+        // Account for slippage due to floor tick width (max 1.5%)
+        uint256 minAmountOut = (balance * 985) / 1000;
 
-    // Get the available balance of token0 in the contract
-    uint256 availableBalance = IERC20(token0).balanceOf(address(this));
+        // Get the available balance of token0 in the contract
+        uint256 availableBalance = IERC20(token0).balanceOf(address(this));
 
-    // Ensure the available balance meets the minimum required amount
-    uint256 amountToTransfer = minAmountOut;
+        // Ensure the available balance meets the minimum required amount
+        uint256 amountToTransfer = minAmountOut;
 
-    if (availableBalance < amountToTransfer) {
-        amountToTransfer = availableBalance;
-    }
+        if (availableBalance < amountToTransfer) {
+            amountToTransfer = availableBalance;
+        }
 
-    bool isMigration = migrationContract != address(0);
+        bool isMigration = migrationContract != address(0);
 
-    if (isMigration) {
-        IERC20(token0).safeTransfer(migrationContract, amountToTransfer);
-    } else {
-        IERC20(token0).safeTransfer(msg.sender, amountToTransfer);
-    }
+        if (isMigration) {
+            IERC20(token0).safeTransfer(migrationContract, amountToTransfer);
+        } else {
+            IERC20(token0).safeTransfer(msg.sender, amountToTransfer);
+        }
 
-    emit TokensWithdrawn(msg.sender, amountToTransfer);
+        emit TokensWithdrawn(msg.sender, amountToTransfer);
     }
 
     /**
@@ -404,20 +421,20 @@ function deposit(bytes32 referralCode) external payable lock {
     }
 
     function _withdrawExcessEth() internal {
-    if (!finalized) revert NotFinalized();
+        if (!finalized) revert NotFinalized();
 
-    uint256 balance = address(this).balance;
-        
-    // calculate fee
-    uint256 fee = (balance * teamFeePct) / 100;
+        uint256 balance = address(this).balance;
+            
+        // calculate fee
+        uint256 fee = (balance * teamFeePct) / 100;
 
-    address teamMultiSig = IFactory(factory).teamMultiSig();
+        address teamMultiSig = IFactory(factory).teamMultiSig();
 
-    if (teamMultiSig != address(0)) {
-        // transfer fee to team multisig
-        payable(teamMultiSig).transfer(fee);
-    }
-    payable(owner()).transfer(balance - fee);
+        if (teamMultiSig != address(0)) {
+            // transfer fee to team multisig
+            payable(teamMultiSig).transfer(fee);
+        }
+        payable(owner()).transfer(balance - fee);
     }
 
     /**
@@ -447,7 +464,7 @@ function deposit(bytes32 referralCode) external payable lock {
     * @param _migrationContract Address of the migration contract.
     */
     function setMigrationContract(address _migrationContract) external isFactoryOwner {
-    migrationContract = _migrationContract;
+        migrationContract = _migrationContract;
     }
 
     /**

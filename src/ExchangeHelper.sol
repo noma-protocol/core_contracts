@@ -312,6 +312,27 @@ contract ExchangeHelper {
         });
         poolAddress = address(0);
     }
+    
+    function pancakeV3SwapCallback(
+        int256 amount0Delta, 
+        int256 amount1Delta, 
+        bytes calldata data
+    ) external {
+        require(msg.sender == poolAddress, "ExchangeHelper: Callback caller not pool");
+
+        if (amount0Delta > 0) {
+            IERC20(tokenInfo.token0).transfer(msg.sender, uint256(amount0Delta));
+        } else if (amount1Delta > 0) {
+            IERC20(tokenInfo.token1).transfer(msg.sender, uint256(amount1Delta));
+        }
+
+        // Reset token info and pool address
+        tokenInfo = TokenInfo({
+            token0: address(0),
+            token1: address(0)
+        });
+        poolAddress = address(0);
+    }
 
     // Modifier to prevent reentrancy
     modifier lock() {

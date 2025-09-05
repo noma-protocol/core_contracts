@@ -80,6 +80,27 @@ contract BaseVault  {
         } 
     }
 
+    function pancakeV3MintCallback(
+        uint256 amount0Owed, 
+        uint256 amount1Owed, 
+        bytes calldata data
+    )
+        external
+    {
+        if (msg.sender != address(_v.pool)) revert CallbackCaller();
+
+        uint256 token0Balance = IERC20(_v.tokenInfo.token0).balanceOf(address(this));
+        uint256 token1Balance = IERC20(_v.tokenInfo.token1).balanceOf(address(this));
+
+        if (token0Balance >= amount0Owed) {
+            if (amount0Owed > 0) IERC20(_v.tokenInfo.token0).transfer(msg.sender, amount0Owed);
+        } 
+
+        if (token1Balance >= amount1Owed) {
+            if (amount1Owed > 0) IERC20(_v.tokenInfo.token1).transfer(msg.sender, amount1Owed); 
+        } 
+    }
+
     /**
      * @notice Initializes the vault with the necessary parameters.
      * @param _factory The address of the factory contract.

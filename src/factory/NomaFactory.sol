@@ -83,6 +83,7 @@ contract NomaFactory {
     address private extFactory;
     address private authority;
     address private uniswapV3Factory;
+    address private pancakeSwapV3Factory;
     address private teamMultisigAddress;
 
     uint256 private totalVaults;
@@ -101,19 +102,22 @@ contract NomaFactory {
     /**
      * @notice Constructor to initialize the NomaFactory contract.
      * @param _uniswapV3Factory The address of the Uniswap V3 Factory contract.
+     * @param _pancakeSwapV3Factory The address of the PancakeSwap V3 Factory contract.
      * @param _resolver The address of the Address Resolver contract.
      * @param _deployerFactory The address of the Deployment Factory contract.
      * @param _extFactory The address of the External Factory contract.
      */
     constructor(
         address _uniswapV3Factory,
+        address _pancakeSwapV3Factory,
         address _resolver,
         address _deployerFactory,
         address _extFactory,
         address _presaleFactory
     ) {
         if (
-            _uniswapV3Factory == address(0) || 
+            _uniswapV3Factory == address(0) ||
+            _pancakeSwapV3Factory == address(0) ||
             _resolver == address(0)         || 
             _deployerFactory == address(0)  || 
             _extFactory == address(0)       ||
@@ -123,6 +127,7 @@ contract NomaFactory {
         authority = msg.sender;
         teamMultisigAddress = msg.sender;
         uniswapV3Factory = _uniswapV3Factory;
+        pancakeSwapV3Factory = _pancakeSwapV3Factory;
         resolver = IAddressResolver(_resolver);
         deployerFactory = _deployerFactory;
         extFactory = _extFactory;
@@ -153,7 +158,8 @@ contract NomaFactory {
             address(proxy), 
             vaultDeployParams.token1,
             vaultDeployParams.feeTier,
-            tickSpacing
+            tickSpacing,
+            vaultDeployParams.useUniswap
         );
 
         DeploymentData memory data;
@@ -400,6 +406,7 @@ contract NomaFactory {
     * @param token1 The address of the second token.
     * @param feeTier The fee tier of the pool.
     * @param tickSpacing The tick spacing of the pool.
+    * @param useUniswap  Test desc
     * @return pool The address of the deployed Uniswap V3 pool.
     * @dev This internal function checks if the pool already exists; if not, it creates a new pool and initializes it with the provided price.
     */
@@ -408,9 +415,10 @@ contract NomaFactory {
         address token0,
         address token1,
         uint24 feeTier,
-        int24 tickSpacing
+        int24 tickSpacing,
+        bool useUniswap
     ) internal returns (IUniswapV3Pool pool) {
-        IUniswapV3Factory factory = IUniswapV3Factory(uniswapV3Factory);
+        IUniswapV3Factory factory = IUniswapV3Factory(useUniswap ? uniswapV3Factory : pancakeSwapV3Factory);
         IUniswapV3Pool _pool = IUniswapV3Pool(
             factory.getPool(token0, token1, feeTier)
         );

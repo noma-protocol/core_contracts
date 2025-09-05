@@ -100,6 +100,7 @@ struct VaultDeployParams {
     address token1;
     uint24 feeTier;
     uint8  presale;
+    bool useUniswap;
 }
 
 /// @notice Description of a vault.
