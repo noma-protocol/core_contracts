@@ -66,7 +66,10 @@
     mapping(address => uint256) public contributions;
 
     /// @notice Tracks referral earnings using referral codes.
-    mapping(bytes32 => uint256) public referralEarnings;
+    mapping(bytes8 => uint256) public referralEarnings;
+
+    /// @notice Tracks number of participants per referral code.
+    mapping(bytes8 => uint256) public referralParticipants;
 
     /// @notice Referral percentage 
     uint256 public referralPercentage;
@@ -105,8 +108,8 @@
     bool private locked;
 
     /// @notice Events
-    event Deposit(address indexed user, uint256 amount, bytes32 indexed referralCode);
-    event ReferralPaid(bytes32 indexed referralCode, uint256 amount);
+    event Deposit(address indexed user, uint256 amount, bytes8 indexed referralCode);
+    event ReferralPaid(bytes8 indexed referralCode, uint256 amount);
     event Finalized(
         uint256 totalRaised,
         uint256 feeTaken,
@@ -115,6 +118,7 @@
     );
     event TokenBurned(address indexed user, uint256 amount);
     event TokensWithdrawn(address indexed user, uint256 amount);
+    error NothingToClaim();
 
     /// @dev Custom errors
     error NotFinalized();
@@ -223,13 +227,12 @@
     * @notice Allows users to contribute ETH to the presale.
     * @param referralCode Referral code used for this deposit (optional).
     */
-    function deposit(bytes32 referralCode) external payable lock {
+    function deposit(bytes8 referralCode) external payable lock {
         if (hasExpired()) revert PresaleEnded();
         if (finalized) revert AlreadyFinalized();
         if (msg.value == 0) revert InvalidParameters();
 
-        // Prevent self-referrals by checking if the referral code is the sender's own code
-        if (referralCode != bytes32(0) && referralCode == keccak256(abi.encodePacked(msg.sender))) {
+        if (referralCode != bytes8(0) && referralCode == Utils.getReferralCode(msg.sender)) {
             revert InvalidParameters();
         }
 
@@ -257,9 +260,10 @@
         }
 
         // Handle referrals
-        if (referralCode != bytes32(0)) {
+        if (referralCode != bytes8(0)) {
             uint256 referralFee = (msg.value * referralPercentage) / 100;
             referralEarnings[referralCode] += referralFee;
+            referralParticipants[referralCode] += 1;
         }
 
         emit Deposit(msg.sender, msg.value, referralCode);
@@ -327,30 +331,7 @@
 
         // 8) emit + payouts
         emit Finalized(raisedBalance, feeTaken, contributionAmount, slippagePriceX96);
-        _payReferrals();
         _withdrawExcessEth();
-    }
-
-    /**
-    * @notice Pays out referral fees after finalization.
-    */
-    function _payReferrals() internal {
-        if (!finalized) revert NotFinalized();
-
-        for (uint256 i = 0; i < contributors.length; i++) {
-            bytes32 referralCode = Utils.generateReferralCode(contributors[i]);
-            uint256 fee = referralEarnings[referralCode];
-            if (fee > 0) {
-                referralEarnings[referralCode] = 0;
-
-                // Derive referrer address directly from referral code
-                address referrer = address(uint160(uint256(referralCode)));
-                if (referrer != address(0)) {
-                    payable(referrer).transfer(fee);
-                    emit ReferralPaid(referralCode, fee);
-                }
-            }
-        }
     }
 
     function withdraw() external lock {
@@ -388,6 +369,18 @@
         }
 
         emit TokensWithdrawn(msg.sender, amountToTransfer);
+    }
+
+    function claimReferralRewards() external {
+        if (!finalized) revert NotFinalized();
+
+        bytes8 code = Utils.getReferralCode(msg.sender);
+        uint256 amount = referralEarnings[code];
+        if (amount == 0) revert NothingToClaim();
+
+        referralEarnings[code] = 0;
+        payable(msg.sender).transfer(amount);
+        emit ReferralPaid(code, amount);
     }
 
     /**
@@ -489,7 +482,7 @@
     * @param referralCode The referral code to check.
     * @return Total ETH raised through the referral code.
     */
-    function getTotalReferredByCode(bytes32 referralCode) external view returns (uint256) {
+    function getTotalReferredByCode(bytes8 referralCode) external view returns (uint256) {
         return referralEarnings[referralCode];
     }
 
@@ -498,16 +491,25 @@
     * @param referralCode The referral code to check.
     * @return Number of users who used the referral code.
     */
-    function getReferralUserCount(bytes32 referralCode) external view returns (uint256) {
-        uint256 count = 0;
-        for (uint256 i = 0; i < contributors.length; i++) {
-            if (Utils.generateReferralCode(contributors[i]) == referralCode) {
-                count++;
-            }
-        }
-        return count;
+    function getReferralUserCount(bytes8 referralCode) external view returns (uint256) {
+        return referralParticipants[referralCode];
     }
 
+
+    /**
+    * @notice Returns the claimable referral rewards for a user.
+    * @param user The address of the user.
+    * @return Claimable referral rewards for the user.
+    */
+    function claimableReferralRewards(address user) external view returns (uint256) {
+        return referralEarnings[Utils.getReferralCode(user)];
+    }
+
+    /**
+    * @notice Checks if the presale can be finalized.
+    * @return allowed True if the presale can be finalized, false otherwise.
+    * @return ownerOnly True if only the owner can finalize, false if permissionless.
+     */
     function canFinalize() external view returns (bool allowed, bool ownerOnly) {
         if (finalized) return (false, false);
 
@@ -539,19 +541,35 @@
         return (true, false);
     }
 
+    /**
+    * @notice Returns the time left until the presale deadline.
+    * @return Time left in seconds. Returns 0 if the deadline has passed.
+    */
     function getTimeLeft() external view returns (uint256) {
         if (block.timestamp > deadline) return 0;
         return deadline - block.timestamp;
     }
 
+    /**
+    * @notice Checks if the presale has expired.
+    * @return True if the presale has expired, false otherwise.
+    */
     function hasExpired() public view returns (bool) {
         return block.timestamp > deadline;
     }
 
+    /**
+    * @notice Returns the current block timestamp.
+    * @return Current block timestamp.
+    */
     function getCurrentTimestamp() external view returns (uint256) {
         return block.timestamp;
     }
 
+    /**
+    * @notice Returns the parameters of the presale.
+    * @return LivePresaleParams struct containing presale parameters.
+    */
     function getPresaleParams() external view returns (LivePresaleParams memory) {
         return LivePresaleParams({
             softCap: softCap,

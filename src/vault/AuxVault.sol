@@ -291,6 +291,20 @@ contract AuxVault {
         ];
     }
 
+    function getReferralEntity(address who) public view returns (ReferralEntity memory) {
+        // Get referral code directly as bytes8
+        bytes8 code = Utils.getReferralCode(who);
+
+        if (code == bytes8(0)) {
+            return ReferralEntity({
+                code: bytes8(0),
+                totalReferred: 0
+            });
+        }
+
+        return _v.referrals[code];
+    }
+
     /**
      * @notice Retrieves the time since the last mint operation.
      * @return The time since the last mint operation.
@@ -364,7 +378,7 @@ contract AuxVault {
     function setReferralEntity(
         bytes8 code, 
         uint256 amount
-    ) public onlyExchangeHelper {
+    ) public onlyAuthorizedContracts {
         uint256 totalReferred = _v.referrals[code].totalReferred;
 
         _v.referrals[code] = ReferralEntity({
@@ -395,6 +409,20 @@ contract AuxVault {
     }
 
     /**
+     * @notice Retrieves the address of the vToken contract.
+     * @return The address of the contract.
+     */
+    function vToken() public view returns (address) {
+        IAddressResolver resolver = _v.resolver;
+        address _vToken = resolver
+        .getVaultAddress(
+            address(this), 
+            Utils.stringToBytes32("vToken")
+        );
+        return _vToken;
+    }
+
+    /**
      * @notice Modifier to restrict access to the authorized manager.`
      */
     modifier authorized() {
@@ -417,8 +445,8 @@ contract AuxVault {
         _;        
     }
 
-    modifier onlyExchangeHelper() {
-        if (msg.sender != exchangeHelper()) revert NotAuthorized();
+    modifier onlyAuthorizedContracts() {
+        if (msg.sender != exchangeHelper() || msg.sender != vToken()) revert NotAuthorized();
         _;        
     }
 
@@ -427,7 +455,7 @@ contract AuxVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](14);
+        bytes4[] memory selectors = new bytes4[](16);
         selectors[0] = bytes4(keccak256(bytes("teamMultiSig()")));
         selectors[1] = bytes4(keccak256(bytes("getProtocolParameters()")));  
         selectors[2] = bytes4(keccak256(bytes("getTimeSinceLastMint()")));
@@ -442,6 +470,9 @@ contract AuxVault {
         selectors[11] = bytes4(keccak256(bytes("mintTokens(address,uint256)")));
         selectors[12] = bytes4(keccak256(bytes("burnTokens(uint256)")));
         selectors[13] = bytes4(keccak256(bytes("bumpRewards(uint256)")));
+        selectors[14] = bytes4(keccak256(bytes("setReferralEntity(bytes8,uint256)")));
+        selectors[15] = bytes4(keccak256(bytes("getReferralEntity(address)")));
+        // selectors[15] = bytes4(keccak256(bytes("selfRepayLoans(uint256,uint256,uint256)")));
         return selectors;
     }
 }        

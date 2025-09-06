@@ -133,7 +133,7 @@ contract NomaFactory {
         deployerFactory = _deployerFactory;
         extFactory = _extFactory;
         presaleFactory = _presaleFactory;
-        permissionlessDeployEnabled = false;
+        permissionlessDeployEnabled = true;
     }
 
     function deployVault(

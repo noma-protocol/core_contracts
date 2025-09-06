@@ -79,10 +79,13 @@ library Utils {
     }
 
     function _getTickSpacing(uint24 _feeTier) internal pure returns (int24) {
+        // Uniswap
         if (_feeTier == 100) return 1;
         if (_feeTier == 500) return 10;
         if (_feeTier == 3000) return 60;
         if (_feeTier == 10000) return 200;
+        // PancakeSwap
+        if (_feeTier == 2500) return 50;
         revert InvalidFeeTier();
     }
 
@@ -278,8 +281,61 @@ library Utils {
 
         return code;
     }
-     
+    /**
+     * @notice Generates an 8‐character hex referral code string from an address
+     * @param user Address to generate a referral code for.
+     * @return The referral code as a string.
+     */
+    function getCodeString(address user) external pure returns (string memory) {
+        bytes8 code = bytes8(keccak256(abi.encodePacked(user)));
+        return toHexString(code);
+    }
 
+    /**
+     * @notice Generates a bytes8 referral code from an address
+     * @param user Address to generate a referral code for.
+     * @return The referral code as bytes8.
+     */
+    function getReferralCode(address user) external pure returns (bytes8) {
+        return bytes8(keccak256(abi.encodePacked(user)));
+    }
+
+    /**
+     * @notice Converts an 8-byte bytes8 value to its hexadecimal string representation.
+     * @param data The bytes8 value to convert.
+     * @return The hexadecimal string representation of the bytes8 value.
+     */
+    function toHexString(bytes8 data) internal pure returns (string memory) {
+        bytes16 _HEX_SYMBOLS = "0123456789abcdef";
+        bytes memory buffer = new bytes(16); // 8 bytes = 16 hex chars
+        for (uint256 i = 0; i < 8; i++) {
+            buffer[2*i]   = _HEX_SYMBOLS[uint8(data[i] >> 4)];
+            buffer[2*i+1] = _HEX_SYMBOLS[uint8(data[i] & 0x0f)];
+        }
+        return string(buffer); // e.g. "4252fe7dbea04ba0"
+    }
+
+    /**
+     * @notice Converts a string to a bytes8 value.
+     * @param source The string to convert (max 8 characters).
+     * @return result The bytes8 representation of the string.
+     */
+    function stringToBytes8(string memory source) internal pure returns (bytes8 result) {
+        bytes memory temp = bytes(source);
+        require(temp.length <= 8, "String too long for bytes8");
+        assembly {
+            // load first 32 bytes of `temp` data, starting after length slot
+            result := mload(add(temp, 32))
+        }
+        // if shorter than 8, high-order bytes are already zero-padded
+    }
+
+    /**
+     * @notice Computes the address of a contract deployed using CREATE2.
+     * @param bytecode The bytecode of the contract to be deployed.
+     * @param _salt The salt used in the CREATE2 deployment.
+     * @return The computed address of the contract.
+     */
     function getAddress(bytes memory bytecode, uint256 _salt)
         public
         view

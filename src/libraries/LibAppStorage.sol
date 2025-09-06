@@ -8,7 +8,8 @@ import {
     TokenInfo, 
     LiquidityPosition, 
     LoanPosition, 
-    ProtocolParameters
+    ProtocolParameters,
+    ReferralEntity
 }  from "../types/Types.sol";
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
 
@@ -65,6 +66,9 @@ struct VaultStorage {
     // Uniswap Fees
     uint256 feesAccumulatorToken0;
     uint256 feesAccumulatorToken1;
+
+    // Referral information
+    mapping(bytes8 => ReferralEntity) referrals;
 
     // Per vault lock state
     mapping(address => bool) isLocked;

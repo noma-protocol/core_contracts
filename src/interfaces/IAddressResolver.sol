@@ -62,5 +62,8 @@ interface IAddressResolver {
     /// @param names An array of bytes32 identifiers.
     /// @param destinations An array of contract addresses, each corresponding to the name at the same index in the names array.
     function importVaultAddress(address _vault, bytes32[] calldata names, address[] calldata destinations) external;
-
+    
+    /// @notice Returns the owner of the Address Resolver contract.
+    /// @dev This function is typically used to check administrative privileges.
+    function owner() external view returns (address);
 }
