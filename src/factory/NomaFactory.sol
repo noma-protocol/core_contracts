@@ -197,7 +197,7 @@ contract NomaFactory {
         ).preDeployVault(address(resolver));
 
 
-        (data.sNOMA, data.stakingContract, data.tokenRepo) = IExtFactory(extFactory)
+        (data.sNOMA, data.stakingContract, data.tokenRepo, data.vToken) = IExtFactory(extFactory)
             .deployAll(
                 vaultDeployParams.name,
                 vaultDeployParams.symbol,
@@ -270,7 +270,8 @@ contract NomaFactory {
             data.presaleContract,
             adaptiveSupply(),
             modelHelper(),
-            address(deployer)
+            address(deployer),
+            data.vToken
         );
 
         return (data.vaultAddress, address(data.pool), address(data.proxy));

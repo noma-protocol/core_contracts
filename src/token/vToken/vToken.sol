@@ -21,10 +21,12 @@ contract vToken is ERC20 {
 
     constructor(
         address _resolver,
-        string memory name_, 
-        string memory symbol_
-    ) ERC20(name_, symbol_) {
+        address _vaultAddress,
+        string memory _name, 
+        string memory _symbol
+    ) ERC20(_name, _symbol) {
         resolver = IAddressResolver(_resolver);
+        vault = _vaultAddress;
     }
 
     // Non-transferable: only mint/burn are allowed.
@@ -41,7 +43,9 @@ contract vToken is ERC20 {
         if (vault == address(0)) revert InvalidAddress();
 
         // Fetch caller's referral balance/entity
-        ReferralEntity memory referralEntity = IVault(vault).getReferralEntity(msg.sender);
+        ReferralEntity memory referralEntity = 
+        IVault(vault).getReferralEntity(msg.sender);
+        
         uint256 available = referralEntity.totalReferred;
         if (available == 0) revert NothingToMint();
 

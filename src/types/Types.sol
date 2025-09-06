@@ -318,6 +318,7 @@ struct DeploymentData {
     address stakingContract;
     address presaleContract;
     address tokenRepo;
+    address vToken;
 }
 
 // @notice Parameters for swapping tokens.

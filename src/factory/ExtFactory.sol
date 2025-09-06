@@ -7,6 +7,7 @@ import { Staking } from "../staking/Staking.sol";
 import { IAddressResolver }  from "../interfaces/IAddressResolver.sol";
 import { Utils } from "../libraries/Utils.sol";
 import { TokenRepo } from "../TokenRepo.sol";
+import { vToken } from "../token/vToken/vToken.sol";
 
 /**
  * @title ExtFactory
@@ -34,6 +35,9 @@ contract ExtFactory {
 
     /// @notice Instance of the deployed `TokenRepo` contract.
     TokenRepo public tokenRepo;
+
+    /// @notice Instance of the deployed `vToken` contract.
+    vToken public vtoken;
 
     /**
      * @notice Constructs the `ExtFactory` contract.
@@ -63,7 +67,8 @@ contract ExtFactory {
     ) external onlyFactory returns (
         address gonsTokenAddress, 
         address stakingContractAddress, 
-        address tokenRepoAddress
+        address tokenRepoAddress,
+        address vtokenAddress
     ) {
         // Deploy GonsToken contract
         gonsToken = new GonsToken(
@@ -77,10 +82,18 @@ contract ExtFactory {
         // Deploy Token Repo contract
         tokenRepo = new TokenRepo(vaultAddress);
 
+        // Deploy vToken contract
+        vtoken = new vToken(
+            address(resolver),
+            vaultAddress,
+            string(abi.encodePacked("v", symbol)),
+            string(abi.encodePacked("v", symbol))
+        );
+
         emit DeployerCreated(address(stakingContract));
 
         // Return addresses of the deployed contracts
-        return (address(gonsToken), address(stakingContract), address(tokenRepo));
+        return (address(gonsToken), address(stakingContract), address(tokenRepo), address(vtoken));
     }    
 
     /**

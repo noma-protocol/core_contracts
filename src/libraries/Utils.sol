@@ -97,17 +97,19 @@ library Utils {
         address presaleContract,
         address adaptiveSupply,
         address modelHelper,
-        address deployer
+        address deployer,
+        address vToken
     ) internal {
-        bytes32[] memory names = new bytes32[](6);
+        bytes32[] memory names = new bytes32[](7);
         names[0] = Utils.stringToBytes32("AdaptiveSupply");
         names[1] = Utils.stringToBytes32("ModelHelper");
         names[2] = Utils.stringToBytes32("Staking");
         names[3] = Utils.stringToBytes32("sNOMA");
         names[4] = Utils.stringToBytes32("Deployer");
         names[5] = Utils.stringToBytes32("Presale");
+        names[6] = Utils.stringToBytes32("vToken");
 
-        address[] memory destinations  = new address[](6);
+        address[] memory destinations  = new address[](7);
 
         destinations[0] = adaptiveSupply;
         destinations[1] = modelHelper;
@@ -115,6 +117,7 @@ library Utils {
         destinations[3] = sNOMA;
         destinations[4] = deployer;
         destinations[5] = presaleContract;
+        destinations[6] = vToken;
 
         IAddressResolver(resolverAddress).configureDeployerACL(vaultAddress);  
         IAddressResolver(resolverAddress).importVaultAddress(vaultAddress, names, destinations);

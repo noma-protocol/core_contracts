@@ -58,7 +58,8 @@ interface IExtFactory {
     ) external returns (
         address auxiliaryContract1, 
         address auxiliaryContract2, 
-        address auxiliaryContract3
+        address auxiliaryContract3,
+        address auxiliaryContract4
     );
 }
 
