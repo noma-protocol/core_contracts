@@ -323,14 +323,15 @@ struct DeploymentData {
 // @notice Parameters for swapping tokens.
 struct SwapParams {
     address poolAddress;
-    address receiver;
     address token0;
     address token1;
-    uint160 basePriceX96; 
-    uint256 amountToSwap; 
-    uint256 slippageTolerance;
-    bool zeroForOne; 
-    bool isLimitOrder;
+    address receiver;
+    bool    zeroForOne;       // true: token0 -> token1
+    uint256 amountToSwap;     // exact input
+    bool    isLimitOrder;     // if true, use basePriceX96 as limit
+    uint160 basePriceX96;     // only used if isLimitOrder == true
+    uint256 slippageTolerance; 
+    uint256 minAmountOut;    
 }
 
 struct OutstandingLoan {

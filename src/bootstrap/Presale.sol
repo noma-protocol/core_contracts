@@ -320,7 +320,8 @@
                 amountToSwap:  contributionAmount,
                 slippageTolerance: 1,
                 zeroForOne:    false,
-                isLimitOrder:  true
+                isLimitOrder:  true,
+                minAmountOut:  0
             })
         );
 

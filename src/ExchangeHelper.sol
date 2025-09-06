@@ -48,6 +48,7 @@ contract ExchangeHelper {
     function buyTokens(
         address pool, 
         uint256 price, 
+        uint256 minAmount,
         address receiver,
         bool isLimitOrder,
         uint256 slippageTolerance
@@ -88,7 +89,8 @@ contract ExchangeHelper {
             amountToSwap: msg.value,
             slippageTolerance: slippageTolerance,
             zeroForOne: false,
-            isLimitOrder: isLimitOrder
+            isLimitOrder: isLimitOrder,
+            minAmountOut: minAmount
         });
         
         // Perform the swap using the newly deposited WMON
@@ -119,6 +121,7 @@ contract ExchangeHelper {
         address pool, 
         uint256 price, 
         uint256 amount, 
+        uint256 minAmount,
         address receiver,
         bool isLimitOrder,
         uint256 slippageTolerance
@@ -152,7 +155,8 @@ contract ExchangeHelper {
             amountToSwap: amount,
             slippageTolerance: slippageTolerance,
             zeroForOne: false,
-            isLimitOrder: isLimitOrder
+            isLimitOrder: isLimitOrder,
+            minAmountOut: minAmount
         });
         
         // Perform the swap using the newly deposited WMON
@@ -173,6 +177,7 @@ contract ExchangeHelper {
         address pool, 
         uint256 price, 
         uint256 amount, 
+        uint256 minAmount,
         address receiver,
         bool isLimitOrder,
         uint256 slippageTolerance
@@ -207,7 +212,8 @@ contract ExchangeHelper {
             amountToSwap: amount,
             slippageTolerance: slippageTolerance,
             zeroForOne: true,
-            isLimitOrder: isLimitOrder
+            isLimitOrder: isLimitOrder,
+            minAmountOut: minAmount
         });
             
         // Perform the swap
@@ -233,6 +239,7 @@ contract ExchangeHelper {
         address pool, 
         uint256 price, 
         uint256 amount, 
+        uint256 minAmount,
         address receiver,
         bool isLimitOrder,
         uint256 slippageTolerance
@@ -265,7 +272,8 @@ contract ExchangeHelper {
             amountToSwap: amount,
             slippageTolerance: slippageTolerance,
             zeroForOne: true,
-            isLimitOrder: isLimitOrder
+            isLimitOrder: isLimitOrder,
+            minAmountOut: minAmount
         });
             
         // Perform the swap
@@ -312,7 +320,7 @@ contract ExchangeHelper {
         });
         poolAddress = address(0);
     }
-    
+
     function pancakeV3SwapCallback(
         int256 amount0Delta, 
         int256 amount1Delta, 

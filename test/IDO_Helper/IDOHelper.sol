@@ -59,9 +59,10 @@ contract IDOHelper {
                 decimals
             ),
             amountToSwap: amount,
-            slippageTolerance: 1,
+            slippageTolerance: 10,
             zeroForOne: false,
-            isLimitOrder: false
+            isLimitOrder: false,
+            minAmountOut: 0
         });
         
         Uniswap.swap(
@@ -82,9 +83,10 @@ contract IDOHelper {
                 decimals
             ),
             amountToSwap: amount,
-            slippageTolerance: 1,
+            slippageTolerance: 10,
             zeroForOne: true,
-            isLimitOrder: false
+            isLimitOrder: false,
+            minAmountOut: 0
         });
 
         Uniswap.swap(

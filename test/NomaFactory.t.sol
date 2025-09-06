@@ -100,6 +100,7 @@ contract NomaFactoryTest is Test {
         // Noma Factory
         nomaFactory = new NomaFactory(
             uniswapFactory,
+            address(0), 
             address(resolver),
             address(deploymentFactory),
             address(extFactory),
@@ -157,7 +158,8 @@ contract NomaFactoryTest is Test {
             5e15,       // inflationFee
             27,         // loanFee
             0.01e18,    // deployFee (ETH)
-            25e16       // presalePremium (25%)
+            25e16,      // presalePremium (25%)
+            1_250       // self repaying loan ltv treshold
         );
 
         vm.prank(deployer);
@@ -176,7 +178,8 @@ contract NomaFactoryTest is Test {
                 0,
                 WMON,         // Token1 address
                 3000,         // Uniswap V3 Fee tier
-                0             // Presale
+                0,            // Presale
+                true          // use Uniswap
             );
 
         // 1. Expect revert using custom error signature
@@ -205,18 +208,19 @@ contract NomaFactoryTest is Test {
         configureResolver();    
 
         VaultDeployParams memory vaultDeployParams = 
-            VaultDeployParams(
-                "Noma Token", // Name
-                "NOMA",       // Symbol
-                18,           // Decimals
-                100e18,       // Total supply
-                200e18,       // Max supply
-                1e18,         // IDO Price
-                0,
-                WMON,         // Token1 address
-                3000,         // Uniswap V3 Fee tier
-                0             // Presale
-            );
+        VaultDeployParams(
+            "Noma Token", // Name
+            "NOMA",       // Symbol
+            18,           // Decimals
+            100e18,       // Total supply
+            200e18,       // Max supply
+            1e18,         // IDO Price
+            0,
+            WMON,         // Token1 address
+            3000,         // Uniswap V3 Fee tier
+            0,            // Presale
+            true          // use Uniswap
+        );
 
         PresaleUserParams memory presaleParams =
         PresaleUserParams(
@@ -244,15 +248,16 @@ contract NomaFactoryTest is Test {
         VaultDeployParams memory vaultDeployParams = 
         VaultDeployParams(
             "Noma Token", // Name
-            "NOMA",         // Symbol
-            18,            // Decimals
+            "NOMA",       // Symbol
+            18,           // Decimals
             100e18,       // Total supply
             200e18,       // Max supply
-            1e18,          // IDO Price
+            1e18,         // IDO Price
             0,
-            WMON,          // Token1 address
-            3000,          // Uniswap V3 Fee tier
-            0              // Presale
+            WMON,         // Token1 address
+            3000,         // Uniswap V3 Fee tier
+            0,            // Presale
+            true          // use Uniswap
         );
 
         PresaleUserParams memory presaleParams =
@@ -272,18 +277,19 @@ contract NomaFactoryTest is Test {
         nomaFactory.setPermissionlessDeploy(true);
 
         vaultDeployParams = 
-            VaultDeployParams(
-                "Noma Token", // Name
-                "NOMA",        // Symbol
-                18,           // Decimals
-                100e18,       // Total supply
-                200e18,       // Max supply
-                1e18,         // IDO Price
-                0,
-                WMON,         // Token1 address
-                3000,         // Uniswap V3 Fee tier
-                0             // Presale
-            );
+        VaultDeployParams(
+            "Noma Token", // Name
+            "NOMA",       // Symbol
+            18,           // Decimals
+            100e18,       // Total supply
+            200e18,       // Max supply
+            1e18,         // IDO Price
+            0,
+            WMON,         // Token1 address
+            3000,         // Uniswap V3 Fee tier
+            0,            // Presale
+            true          // use Uniswap
+        );
 
         vm.expectRevert(abi.encodeWithSignature("TokenAlreadyExistsError()"));
 
@@ -313,7 +319,8 @@ contract NomaFactoryTest is Test {
             5e15,       // inflationFee
             27,         // loanFee
             0.01e18,    // deployFee (ETH)
-            25e16       // presalePremium (25%)
+            25e16,      // presalePremium (25%)
+            1_250       // self repaying loan ltv treshold
         );
 
         vm.prank(deployer);
@@ -339,18 +346,19 @@ contract NomaFactoryTest is Test {
         configureResolver();    
 
         VaultDeployParams memory vaultDeployParams = 
-            VaultDeployParams(
-                "Noma Token", // Name
-                "NOMA",       // Symbol
-                18,           // Decimals
-                100e18,       // Total supply
-                200e18,       // Max supply
-                1e18,         // IDO Price
-                0,
-                WMON,         // Token1 address
-                3000,         // Uniswap V3 Fee tier
-                0             // Presale
-            );
+        VaultDeployParams(
+            "Noma Token", // Name
+            "NOMA",       // Symbol
+            18,           // Decimals
+            100e18,       // Total supply
+            200e18,       // Max supply
+            1e18,         // IDO Price
+            0,
+            WMON,         // Token1 address
+            3000,         // Uniswap V3 Fee tier
+            0,            // Presale
+            true          // use Uniswap
+        );
 
         vm.expectRevert(abi.encodeWithSignature("NotAuthorityError()"));
 
@@ -376,18 +384,19 @@ contract NomaFactoryTest is Test {
         configureResolver();    
 
         VaultDeployParams memory vaultDeployParams = 
-            VaultDeployParams(
-                "Noma Token", // Name
-                "NOMA",        // Symbol
-                18,           // Decimals
-                100e18,       // Total supply
-                200e18,       // Max supply
-                1e18,         // IDO Price
-                0,
-                WMON,         // Token1 address
-                3000,         // Uniswap V3 Fee tier
-                0             // Presale
-            );
+        VaultDeployParams(
+            "Noma Token", // Name
+            "NOMA",       // Symbol
+            18,           // Decimals
+            100e18,       // Total supply
+            200e18,       // Max supply
+            1e18,         // IDO Price
+            0,
+            WMON,         // Token1 address
+            3000,         // Uniswap V3 Fee tier
+            0,            // Presale
+            true          // use Uniswap
+        );
 
         vm.prank(deployer);
         nomaFactory.setPermissionlessDeploy(true);
@@ -413,18 +422,19 @@ contract NomaFactoryTest is Test {
         configureResolver();    
 
         VaultDeployParams memory vaultDeployParams = 
-            VaultDeployParams(
-                "Noma Token", // Name
-                "NOMA",       // Symbol
-                18,           // Decimals
-                100e18,       // Total supply
-                200e18,       // Max supply
-                1e18,         // IDO Price
-                0,
-                WMON,         // Token1 address
-                3000,         // Uniswap V3 Fee tier
-                0             // Presale
-            );
+        VaultDeployParams(
+            "Noma Token", // Name
+            "NOMA",       // Symbol
+            18,           // Decimals
+            100e18,       // Total supply
+            200e18,       // Max supply
+            1e18,         // IDO Price
+            0,
+            WMON,         // Token1 address
+            3000,         // Uniswap V3 Fee tier
+            0,            // Presale
+            true          // use Uniswap
+        );
 
         vm.prank(deployer);
         nomaFactory.setPermissionlessDeploy(true);
@@ -456,18 +466,20 @@ contract NomaFactoryTest is Test {
         assertEq(vaultDesc.token1, WMON);
 
         vaultDeployParams = 
-            VaultDeployParams(
-                "Test Token", // Name
-                "TEST",       // Symbol
-                18,           // Decimals
-                100e18,       // Total supply
-                200e18,       // Max supply
-                1e18,         // IDO Price
-                0,
-                WMON,         // Token1 address
-                3000,         // Uniswap V3 Fee tier
-                0             // Presale
-            );
+        VaultDeployParams(
+            "Test Token", // Name
+            "TEST",       // Symbol
+            18,           // Decimals
+            100e18,       // Total supply
+            200e18,       // Max supply
+            1e18,         // IDO Price
+            0,
+            WMON,         // Token1 address
+            3000,         // Uniswap V3 Fee tier
+            0,             // Presale
+            true          // use Uniswap
+        );
+
 
         // 1. Call the function
         vm.prank(user);
@@ -510,8 +522,10 @@ contract NomaFactoryTest is Test {
             0,
             WMON,               // Token1 address
             3000,               // Uniswap V3 Fee tier
-            0                   // Presale
+            0,             // Presale
+            true          // use Uniswap
         );
+
 
         // Vault 2 parameters
         VaultDeployParams memory vault2Params = VaultDeployParams(
@@ -524,8 +538,10 @@ contract NomaFactoryTest is Test {
             0,
             WMON,               // Token1 address
             3000,               // Uniswap V3 Fee tier
-            0                   // Presale
+            0,             // Presale
+            true          // use Uniswap
         );
+
 
         // Set permissionless deploy to allow multiple vaults
         vm.prank(deployer);
