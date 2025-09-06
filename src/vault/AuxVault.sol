@@ -7,7 +7,7 @@ import { ProtocolParameters, LiquidityPosition } from "../types/Types.sol";
 import { Utils } from "../libraries/Utils.sol";
 import { IModelHelper } from "../interfaces/IModelHelper.sol";
 import { IDeployer } from "../interfaces/IDeployer.sol";
-import { LiquidityType, ProtocolAddresses, LiquidityInternalPars } from "../types/Types.sol";
+import { LiquidityType, ProtocolAddresses, LiquidityInternalPars, ReferralEntity } from "../types/Types.sol";
 import { DeployHelper } from "../libraries/DeployHelper.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Uniswap } from "../libraries/Uniswap.sol";
@@ -19,6 +19,7 @@ import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/I
 import { TickMath } from "v3-core/libraries/TickMath.sol";
 import { LiquidityDeployer } from "../libraries/LiquidityDeployer.sol";
 import { LiquidityOps } from "../libraries/LiquidityOps.sol";
+import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
 
 interface INomaFactory {
     function deferredDeploy(address deployer) external;
@@ -356,6 +357,44 @@ contract AuxVault {
     }
     
     /**
+     * @notice Sets or updates a referral entity.
+     * @param code The referral code.
+     * @param amount The amount to add to the total referred.
+     */
+    function setReferralEntity(
+        bytes8 code, 
+        uint256 amount
+    ) public onlyExchangeHelper {
+        uint256 totalReferred = _v.referrals[code].totalReferred;
+
+        _v.referrals[code] = ReferralEntity({
+            code: code,
+            totalReferred: (totalReferred + amount)
+        });
+    }
+
+    /**
+     * @notice Retrieves the address of the exchange helper.
+     * @return The address of the contract.
+     */
+    function exchangeHelper() public view returns (address) {
+        IAddressResolver resolver = _v.resolver;
+        address _exchangeHelper = resolver
+        .getVaultAddress(
+            address(this), 
+            Utils.stringToBytes32("ExchangeHelper")
+        );
+        if (_exchangeHelper == address(0)) {
+            _exchangeHelper = resolver
+                .requireAndGetAddress(
+                    Utils.stringToBytes32("ExchangeHelper"), 
+                    "no ExchangeHelper"
+                );
+        }
+        return _exchangeHelper;
+    }
+
+    /**
      * @notice Modifier to restrict access to the authorized manager.`
      */
     modifier authorized() {
@@ -375,6 +414,11 @@ contract AuxVault {
      */
     modifier onlyInternalCalls() {
         if (msg.sender != _v.factory && msg.sender != address(this)) revert OnlyInternalCalls();
+        _;        
+    }
+
+    modifier onlyExchangeHelper() {
+        if (msg.sender != exchangeHelper()) revert NotAuthorized();
         _;        
     }
 

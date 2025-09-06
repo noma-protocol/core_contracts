@@ -98,6 +98,7 @@ contract NomaFactory {
     mapping(bytes32 => bool) private deployedTokenHashes;
 
     mapping(address => VaultDeployParams) private deferredDeployParams;
+    mapping(address => address) private poolToVaultMap;
 
     /**
      * @notice Constructor to initialize the NomaFactory contract.
@@ -256,6 +257,8 @@ contract NomaFactory {
 
         vaultsRepository[data.vaultAddress] = vaultDesc;
         _vaults[msg.sender].add(data.vaultAddress);
+        poolToVaultMap[address(data.pool)] = data.vaultAddress;
+
         deployers.add(msg.sender);
         totalVaults += 1;
 
@@ -678,6 +681,19 @@ contract NomaFactory {
         return _vaults[_deployer].at(index);
     }
 
+    /**
+     * @notice Retrieves the vault address associated with a given Uniswap V3 pool.
+     * @param pool The address of the Uniswap V3 pool.
+     * @return The address of the vault associated with the specified pool.
+     */
+    function getVaultFromPool(address pool) public view returns (address) {
+        return poolToVaultMap[pool];
+    }
+
+    /**
+     * @notice Retrieves the address of the authority.
+     * @return The address of the authority.
+     */
     function owner() public view returns (address) {
         return authority;
     }
@@ -714,6 +730,10 @@ contract NomaFactory {
                 );
     }
 
+    /**
+     * @notice Retrieves the address of the team multisig wallet.
+     * @return The address of the team multisig wallet.
+     */
     function teamMultiSig() public view returns (address) {
         return teamMultisigAddress;
     }

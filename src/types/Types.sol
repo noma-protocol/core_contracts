@@ -334,7 +334,14 @@ struct SwapParams {
     uint256 minAmountOut;    
 }
 
+// @notice Represents an outstanding loan.
 struct OutstandingLoan {
     address who;
     uint256 borrowAmount;
+}
+
+// @notice Represents a referral entity.
+struct ReferralEntity {
+    bytes8  code;
+    uint256 totalReferred;
 }

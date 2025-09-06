@@ -20,6 +20,14 @@ interface IWETH {
     function balanceOf(address owner) external returns (uint256);
 }
 
+interface INomaFactory {
+    function getVaultFromPool(address pool) external view returns (address);
+}
+
+interface IVault {
+    function setReferralEntity(bytes8 code, uint256 amount) external;
+}
+
 contract ExchangeHelper {
 
     event BoughtTokensETH(address who, uint256 amount);
@@ -34,14 +42,18 @@ contract ExchangeHelper {
 
     // TokenInfo state variable
     TokenInfo public tokenInfo;
-    address public poolAddress;
 
     address public WMON = address(0);
+    address public nomaFactory = address(0);
 
     // Lock state variable to prevent reentrancy
     bool private locked;
 
-    constructor(address wrappedMonAddress) {
+    constructor(
+        address nomaFactoryAddress, 
+        address wrappedMonAddress
+    ) {
+        nomaFactory = nomaFactoryAddress;
         WMON = wrappedMonAddress;
     }
 
@@ -51,7 +63,8 @@ contract ExchangeHelper {
         uint256 minAmount,
         address receiver,
         bool isLimitOrder,
-        uint256 slippageTolerance
+        uint256 slippageTolerance,
+        bytes8 referralCode
     ) public payable lock {
 
         if (msg.value <= 0) {
@@ -65,7 +78,6 @@ contract ExchangeHelper {
             token0: IUniswapV3Pool(pool).token0(),
             token1: IUniswapV3Pool(pool).token1()
         });
-        poolAddress = pool;
         uint8 decimals = IERC20Metadata(tokenInfo.token0).decimals();
 
         // --- Record the initial WMON balance to avoid refunding extra ---
@@ -94,7 +106,7 @@ contract ExchangeHelper {
         });
         
         // Perform the swap using the newly deposited WMON
-        (int256 amount0, ) = Uniswap
+        (int256 amount0, int256 amount1) = Uniswap
         .swap(
             swapParams
         );
@@ -113,6 +125,11 @@ contract ExchangeHelper {
             payable(receiver).transfer(refundAmount);
         }
 
+        // track referrals if a code is provided
+        if (referralCode != bytes8(0)) {
+            _trackReferralVolume(pool, referralCode, amount1);
+        }
+
         emit BoughtTokensETH(receiver, SignedMath.abs(amount0));
     }
 
@@ -124,7 +141,8 @@ contract ExchangeHelper {
         uint256 minAmount,
         address receiver,
         bool isLimitOrder,
-        uint256 slippageTolerance
+        uint256 slippageTolerance,
+        bytes8 referralCode
     ) public lock {
         if (amount <= 0) {
             revert InvalidAmount();
@@ -136,7 +154,6 @@ contract ExchangeHelper {
             token0: IUniswapV3Pool(pool).token0(),
             token1: IUniswapV3Pool(pool).token1()
         });    
-        poolAddress = pool;    
         IERC20(tokenInfo.token1).transferFrom(msg.sender, address(this), amount);
         uint8 decimals = IERC20Metadata(tokenInfo.token1).decimals();
 
@@ -160,7 +177,7 @@ contract ExchangeHelper {
         });
         
         // Perform the swap using the newly deposited WMON
-        (int256 amount0, ) = Uniswap
+        (int256 amount0, int256 amount1) = Uniswap
         .swap(
             swapParams
         );       
@@ -170,6 +187,11 @@ contract ExchangeHelper {
             revert InvalidSwap();
         }
         
+        // track referrals if a code is provided
+        if (referralCode != bytes8(0)) {
+            _trackReferralVolume(pool, referralCode, amount1);
+        }
+
         emit  BoughtTokensWETH(receiver, SignedMath.abs(amount0));
     }
     
@@ -180,7 +202,8 @@ contract ExchangeHelper {
         uint256 minAmount,
         address receiver,
         bool isLimitOrder,
-        uint256 slippageTolerance
+        uint256 slippageTolerance,
+        bytes8 referralCode
     ) public lock {
         if (amount <= 0) {
             revert InvalidAmount();
@@ -192,10 +215,8 @@ contract ExchangeHelper {
             token0: IUniswapV3Pool(pool).token0(),
             token1: IUniswapV3Pool(pool).token1()
         });    
-        poolAddress = pool;    
         address token0 = tokenInfo.token0;
         IERC20(tokenInfo.token0).transferFrom(msg.sender, address(this), amount);
-        uint8 decimals = IERC20Metadata(tokenInfo.token0).decimals();
 
         // Swap Params
         SwapParams memory swapParams = SwapParams({
@@ -207,7 +228,7 @@ contract ExchangeHelper {
             .priceToSqrtPriceX96(
                 int256(price), 
                 tickSpacing, 
-                decimals
+                IERC20Metadata(tokenInfo.token0).decimals()
             ),
             amountToSwap: amount,
             slippageTolerance: slippageTolerance,
@@ -222,14 +243,18 @@ contract ExchangeHelper {
             revert InvalidSwap();
         }
         
-        uint256 balanceAfterSwap = IERC20Metadata(token0).balanceOf(address(this));
 
-        uint256 refund = balanceAfterSwap > (amount - uint256(amount0)) ?
+        uint256 refund = IERC20Metadata(token0).balanceOf(address(this)) > (amount - uint256(amount0)) ?
             amount - uint256(amount0) :
-            balanceAfterSwap;  
+            IERC20Metadata(token0).balanceOf(address(this));  
 
         if (refund > 0) {
             IERC20(token0).transfer(msg.sender, refund);
+        }
+
+        // track referrals if a code is provided
+        if (referralCode != bytes8(0)) {
+            _trackReferralVolume(pool, referralCode, amount1);
         }
 
         emit SoldTokensETH(receiver, SignedMath.abs(amount1));
@@ -242,7 +267,8 @@ contract ExchangeHelper {
         uint256 minAmount,
         address receiver,
         bool isLimitOrder,
-        uint256 slippageTolerance
+        uint256 slippageTolerance,
+        bytes8 referralCode
     ) public lock {
         require(amount > 0, "ExchangeHelper: Amount must be greater than 0");
         
@@ -252,10 +278,7 @@ contract ExchangeHelper {
             token0: IUniswapV3Pool(pool).token0(),
             token1: IUniswapV3Pool(pool).token1()
         });    
-        poolAddress = pool;    
-        address token0 = tokenInfo.token0;
         IERC20(tokenInfo.token0).transferFrom(msg.sender, address(this), amount);
-        uint8 decimals = IERC20Metadata(tokenInfo.token0).decimals();
 
         // Swap Params
         SwapParams memory swapParams = SwapParams({
@@ -267,7 +290,7 @@ contract ExchangeHelper {
             .priceToSqrtPriceX96(
                 int256(price), 
                 tickSpacing, 
-                decimals
+                IERC20Metadata(tokenInfo.token0).decimals()
             ),
             amountToSwap: amount,
             slippageTolerance: slippageTolerance,
@@ -284,28 +307,42 @@ contract ExchangeHelper {
         IWETH(WMON).withdraw(ethReceived);
         payable(receiver).transfer(ethReceived);
 
-        uint256 balanceAfterSwap = IERC20Metadata(token0).balanceOf(address(this));
-
-        uint256 refund = balanceAfterSwap > (amount - uint256(amount0)) ?
+        uint256 refund = IERC20Metadata(tokenInfo.token0).balanceOf(address(this)) > (amount - uint256(amount0)) ?
             amount - uint256(amount0) :
-            balanceAfterSwap;  
+            IERC20Metadata(tokenInfo.token0).balanceOf(address(this));  
 
         if (refund > 0) {
-            IERC20(token0).transfer(msg.sender, refund);
+            IERC20(tokenInfo.token0).transfer(msg.sender, refund);
+        }
+
+        // track referrals if a code is provided
+        if (referralCode != bytes8(0)) {
+            _trackReferralVolume(pool, referralCode, amount1);
         }
 
         emit SoldTokensETH(receiver, SignedMath.abs(amount1));
     }
 
-        /**
-         * @notice Uniswap v3 callback function, called back on pool.swap
-         */
+    // Function to record referral usage
+    function _trackReferralVolume(address poolAddress, bytes8 code, int256 amount) internal {
+        address vault = INomaFactory(nomaFactory).getVaultFromPool(poolAddress);
+        if (vault != address(0)) {
+            IVault(vault).setReferralEntity(code, uint256(SignedMath.abs(amount)));
+        }
+    }
+
+    /**
+    * @notice Uniswap v3 callback function, called back on pool.swap
+    */
     function uniswapV3SwapCallback(
         int256 amount0Delta, 
         int256 amount1Delta, 
         bytes calldata data
     ) external {
-        require(msg.sender == poolAddress, "ExchangeHelper: Callback caller not pool");
+        address vault = INomaFactory(nomaFactory).getVaultFromPool(msg.sender);
+        if (vault == address(0)) {
+            revert InvalidSwap();
+        }
 
         if (amount0Delta > 0) {
             IERC20(tokenInfo.token0).transfer(msg.sender, uint256(amount0Delta));
@@ -313,20 +350,25 @@ contract ExchangeHelper {
             IERC20(tokenInfo.token1).transfer(msg.sender, uint256(amount1Delta));
         }
 
-        // Reset token info and pool address
+        // Reset token info 
         tokenInfo = TokenInfo({
             token0: address(0),
             token1: address(0)
         });
-        poolAddress = address(0);
     }
 
+    /**
+    * @notice PancakeSwap v3 callback function, called back on pool.swap
+    */
     function pancakeV3SwapCallback(
         int256 amount0Delta, 
         int256 amount1Delta, 
         bytes calldata data
     ) external {
-        require(msg.sender == poolAddress, "ExchangeHelper: Callback caller not pool");
+        address vault = INomaFactory(nomaFactory).getVaultFromPool(msg.sender);
+        if (vault == address(0)) {
+            revert InvalidSwap();
+        }
 
         if (amount0Delta > 0) {
             IERC20(tokenInfo.token0).transfer(msg.sender, uint256(amount0Delta));
@@ -334,12 +376,11 @@ contract ExchangeHelper {
             IERC20(tokenInfo.token1).transfer(msg.sender, uint256(amount1Delta));
         }
 
-        // Reset token info and pool address
+        // Reset token info 
         tokenInfo = TokenInfo({
             token0: address(0),
             token1: address(0)
         });
-        poolAddress = address(0);
     }
 
     // Modifier to prevent reentrancy
