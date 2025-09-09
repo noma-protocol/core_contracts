@@ -446,7 +446,7 @@ contract AuxVault {
     }
 
     modifier onlyAuthorizedContracts() {
-        if (msg.sender != exchangeHelper() || msg.sender != vToken()) revert NotAuthorized();
+        if (msg.sender != exchangeHelper() && msg.sender != vToken()) revert NotAuthorized();
         _;        
     }
 

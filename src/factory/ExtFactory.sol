@@ -86,6 +86,7 @@ contract ExtFactory {
         vtoken = new vToken(
             address(resolver),
             vaultAddress,
+            token0,
             string(abi.encodePacked("v", symbol)),
             string(abi.encodePacked("v", symbol))
         );

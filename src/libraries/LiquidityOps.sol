@@ -4,18 +4,16 @@ pragma solidity ^0.8.0;
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {TickMath} from 'v3-core/libraries/TickMath.sol';
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Uniswap} from "./Uniswap.sol";
 import {Utils} from "./Utils.sol";
 import {Conversions} from "./Conversions.sol";
 import {DecimalMath} from "./DecimalMath.sol";
-
 import {Underlying} from "./Underlying.sol";
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
 import {IDeployer} from "../interfaces/IDeployer.sol";
-
 import {IVault} from "../interfaces/IVault.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {
     LiquidityPosition, 

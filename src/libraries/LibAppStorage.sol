@@ -14,7 +14,7 @@ import {
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
 
 /**
- * @notice Storage structure for vault-related information.
+ * @notice Storage structure for vault state.
  */
 struct VaultStorage {
     // Vault state

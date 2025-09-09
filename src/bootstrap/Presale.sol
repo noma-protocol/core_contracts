@@ -123,6 +123,7 @@
     /// @dev Custom errors
     error NotFinalized();
     error AlreadyFinalized();
+    error AlreadyContributed();
     error PresaleOngoing();
     error PresaleEnded();
     error WithdrawNotAllowedYet();
@@ -159,6 +160,8 @@
         referralPercentage = _protocolParams.referralPercentage;
         factory = _factory;
         teamFeePct = _protocolParams.teamFee;
+
+        if (params.deadline < 3 days || params.deadline > 90 days) revert InvalidParameters();
 
         uint256 launchSupplyDecimals = IERC20Metadata(pool.token0()).decimals(); 
         uint256 initialPriceDecimals = 18; 
@@ -231,6 +234,7 @@
         if (hasExpired()) revert PresaleEnded();
         if (finalized) revert AlreadyFinalized();
         if (msg.value == 0) revert InvalidParameters();
+        if (isContributor[msg.sender]) revert AlreadyContributed();
 
         if (referralCode != bytes8(0) && referralCode == Utils.getReferralCode(msg.sender)) {
             revert InvalidParameters();

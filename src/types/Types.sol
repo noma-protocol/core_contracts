@@ -123,6 +123,7 @@ struct VaultDescription {
     address stakingContract;
 }
 
+/// @notice Parameters for initializing a vault.
 struct VaultInitParams {
     address vaultAddress;
     address owner;
@@ -135,11 +136,13 @@ struct VaultInitParams {
     ProtocolParameters protocolParameters;
 }
 
+/// @notice Parameters for a presale user.
 struct PresaleUserParams {
     uint256 softCap;
     uint256 deadline;
 }
 
+/// @notice Parameters for deploying a presale contract.
 struct PresaleDeployParams {
     address deployer;
     address vaultAddress;
@@ -155,6 +158,7 @@ struct PresaleDeployParams {
     uint256 totalSupply;    
 }
 
+/// @notice Parameters for a live presale.
 struct LivePresaleParams {
     uint256 softCap;
     uint256 hardCap;
@@ -164,6 +168,7 @@ struct LivePresaleParams {
     address deployer;
 }
 
+/// @notice Parameters for presale protocol configuration.
 struct PresaleProtocolParams {
     uint256 maxSoftCap;
     uint256 minContributionRatio;

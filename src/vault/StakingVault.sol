@@ -13,6 +13,7 @@ import {Uniswap} from "../libraries/Uniswap.sol";
 import {IVault} from "../interfaces/IVault.sol";
 import {DecimalMath} from "../libraries/DecimalMath.sol";
 import {LiquidityDeployer} from "../libraries/LiquidityDeployer.sol";
+import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
 
 import {
     LiquidityType,
@@ -30,7 +31,7 @@ interface IRewardsCalculator {
 }
 
 interface ILendingVault {
-    function vaultSelfRepayLoans(uint256 fundsToPull, uint256 start, uint256 limit) external;
+    function vaultSelfRepayLoans(uint256 fundsToPull, uint256 start, uint256 limit) external returns (uint256 eligibleCount, uint256 totalRepaid, uint256 nextIndex);
 }
 
 // Custom errors
@@ -55,7 +56,9 @@ contract StakingVault is BaseVault {
         address caller,
         ProtocolAddresses memory addresses
     ) public onlyInternalCalls {
-        require(msg.sender == address(this), "Unauthorized");
+        if (msg.sender != address(this)) {
+            revert Unauthorized();
+        }
         if (_v.stakingContract == address(0)) revert StakingContractNotSet();
         if (!_v.stakingEnabled) return;
 
@@ -66,7 +69,7 @@ contract StakingVault is BaseVault {
             uint256 selfRepayingLoansEth
         ) = _calculateMint(addresses);
 
-        ILendingVault(address(this))
+        (,uint256 totalRepaid,) = ILendingVault(address(this))
         .vaultSelfRepayLoans(
             selfRepayingLoansEth,
             0,
@@ -88,7 +91,7 @@ contract StakingVault is BaseVault {
                 // 4) send to staking & notify
                 _notifyStaking(postFee);
 
-                // 5) redeploy floor liquidity
+                // // 5) redeploy floor liquidity
                 _redeployFloor(addresses.pool, toMintEth);            
             }            
         }
@@ -117,8 +120,10 @@ contract StakingVault is BaseVault {
 
         uint256 totalStaked = IERC20(_v.tokenInfo.token0)
             .balanceOf(_v.stakingContract);
+
         uint256 intrinsicMin = IModelHelper(modelHelper())
             .getIntrinsicMinimumValue(address(this));
+
         uint256 circulating = IModelHelper(modelHelper())
             .getCirculatingSupply(
                 addresses.pool,
@@ -139,16 +144,16 @@ contract StakingVault is BaseVault {
         uint256 toMint
     ) internal returns (uint256 remain) {
         IVault v = IVault(address(this));
-
-        // vNOMA share set to inflation fee for now
-        uint256 vNomaShare = (toMint * v.getProtocolParameters().inflationFee) / 100;
-
         uint256 inflationFeePct = v.getProtocolParameters().inflationFee; // e.g. 5 means 5%
+        
+        // vNOMA share set to inflation fee for now
+        uint256 vNomaShare = (toMint * inflationFeePct) / 100;
+
         address teamMultisig = v.teamMultiSig();
-
+        
         uint256 baseAfterVnoma = toMint - vNomaShare;
-
         uint256 inflation = (baseAfterVnoma * inflationFeePct) / 100;
+
         if (inflation == 0) {
             if (_v.vNOMAContract != address(0)) {
                 IERC20(IUniswapV3Pool(poolAddr).token0()).safeTransfer(_v.vNOMAContract, vNomaShare);
@@ -175,8 +180,13 @@ contract StakingVault is BaseVault {
         if (_v.manager != address(0) && creatorFee > 0) {
             IERC20(token0).safeTransfer(_v.manager, creatorFee);
         }
-        if (_v.vNOMAContract != address(0) && vNomaShare > 0) {
-            IERC20(token0).safeTransfer(_v.vNOMAContract, vNomaShare);
+        if (vToken() != address(0) && vNomaShare > 0) {
+            IERC20(token0).safeTransfer(vToken(), vNomaShare);
+        } else {
+            // if no vToken, send to team
+            if (teamMultisig != address(0) && vNomaShare > 0) {
+                IERC20(token0).safeTransfer(teamMultisig, vNomaShare);
+            }
         }
 
         // remain is the base minus inflation 
@@ -209,20 +219,23 @@ contract StakingVault is BaseVault {
             LiquidityType.Floor
         );
             
-        Uniswap.collect(
+        Uniswap
+        .collect(
             poolAddr,
             address(this),
             _v.floorPosition.lowerTick,
             _v.floorPosition.upperTick
         );
 
-        LiquidityDeployer.reDeployFloor(
+        LiquidityDeployer
+        .reDeployFloor(
             poolAddr,
             address(this),
             floor0,
             floor1 + toMintEth,
             [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition]
         );
+
     }
     
     /**
@@ -260,16 +273,6 @@ contract StakingVault is BaseVault {
     }
 
     /**
-     * @notice Transfers excess balance to the deployer.
-     * @param addresses The protocol addresses.
-     * @param totalAmount The total amount to transfer.
-     */
-    function _transferExcessBalance(ProtocolAddresses memory addresses, uint256 totalAmount) internal {
-        IERC20 token1 = IERC20(IUniswapV3Pool(addresses.pool).token1());
-        token1.safeTransfer(addresses.deployer, totalAmount);
-    }
-
-    /**
      * @notice Retrieves the address of the rewards calculator.
      * @return The address of the rewards calculator.
      */
@@ -287,6 +290,20 @@ contract StakingVault is BaseVault {
             );
         }
         return _rewardsCalculator;
+    }
+
+    /**
+     * @notice Retrieves the address of the vToken contract.
+     * @return The address of the contract.
+     */
+    function vToken() public view returns (address) {
+        IAddressResolver resolver = _v.resolver;
+        address _vToken = resolver
+        .getVaultAddress(
+            address(this), 
+            Utils.stringToBytes32("vToken")
+        );
+        return _vToken;
     }
 
     /**
@@ -336,11 +353,13 @@ contract StakingVault is BaseVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure  override returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](4);
+        bytes4[] memory selectors = new bytes4[](6);
         selectors[0] = bytes4(keccak256(bytes("mintAndDistributeRewards(address,(address,address,address,address,address,address))"))); 
         selectors[1] = bytes4(keccak256(bytes("setStakingContract(address)")));
         selectors[2] = bytes4(keccak256(bytes("getStakingContract()")));
         selectors[3] = bytes4(keccak256(bytes("stakingEnabled()")));
+        selectors[4] = bytes4(keccak256(bytes("setvNOMAContract(address)")));
+        selectors[5] = bytes4(keccak256(bytes("getVNOMAContract()")));
         return selectors;
     }
 }

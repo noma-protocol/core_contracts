@@ -189,15 +189,22 @@ contract NomaFactory {
         VaultDeployParams memory vaultDeployParams,
         DeploymentData memory data
     ) internal returns (address, address, address) {
-        (data.vaultAddress, data.vaultUpgrade) = IEtchVault(
+        (
+            data.vaultAddress, 
+            data.vaultUpgrade
+        ) = IEtchVault(
             resolver.requireAndGetAddress(
                 Utils.stringToBytes32("EtchVault"), 
                 "no EtchVault"
             )
         ).preDeployVault(address(resolver));
 
-
-        (data.sNOMA, data.stakingContract, data.tokenRepo, data.vToken) = IExtFactory(extFactory)
+        (
+            data.sNOMA, 
+            data.stakingContract, 
+            data.tokenRepo, 
+            data.vToken
+        ) = IExtFactory(extFactory)
             .deployAll(
                 vaultDeployParams.name,
                 vaultDeployParams.symbol,
@@ -327,10 +334,7 @@ contract NomaFactory {
     ) internal returns (address presaleAddress) {
         int24 tickSpacing = Utils._validateFeeTier(vaultDeployParams.feeTier);
 
-        uint256 initialPrice = 
-            keccak256(bytes(vaultDeployParams.symbol)) == keccak256(bytes("NOMA"))
-                ? vaultDeployParams.IDOPrice
-                : _calculatePresalePremium(vaultDeployParams.IDOPrice);
+        uint256 initialPrice = _calculatePresalePremium(vaultDeployParams.IDOPrice);
 
         if (vaultDeployParams.presale == 1) {
             

@@ -72,7 +72,6 @@ contract LendingVault is BaseVault {
         uint256 duration
     ) internal view returns (uint256 fees) {
         uint256 SECONDS_IN_DAY = 86400;
-        // daily rate = 0.057% -> 57 / 100_000
         uint256 daysElapsed = duration / SECONDS_IN_DAY;
         fees = (borrowAmount *_v.loanFee * daysElapsed) / 100_000;
     }
