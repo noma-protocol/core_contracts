@@ -10,7 +10,8 @@ import {
     VaultDeployParams, 
     PresaleUserParams, 
     VaultDescription, 
-    ProtocolParameters 
+    ProtocolParameters,
+    ExistingDeployData
 } from "../../src/types/Types.sol";
 import { IDOHelper } from "../../test/IDO_Helper/IDOHelper.sol";
 import { BaseVault } from  "../../src/vault/BaseVault.sol";
@@ -33,7 +34,7 @@ contract DeployVault is Script {
     address deployer = vm.envAddress("DEPLOYER");
 
     // Constants
-    address WMON = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
+    address WMON = 0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A;
     address private nomaFactoryAddress;
     address private modelHelper;
 
@@ -66,23 +67,28 @@ contract DeployVault is Script {
 
         NomaFactory nomaFactory = NomaFactory(nomaFactoryAddress);
 
+        bool useUniswap = true;
+        bool isFreshDeploy = true;
+
         VaultDeployParams memory vaultDeployParams = 
         VaultDeployParams(
-            "NOMA TOKEN",
-            "NOMA",
+            "BUNAD",
+            "BUN",
             18,
             14000000000000000000000000,
             1400000000000000000000000000,
-            10000000000000,
+            2000000000000000,
             0,
             WMON,
-            3000,
-            0 // 0 = no presale
+            useUniswap ? 3000 : 2500,
+            0, // 0 = no presale
+            isFreshDeploy, // isFreshDeploy
+            useUniswap // useUniswap 
         );
 
         PresaleUserParams memory presaleParams =
         PresaleUserParams(
-            27000000000000000000, // softCap
+            27000000000000000000,   // softCap
             900 //2592000          // duration (seconds)
         );
 
@@ -90,7 +96,11 @@ contract DeployVault is Script {
         nomaFactory
         .deployVault(
             presaleParams,
-            vaultDeployParams
+            vaultDeployParams,
+            ExistingDeployData({
+                pool: 0x104bab30b2983df47dd504114353B0A73bF663CE,
+                token0: 0x614da16Af43A8Ad0b9F419Ab78d14D163DEa6488
+            })            
         );
 
         BaseVault vaultContract = BaseVault(vault);

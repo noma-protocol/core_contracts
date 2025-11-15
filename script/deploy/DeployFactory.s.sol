@@ -14,7 +14,9 @@ import { VaultDeployParams, VaultDescription, ProtocolParameters, PresaleProtoco
 import { 
     VaultUpgrade, 
     VaultUpgradeStep1, 
-    VaultUpgradeStep2
+    VaultUpgradeStep2,
+    VaultUpgradeStep3,
+    VaultUpgradeStep4
 } from "../../src/vault/init/VaultUpgrade.sol";
 import { VaultAux } from "../../src/vault/init/VaultAux.sol";
 import { VaultFinalize } from "../../src/vault/init/VaultFinalize.sol";
@@ -54,8 +56,9 @@ contract DeployFactory is Script {
     address deployer = vm.envAddress("DEPLOYER");
 
     // Constants
-    address WMON = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
-    address private uniswapFactory = 0x961235a9020B05C44DF1026D956D1F4D78014276;
+    address WMON = 0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A;
+    address uniswapFactory = 0x204FAca1764B154221e35c0d20aBb3c525710498;
+    address pancakeSwapFactory = 0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865;
 
     ContractInfo[] private expectedAddressesInResolver;
 
@@ -76,24 +79,9 @@ contract DeployFactory is Script {
         expectedAddressesInResolver.push(
             ContractInfo("WMON", WMON)
         );
-
-        // WETH9 weth = new WETH9(deployer);
-
-        // expectedAddressesInResolver.push(
-        //     ContractInfo("WMON", address(weth))
-        // );
-
-        // console.log("WETH9 address: ", address(weth));
         
         // Model Helper
         modelHelper = new ModelHelper();
-        
-        // Exchange Helper
-        exchangeHelper = new ExchangeHelper(
-            WMON
-        );
-
-        console.log("Exchange Helper address: ", address(exchangeHelper));
 
         expectedAddressesInResolver.push(
             ContractInfo("ModelHelper", address(modelHelper))
@@ -141,6 +129,7 @@ contract DeployFactory is Script {
         // Noma Factory
         nomaFactory = new NomaFactory(
             uniswapFactory,
+            pancakeSwapFactory,
             address(resolver),
             address(deploymentFactory),
             address(extFactory),
@@ -151,6 +140,18 @@ contract DeployFactory is Script {
             ContractInfo("NomaFactory", address(nomaFactory))
         );
 
+        // Exchange Helper
+        exchangeHelper = new ExchangeHelper(
+            address(nomaFactory),
+            WMON
+        );
+
+        expectedAddressesInResolver.push(
+            ContractInfo("ExchangeHelper", address(exchangeHelper))
+        );
+
+        console.log("Exchange Helper address: ", address(exchangeHelper));
+
         ProtocolParameters memory _params =
         ProtocolParameters(
             10,         // Floor percentage of total supply
@@ -159,7 +160,7 @@ contract DeployFactory is Script {
             [200, 500], // Floor bips
             90e16,      // Shift liquidity ratio
             115e16,     // Slide liquidity ratio
-            25000,      // Discovery deploy bips
+            15000,      // Discovery deploy bips
             10,         // shiftAnchorUpperBips
             300,        // slideAnchorUpperBips
             5,          // lowBalanceThresholdFactor
@@ -167,14 +168,15 @@ contract DeployFactory is Script {
             5,          // inflationFee
             27,         // loan interest fee
             0.1e18,     // deployFee (ETH)
-            25          // presalePremium (25%)
+            25,         // presalePremium (25%)
+            1_250       // selfRepayLtvTreshold
         );
 
         PresaleProtocolParams memory _presaleParams =
         PresaleProtocolParams(
             60,         // Max soft cap (60%)
-            25,          // Min contribution ratio 
-            8,          // Max contribution ratio 
+            10,         // Min contribution ratio BPS 0.10%
+            800,        // Max contribution ratio BPS 8.00%
             20,         // Percentage of funds kept from presale (20%)
             30 days,    // Min deadline
             180 days,   // Max deadline
@@ -195,13 +197,19 @@ contract DeployFactory is Script {
         VaultUpgrade vaultUpgrade = new VaultUpgrade(deployer, address(nomaFactory));
         VaultUpgradeStep1 vaultUpgradeStep1 = new VaultUpgradeStep1(deployer);
         VaultUpgradeStep2 vaultUpgradeStep2 = new VaultUpgradeStep2(deployer);
+        VaultUpgradeStep3 vaultUpgradeStep3 = new VaultUpgradeStep3(deployer);
+        VaultUpgradeStep4 vaultUpgradeStep4 = new VaultUpgradeStep4(deployer);
+        
         VaultAux vaultAux = new VaultAux(deployer);
         VaultFinalize vaultFinalize = new VaultFinalize(deployer);
 
         vaultUpgrade.init(address(vaultUpgradeStep1));
         vaultUpgradeStep1.init(address(vaultUpgradeStep2), address(vaultUpgrade));
-        vaultUpgradeStep2.init(address(vaultAux), address(vaultUpgradeStep1));
-        vaultAux.init(deployer, address(vaultUpgradeStep2), address(vaultFinalize));
+        vaultUpgradeStep2.init(address(vaultUpgradeStep3), address(vaultUpgradeStep1));
+        vaultUpgradeStep3.init(address(vaultUpgradeStep4), address(vaultUpgradeStep2));
+        vaultUpgradeStep4.init(address(vaultAux), address(vaultUpgradeStep3));
+
+        vaultAux.init(deployer, address(vaultUpgradeStep4), address(vaultFinalize));
         vaultFinalize.init(deployer, address(vaultAux));
 
         expectedAddressesInResolver.push(
