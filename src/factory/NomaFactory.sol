@@ -26,7 +26,8 @@ import {
     VaultDeployParams,
     ProtocolParameters,
     PresaleProtocolParams,
-    DeploymentData
+    DeploymentData,
+    ExistingDeployData
 } from "../types/Types.sol";
 
 import {IVaultUpgrade, IEtchVault, IExtFactory, IDeployerFactory} from "../interfaces/IVaultUpgrades.sol";
@@ -138,7 +139,8 @@ contract NomaFactory {
 
     function deployVault(
         PresaleUserParams memory presaleParams,
-        VaultDeployParams memory vaultDeployParams
+        VaultDeployParams memory vaultDeployParams,
+        ExistingDeployData memory existingDeployData
     ) public payable
     checkDeployAuthority  
     returns (address, address, address) {
@@ -148,20 +150,26 @@ contract NomaFactory {
         bytes32 tokenHash = keccak256(abi.encodePacked(vaultDeployParams.name, vaultDeployParams.symbol));
         if (deployedTokenHashes[tokenHash]) revert TokenAlreadyExistsError();
 
-        (,ERC1967Proxy proxy, ) =
-        ITokenFactory(tokenFactory())
-            .deployNomaToken(vaultDeployParams);
+        ERC1967Proxy proxy; 
+        IUniswapV3Pool pool;
         
-        deployedTokenHashes[tokenHash] = true;
+        if (vaultDeployParams.isFreshDeploy) {
+            (, proxy, ) =
+            ITokenFactory(tokenFactory())
+                .deployNomaToken(vaultDeployParams);
 
-        IUniswapV3Pool pool = _deployPool(
-            vaultDeployParams.IDOPrice,
-            address(proxy), 
-            vaultDeployParams.token1,
-            vaultDeployParams.feeTier,
-            tickSpacing,
-            vaultDeployParams.useUniswap
-        );
+            pool = _deployPool(
+                vaultDeployParams.IDOPrice,
+                address(proxy), 
+                vaultDeployParams.token1,
+                vaultDeployParams.feeTier,
+                tickSpacing,
+                vaultDeployParams.useUniswap
+            );
+        } else {
+            proxy = ERC1967Proxy(payable(address(existingDeployData.token0)));
+            pool = IUniswapV3Pool(existingDeployData.pool);
+        }
 
         DeploymentData memory data;
         data.presaleParams = presaleParams;
@@ -407,6 +415,7 @@ contract NomaFactory {
         return presalePrice;
     }
 
+
     /**
     * @notice Deploys a Uniswap V3 pool for the given token pair and initializes it with the specified price.
     * @param _initPrice The initial price of the pool.
@@ -414,7 +423,6 @@ contract NomaFactory {
     * @param token1 The address of the second token.
     * @param feeTier The fee tier of the pool.
     * @param tickSpacing The tick spacing of the pool.
-    * @param useUniswap  Test desc
     * @return pool The address of the deployed Uniswap V3 pool.
     * @dev This internal function checks if the pool already exists; if not, it creates a new pool and initializes it with the provided price.
     */
