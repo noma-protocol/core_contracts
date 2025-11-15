@@ -13,6 +13,8 @@ library Utils {
     // Constants for Uniswap V3 tick range
     int24 public constant MIN_TICK = -887272;
     int24 public constant MAX_TICK = 887272;
+    // Other constants
+    uint16 public constant BPS = 10_000;
 
     // Custom errors
     error OutOfRange();
@@ -73,6 +75,10 @@ library Utils {
         return newTickValue;
     }
 
+    function applyBps(uint256 amount, uint16 bps) internal pure returns (uint256) {
+        // require(bps <= BPS, "bps > 100%");
+        return amount * bps / BPS;
+    }
 
     function _validateFeeTier(uint24 _feeTier) internal pure returns (int24) {
         return _getTickSpacing(_feeTier);

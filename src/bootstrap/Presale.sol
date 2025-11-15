@@ -183,8 +183,8 @@
             token1: pool.token1()
         });
 
-        MIN_CONTRIBUTION = hardCap / _protocolParams.minContributionRatio;
-        MAX_CONTRIBUTION = hardCap / _protocolParams.maxContributionRatio;
+        MIN_CONTRIBUTION = Utils.applyBps(hardCap, _protocolParams.minContributionRatioBps);
+        MAX_CONTRIBUTION = Utils.applyBps(hardCap, _protocolParams.maxContributionRatioBps);
 
         // Set default values for flags
         emergencyWithdrawalFlag = true;
@@ -320,6 +320,7 @@
         // 7) swap with a limit order at slippagePriceX96
         Uniswap.swap(
             SwapParams({
+                vaultAddress: address(0),
                 poolAddress:   address(pool),
                 receiver:      address(this),
                 token0:        tokenInfo.token0,
@@ -422,10 +423,8 @@
         if (!finalized) revert NotFinalized();
 
         uint256 balance = address(this).balance;
-            
         // calculate fee
         uint256 fee = (balance * teamFeePct) / 100;
-
         address teamMultiSig = IFactory(factory).teamMultiSig();
 
         if (teamMultiSig != address(0)) {
