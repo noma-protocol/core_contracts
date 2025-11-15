@@ -15,12 +15,15 @@ import {
     LiquidityType
 } from "../types/Types.sol";
 
+import "./TickMathExtra.sol";
+
 /**
  * @title DeployHelper Library
  * @dev This library provides helper functions for deploying liquidity positions on Uniswap V3.
  *      It facilitates the creation of "Floor" liquidity positions with calculated tick ranges.
  */
 library DeployHelper {
+    using TickMathExtra for int24;
 
     /**
      * @notice Deploys a "Floor" liquidity position in a Uniswap V3 pool.
@@ -63,8 +66,12 @@ library DeployHelper {
             )
         );
 
+        lowerTick = TickMathExtra.ceilToSpacing(lowerTick, tickSpacing);
+
         // Sets the upper tick value to lower tick + minimum tick spacing value
         int24 upperTick = lowerTick + tickSpacing;
+
+        upperTick = TickMathExtra.ceilToSpacing(upperTick, tickSpacing);
 
         // Compute the liquidity amount based on the provided token0 amount
         uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
