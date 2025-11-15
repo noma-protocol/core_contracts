@@ -100,6 +100,7 @@ struct VaultDeployParams {
     address token1;
     uint24 feeTier;
     uint8  presale;
+    bool isFreshDeploy;
     bool useUniswap;
 }
 
@@ -169,16 +170,18 @@ struct LivePresaleParams {
 }
 
 /// @notice Parameters for presale protocol configuration.
+/// @dev Only *_Bps fields are scaled by 10_000 (bps). Others remain plain integers.
 struct PresaleProtocolParams {
-    uint256 maxSoftCap;
-    uint256 minContributionRatio;
-    uint256 maxContributionRatio;
-    uint256 presalePercentage;
-    uint256 minDuration;
-    uint256 maxDuration;
-    uint256 referralPercentage;
-    uint256 teamFee;
+    uint256 maxSoftCap;                 // unchanged
+    uint16  minContributionRatioBps;    // NEW: bps (0–10_000)
+    uint16  maxContributionRatioBps;    // NEW: bps (0–10_000)
+    uint256 presalePercentage;          // unchanged (integer percent)
+    uint256 minDuration;                // unchanged (seconds)
+    uint256 maxDuration;                // unchanged (seconds)
+    uint256 referralPercentage;         // unchanged (integer percent)
+    uint256 teamFee;                    // unchanged (integer percent)
 }
+
 
 /// @notice Parameters for deploying liquidity positions.
 /// @param bips Basis points for the liquidity.
@@ -328,6 +331,7 @@ struct DeploymentData {
 
 // @notice Parameters for swapping tokens.
 struct SwapParams {
+    address vaultAddress;
     address poolAddress;
     address token0;
     address token1;
@@ -350,4 +354,10 @@ struct OutstandingLoan {
 struct ReferralEntity {
     bytes8  code;
     uint256 totalReferred;
+}
+
+// @notice Data for existing deployments.
+struct ExistingDeployData {
+    address token0;
+    address pool;
 }
