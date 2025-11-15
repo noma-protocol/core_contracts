@@ -58,6 +58,7 @@ contract ExchangeHelper {
     }
 
     function buyTokens(
+        address vaultAddress,
         address pool, 
         uint256 price, 
         uint256 minAmount,
@@ -88,6 +89,7 @@ contract ExchangeHelper {
 
         // Swap Params
         SwapParams memory swapParams = SwapParams({
+            vaultAddress: vaultAddress,
             poolAddress: address(pool),
             receiver: receiver,
             token0: tokenInfo.token0,
@@ -135,6 +137,7 @@ contract ExchangeHelper {
 
     // Requires approval for the token0 token
     function buyTokensWETH(
+        address vaultAddress,
         address pool, 
         uint256 price, 
         uint256 amount, 
@@ -159,6 +162,7 @@ contract ExchangeHelper {
 
         // Swap Params
         SwapParams memory swapParams = SwapParams({
+            vaultAddress: vaultAddress,
             poolAddress: address(pool),
             receiver: receiver,
             token0: tokenInfo.token0,
@@ -196,6 +200,7 @@ contract ExchangeHelper {
     }
     
     function sellTokens(
+        address vaultAddress,
         address pool, 
         uint256 price, 
         uint256 amount, 
@@ -220,6 +225,7 @@ contract ExchangeHelper {
 
         // Swap Params
         SwapParams memory swapParams = SwapParams({
+            vaultAddress: vaultAddress,
             poolAddress: address(pool),
             receiver: receiver,
             token0: tokenInfo.token0,
@@ -261,6 +267,7 @@ contract ExchangeHelper {
     }
 
     function sellTokensETH(
+        address vaultAddress,
         address pool, 
         uint256 price, 
         uint256 amount, 
@@ -282,6 +289,7 @@ contract ExchangeHelper {
 
         // Swap Params
         SwapParams memory swapParams = SwapParams({
+            vaultAddress: vaultAddress,
             poolAddress: address(pool),
             receiver: address(this),
             token0: tokenInfo.token0,
