@@ -3,13 +3,17 @@ pragma solidity ^0.8.0;
 
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {LiquidityType, SwapParams} from "../types/Types.sol";
+import {LiquidityType, LiquidityPosition, SwapParams} from "../types/Types.sol";
 import {Conversions} from "./Conversions.sol";
+import {TickMath} from "v3-core/libraries/TickMath.sol";
+import { IVault } from "../interfaces/IVault.sol";
 
 // Custom errors
 error ZeroLiquidty();
 error NoTokensExchanged();
 error InvalidSwap();
+error SlippageExceeded();
+error PriceImpactTooHigh();
 
 /**
  * @title Uniswap
@@ -120,43 +124,77 @@ library Uniswap {
     }
 
     /**
-     * @notice Executes a swap in a Uniswap V3 pool.
-     */
+    * @notice Executes an exact-input swap in a Uniswap V3 pool.
+    * Uses a wide price limit (unless isLimitOrder) so full input can be consumed,
+    * then enforces slippage via a post-swap minAmountOut check and a max-tick guard.
+    */
     function swap(
         SwapParams memory params
     ) internal returns (int256 amount0, int256 amount1) {
-        uint256 balanceBeforeSwap = IERC20Metadata(params.zeroForOne ? params.token1 : params.token0).balanceOf(params.receiver);
-        // immutables
-        int24  tickSpacing   = IUniswapV3Pool(params.poolAddress).tickSpacing(); 
-        // Convert basePriceX96 before slippage calculation
-        uint256 basePrice = Conversions.sqrtPriceX96ToPrice(params.basePriceX96, IERC20Metadata(params.zeroForOne ? params.token1 : params.token0).decimals());
-        uint160 slippagePrice = Conversions
-        .priceToSqrtPriceX96(
-            int256(
-                params.zeroForOne ? 
-                basePrice - (basePrice * params.slippageTolerance / 100) : 
-                basePrice + (basePrice * params.slippageTolerance / 100)
-            ), 
-            tickSpacing, 
-            IERC20Metadata(params.zeroForOne ? params.token1 : params.token0).decimals()
-        );
+        if (params.amountToSwap == 0) revert InvalidSwap();
+        if (params.receiver == address(0)) revert InvalidSwap();
 
-        try IUniswapV3Pool(params.poolAddress).swap(
-            params.receiver, 
-            params.zeroForOne, 
-            int256(params.amountToSwap), 
-            params.isLimitOrder ? params.basePriceX96 : slippagePrice,
+        // It's okay if minAmountOut is 0 for pure limit orders; otherwise recommend >0.
+        if (!params.isLimitOrder && params.minAmountOut == 0) {
+            revert SlippageExceeded();
+        }
+
+        // Wide price limit avoids early stop unless this is a true limit order.
+        uint160 sqrtPriceLimitX96 = params.isLimitOrder
+            ? params.basePriceX96
+            : (
+                params.zeroForOne
+                    ? (TickMath.MIN_SQRT_RATIO + 1)
+                    : (TickMath.MAX_SQRT_RATIO - 1)
+            );
+
+        try IUniswapV3Pool(params.poolAddress)
+        .swap(
+            params.receiver,
+            params.zeroForOne,
+            int256(params.amountToSwap), // exact input = positive
+            sqrtPriceLimitX96,
             ""
-        ) returns (int256 _amount0, int256 _amount1) {
-            // Capture the return values
-            amount0 = _amount0;
-            amount1 = _amount1;
+        ) returns (int256 a0, int256 a1) {
+            amount0 = a0;
+            amount1 = a1;
 
-            // Check if tokens were exchanged
-            uint256 balanceAfterSwap = IERC20Metadata(params.zeroForOne ? params.token1 : params.token0).balanceOf(params.receiver);
-            if (balanceBeforeSwap == balanceAfterSwap) {
-                revert NoTokensExchanged();
+            // Compute actual amountOut from pool deltas.
+            uint256 amountOut;
+            if (params.zeroForOne) {
+                // pool sent token1 => a1 < 0, out = -a1
+                if (a1 >= 0) revert NoTokensExchanged();
+                amountOut = uint256(-a1);
+            } else {
+                // pool sent token0 => a0 < 0, out = -a0
+                if (a0 >= 0) revert NoTokensExchanged();
+                amountOut = uint256(-a0);
             }
+
+            // Enforce slippage for market-style swaps
+            if (!params.isLimitOrder && amountOut < params.minAmountOut) {
+                revert SlippageExceeded();
+            }
+
+            if (params.vaultAddress != address(0)) {
+
+                int24 tickSpacing = IUniswapV3Pool(params.poolAddress).tickSpacing();
+
+                LiquidityPosition[3] memory positions = 
+                IVault(params.vaultAddress)
+                .getPositions();
+
+                int24 MAX_SAFE_TICK = positions[2].upperTick - tickSpacing;
+
+                // ---- Price impact guard (upper tick only) ----
+                // If the final tick is above MAX_SAFE_TICK, revert the whole swap.
+                // Because of revert, pool state and price both roll back.
+                (, int24 tickAfter,,,,,) = IUniswapV3Pool(params.poolAddress).slot0();
+                if (tickAfter > MAX_SAFE_TICK) {
+                    revert PriceImpactTooHigh();
+                }
+            }
+
         } catch {
             revert InvalidSwap();
         }
