@@ -20,9 +20,12 @@ interface ILendingVault {
     function paybackLoan(address who, uint256 amount, bool isSelfRepaying) external;
     function rollLoan(address who, uint256 newDuration) external returns (uint256 amount);
     function addCollateral(address who, uint256 amount) external;
+    function vaultSelfRepayLoans(uint256 fundsToPull,uint256 start,uint256 limit) external returns (uint256 totalLoans, uint256 collateralToReturn);
+}
+
+interface ILiquidationVault {
     function vaultDefaultLoans() external returns (uint256 totalBurned, uint256 loansDefaulted);
     function vaultDefaultLoansRange(uint256 start, uint256 limit) external returns (uint256 totalBurned, uint256 loansDefaulted);
-    function vaultSelfRepayLoans(uint256 fundsToPull,uint256 start,uint256 limit) external returns (uint256 totalLoans, uint256 collateralToReturn);
 }
 
 // Events
@@ -64,26 +67,6 @@ contract ExtVault {
     }
 
     /**
-     * @notice Allows anybody to default expired loans.
-     */
-    function defaultLoans(uint256 start, uint256 limit) external {
-        uint256 totalBurned = 0;
-        uint256 loansDefaulted = 0;
-
-        if (start == 0 && limit == 0) {
-            (totalBurned, loansDefaulted) = 
-            ILendingVault(address(this))
-            .vaultDefaultLoans();
-        } else {
-            (totalBurned, loansDefaulted) = 
-            ILendingVault(address(this))
-            .vaultDefaultLoansRange(start, limit);            
-        }
-
-        emit DefaultLoans(totalBurned, loansDefaulted);
-    }
-
-    /**
      * @notice Allows a user to pay back a loan.
      */
     function payback(uint256 amount) external  {
@@ -122,7 +105,6 @@ contract ExtVault {
         ILendingVault(address(this))
         .addCollateral(msg.sender, amount);
     }
-
 
     /**
      * @notice Shifts the liquidity positions in the vault.
@@ -172,6 +154,25 @@ contract ExtVault {
         emit Slide();
     }
 
+    /**
+     * @notice Allows anybody to default expired loans.
+     */
+    function defaultLoans(uint256 start, uint256 limit) external {
+        uint256 totalBurned = 0;
+        uint256 loansDefaulted = 0;
+
+        if (start == 0 && limit == 0) {
+            (totalBurned, loansDefaulted) = 
+            ILiquidationVault(address(this))
+            .vaultDefaultLoans();
+        } else {
+            (totalBurned, loansDefaulted) = 
+            ILiquidationVault(address(this))
+            .vaultDefaultLoansRange(start, limit);            
+        }
+
+        emit DefaultLoans(totalBurned, loansDefaulted);
+    }
 
     /**
      * @notice Retrieves the function selectors for this contract.

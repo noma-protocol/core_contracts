@@ -33,6 +33,7 @@ interface IStakingRewards {
 }
 
 interface ILendingVault {
+    function loanLTV(address who) external view returns (uint256 ltv1e18);
     function vaultSelfRepayLoans(uint256 fundsToPull,uint256 start,uint256 limit) external returns (uint256 totalLoans, uint256 collateralToReturn);
 }
 
@@ -91,128 +92,128 @@ contract AuxVault {
         );
     }
     
-    function bumpRewards(uint256 bnbAmount) public onlyManagerOrMultiSig {
-        if (!_v.initialized) revert NotInitialized();
+    // function bumpRewards(uint256 bnbAmount) public onlyManagerOrMultiSig {
+    //     if (!_v.initialized) revert NotInitialized();
         
-        LiquidityPosition[3] memory positions = [
-            _v.floorPosition, 
-            _v.anchorPosition, 
-            _v.discoveryPosition
-        ];
+    //     LiquidityPosition[3] memory positions = [
+    //         _v.floorPosition, 
+    //         _v.anchorPosition, 
+    //         _v.discoveryPosition
+    //     ];
 
-        (,,uint256 floorToken0Balance, uint256 floorToken1Balance) = IModelHelper(_v.modelHelper)
-        .getUnderlyingBalances(
-            address(_v.pool), 
-            address(this), 
-            LiquidityType.Floor
-        );
+    //     (,,uint256 floorToken0Balance, uint256 floorToken1Balance) = IModelHelper(_v.modelHelper)
+    //     .getUnderlyingBalances(
+    //         address(_v.pool), 
+    //         address(this), 
+    //         LiquidityType.Floor
+    //     );
 
-        (,,, uint256 anchorToken1Balance) = IModelHelper(_v.modelHelper)
-        .getUnderlyingBalances(
-            address(_v.pool), 
-            address(this), 
-            LiquidityType.Anchor
-        );
+    //     (,,, uint256 anchorToken1Balance) = IModelHelper(_v.modelHelper)
+    //     .getUnderlyingBalances(
+    //         address(_v.pool), 
+    //         address(this), 
+    //         LiquidityType.Anchor
+    //     );
 
-        // Collect fees from the pool
-        Uniswap.collect(
-            address(_v.pool),
-            address(this), 
-            positions[0].lowerTick, 
-            positions[0].upperTick
-        );
+    //     // Collect fees from the pool
+    //     Uniswap.collect(
+    //         address(_v.pool),
+    //         address(this), 
+    //         positions[0].lowerTick, 
+    //         positions[0].upperTick
+    //     );
 
-        // Collect anchor liquidity
-        Uniswap.collect(
-            address(_v.pool),
-            address(this), 
-            positions[1].lowerTick, 
-            positions[1].upperTick
-        );
+    //     // Collect anchor liquidity
+    //     Uniswap.collect(
+    //         address(_v.pool),
+    //         address(this), 
+    //         positions[1].lowerTick, 
+    //         positions[1].upperTick
+    //     );
 
-        _v.timeLastMinted = block.timestamp;
+    //     _v.timeLastMinted = block.timestamp;
 
-        uint256 imv = IModelHelper(_v.modelHelper)
-        .getIntrinsicMinimumValue(address(this));
+    //     uint256 imv = IModelHelper(_v.modelHelper)
+    //     .getIntrinsicMinimumValue(address(this));
         
-        INomaFactory(_v.factory)
-        .mintTokens(
-            address(this),
-            DecimalMath.divideDecimal(
-            bnbAmount, 
-            imv
-        )
-        );
+    //     INomaFactory(_v.factory)
+    //     .mintTokens(
+    //         address(this),
+    //         DecimalMath.divideDecimal(
+    //         bnbAmount, 
+    //         imv
+    //     )
+    //     );
         
-        if (_v.stakingContract == address(0)) {
-            revert NotInitialized();
-        }
+    //     if (_v.stakingContract == address(0)) {
+    //         revert NotInitialized();
+    //     }
 
-        IERC20(_v.tokenInfo.token0).transfer(
-            _v.stakingContract,
-            DecimalMath.divideDecimal(
-            bnbAmount, 
-            imv
-        )
-        );
+    //     IERC20(_v.tokenInfo.token0).transfer(
+    //         _v.stakingContract,
+    //         DecimalMath.divideDecimal(
+    //         bnbAmount, 
+    //         imv
+    //     )
+    //     );
 
-        IStakingRewards(_v.stakingContract)
-            .notifyRewardAmount(
-            DecimalMath.divideDecimal(
-                bnbAmount, 
-                imv
-            )
-        );     
+    //     IStakingRewards(_v.stakingContract)
+    //         .notifyRewardAmount(
+    //         DecimalMath.divideDecimal(
+    //             bnbAmount, 
+    //             imv
+    //         )
+    //     );     
 
-        LiquidityPosition memory newFloorPos = LiquidityDeployer
-        .reDeployFloor(
-            address(_v.pool), 
-            address(this), 
-            floorToken0Balance, 
-            floorToken1Balance + bnbAmount, 
-            positions
-        );     
+    //     LiquidityPosition memory newFloorPos = LiquidityDeployer
+    //     .reDeployFloor(
+    //         address(_v.pool), 
+    //         address(this), 
+    //         floorToken0Balance, 
+    //         floorToken1Balance + bnbAmount, 
+    //         positions
+    //     );     
 
-        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(_v.pool).slot0();
+    //     (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(_v.pool).slot0();
                   
-        // Deploy new anchor position
-        LiquidityPosition memory newAnchorPos = LiquidityOps
-        .reDeploy(
-            ProtocolAddresses({
-                pool: address(_v.pool),
-                modelHelper: _v.modelHelper,
-                vault: address(this),
-                deployer: _v.deployerContract,
-                presaleContract: _v.presaleContract,
-                adaptiveSupplyController: _v.adaptiveSupplyController
-            }),
-            LiquidityInternalPars({
-                lowerTick: positions[0].upperTick,
-                upperTick: Utils.addBipsToTick(
-                    TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
-                    IVault(address(this))
-                    .getProtocolParameters().shiftAnchorUpperBips,
-                    IERC20Metadata(
-                        IUniswapV3Pool(_v.pool).token1()
-                    ).decimals(),
-                    positions[0].tickSpacing
-                ),
-                amount1ToDeploy: anchorToken1Balance - bnbAmount,
-                liquidityType: LiquidityType.Anchor
-            }),
-            true
-        );
+    //     // Deploy new anchor position
+    //     LiquidityPosition memory newAnchorPos = LiquidityOps
+    //     .reDeploy(
+    //         ProtocolAddresses({
+    //             pool: address(_v.pool),
+    //             modelHelper: _v.modelHelper,
+    //             vault: address(this),
+    //             deployer: _v.deployerContract,
+    //             presaleContract: _v.presaleContract,
+    //             adaptiveSupplyController: _v.adaptiveSupplyController
+    //         }),
+    //         LiquidityInternalPars({
+    //             lowerTick: positions[0].upperTick,
+    //             upperTick: Utils.addBipsToTick(
+    //                 TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
+    //                 IVault(address(this))
+    //                 .getProtocolParameters().shiftAnchorUpperBips,
+    //                 IERC20Metadata(
+    //                     IUniswapV3Pool(_v.pool).token1()
+    //                 ).decimals(),
+    //                 positions[0].tickSpacing
+    //             ),
+    //             amount1ToDeploy: anchorToken1Balance - bnbAmount,
+    //             liquidityType: LiquidityType.Anchor
+    //         }),
+    //         true
+    //     );
 
-        positions = [
-            newFloorPos, 
-            newAnchorPos, 
-            positions[2]
-        ];
+    //     positions = [
+    //         newFloorPos, 
+    //         newAnchorPos, 
+    //         positions[2]
+    //     ];
 
-        _updatePositions(positions);
-        IModelHelper(_v.modelHelper).enforceSolvencyInvariant(address(this));
+    //     _updatePositions(positions);
+    //     IModelHelper(_v.modelHelper).enforceSolvencyInvariant(address(this));
 
-    }
+    // }
 
     function _setFees(
         LiquidityPosition[3] memory positions
@@ -455,7 +456,7 @@ contract AuxVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](16);
+        bytes4[] memory selectors = new bytes4[](15);
         selectors[0] = bytes4(keccak256(bytes("teamMultiSig()")));
         selectors[1] = bytes4(keccak256(bytes("getProtocolParameters()")));  
         selectors[2] = bytes4(keccak256(bytes("getTimeSinceLastMint()")));
@@ -463,15 +464,15 @@ contract AuxVault {
         selectors[4] = bytes4(keccak256(bytes("pool()")));
         selectors[5] = bytes4(keccak256(bytes("getPositions()")));
         selectors[6] = bytes4(keccak256(bytes("afterPresale()")));
-        selectors[7] = bytes4(keccak256(bytes("setProtocolParameters((uint8,uint8,uint8,uint16[2],uint256,uint256,int24,int24,int24,uint256,uint256,uint256,uint256,uint256,uint256))")));
+        selectors[7] = bytes4(keccak256(bytes("setProtocolParameters((uint8,uint8,uint8,uint16[2],uint256,uint256,int24,int24,int24,uint256,uint256,uint256,uint256,uint256,uint256,uint256))")));
         selectors[8] = bytes4(keccak256(bytes("setManager(address)")));
         selectors[9] = bytes4(keccak256(bytes("setModelHelper(address)")));
         selectors[10] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256,int24)[3])")));
         selectors[11] = bytes4(keccak256(bytes("mintTokens(address,uint256)")));
         selectors[12] = bytes4(keccak256(bytes("burnTokens(uint256)")));
-        selectors[13] = bytes4(keccak256(bytes("bumpRewards(uint256)")));
-        selectors[14] = bytes4(keccak256(bytes("setReferralEntity(bytes8,uint256)")));
-        selectors[15] = bytes4(keccak256(bytes("getReferralEntity(address)")));
+        // selectors[13] = bytes4(keccak256(bytes("bumpRewards(uint256)")));
+        selectors[13] = bytes4(keccak256(bytes("setReferralEntity(bytes8,uint256)")));
+        selectors[14] = bytes4(keccak256(bytes("getReferralEntity(address)")));
         // selectors[15] = bytes4(keccak256(bytes("selfRepayLoans(uint256,uint256,uint256)")));
         return selectors;
     }
