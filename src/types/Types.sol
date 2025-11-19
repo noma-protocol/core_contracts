@@ -296,6 +296,20 @@ struct ProtocolParameters {
     uint256 deployFee;
     uint256 presalePremium;
     uint256 selfRepayLtvTreshold;
+    uint256 halfStep;
+}
+
+/// @notice Parameters for configuring the protocol exposed to creators.
+struct CreatorFacingParameters {
+    int24 discoveryBips;
+    int24 shiftAnchorUpperBips;
+    int24 slideAnchorUpperBips;
+    uint256 lowBalanceThresholdFactor;
+    uint256 highBalanceThresholdFactor;
+    uint256 inflationFee;
+    uint256 loanFee;    
+    uint256 selfRepayLtvTreshold;
+    uint256 halfStep;
 }
 
 /// @notice Parameters for structuring liquidity.
