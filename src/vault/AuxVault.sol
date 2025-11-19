@@ -3,11 +3,18 @@ pragma solidity ^0.8.0;
 
 import { IUniswapV3Pool } from "v3-core/interfaces/IUniswapV3Pool.sol";
 import { VaultStorage } from "../libraries/LibAppStorage.sol";
-import { ProtocolParameters, LiquidityPosition } from "../types/Types.sol";
 import { Utils } from "../libraries/Utils.sol";
 import { IModelHelper } from "../interfaces/IModelHelper.sol";
 import { IDeployer } from "../interfaces/IDeployer.sol";
-import { LiquidityType, ProtocolAddresses, LiquidityInternalPars, ReferralEntity } from "../types/Types.sol";
+import { 
+    LiquidityType, 
+    LiquidityPosition,
+    ProtocolAddresses, 
+    LiquidityInternalPars, 
+    ReferralEntity, 
+    ProtocolParameters, 
+    CreatorFacingParameters 
+} from "../types/Types.sol";
 import { DeployHelper } from "../libraries/DeployHelper.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Uniswap } from "../libraries/Uniswap.sol";
@@ -269,12 +276,27 @@ contract AuxVault {
         emit LoanRepaidOnBehalf(msg.sender, totalRepaid, collateralToReturn);
     }
 
-    function setProtocolParameters(
-        ProtocolParameters memory protocolParameters
-    ) public onlyManagerOrMultiSig {
-        _v.protocolParameters = protocolParameters;
-    }
+    /**
+    * @notice Allows creators to update only the subset of protocol parameters
+    * that are explicitly creator-facing, leaving the rest unchanged.
+    */
+    function setProtocolParametersCreator(
+        CreatorFacingParameters memory protocolParameters
+    ) public onlyManager {
+        ProtocolParameters storage p = _v.protocolParameters;
 
+        // Copy over only the creator-facing fields
+        p.discoveryBips              = protocolParameters.discoveryBips;
+        p.shiftAnchorUpperBips       = protocolParameters.shiftAnchorUpperBips;
+        p.slideAnchorUpperBips       = protocolParameters.slideAnchorUpperBips;
+        p.lowBalanceThresholdFactor  = protocolParameters.lowBalanceThresholdFactor;
+        p.highBalanceThresholdFactor = protocolParameters.highBalanceThresholdFactor;
+        p.inflationFee               = protocolParameters.inflationFee;
+        p.loanFee                    = protocolParameters.loanFee;
+        p.selfRepayLtvTreshold       = protocolParameters.selfRepayLtvTreshold;
+        p.halfStep                   = protocolParameters.halfStep;
+    }
+    
     function setManager(address manager) public onlyManagerOrMultiSig {
         _v.manager = manager;
     }
@@ -347,7 +369,7 @@ contract AuxVault {
         return (_v.feesAccumulatorToken0, _v.feesAccumulatorToken1);
     }
 
-    function setModelHelper(address modelHelper) public onlyManagerOrMultiSig {
+    function setModelHelper(address modelHelper) public onlyMultiSig {
         _v.modelHelper = modelHelper;
     }   
 
@@ -388,6 +410,12 @@ contract AuxVault {
         });
     }
 
+    function setProtocolParameters(
+        ProtocolParameters memory protocolParameters
+    ) public onlyMultiSig {
+        _v.protocolParameters = protocolParameters;
+    }
+
     /**
      * @notice Retrieves the address of the exchange helper.
      * @return The address of the contract.
@@ -423,6 +451,14 @@ contract AuxVault {
         return _vToken;
     }
 
+    function getTotalCreatorEarnings() public returns (uint256) {
+        return _v.totalCreatorFees;
+    }
+
+    function getTotalTeamEarnings() public  returns (uint256) {
+        return _v.totalTeamFees;
+    }
+
     /**
      * @notice Modifier to restrict access to the authorized manager.`
      */
@@ -431,8 +467,23 @@ contract AuxVault {
         _;
     }
 
+    modifier onlyMultiSig() {
+        if (msg.sender != INomaFactory(_v.factory).teamMultiSig()) {
+            revert NotAuthorized();
+        }
+        _;        
+    }
+
+     modifier onlyManager() {
+        if (msg.sender != _v.manager) {
+            revert NotAuthorized();
+        }
+        _;
+    }   
+
     modifier onlyManagerOrMultiSig() {
-        if (msg.sender != _v.manager && msg.sender != INomaFactory(_v.factory).teamMultiSig()) {
+        address multiSig = INomaFactory(_v.factory).teamMultiSig();
+        if (msg.sender != _v.manager && msg.sender != multiSig) {
             revert NotAuthorized();
         }
         _;
@@ -456,7 +507,7 @@ contract AuxVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](15);
+        bytes4[] memory selectors = new bytes4[](18);
         selectors[0] = bytes4(keccak256(bytes("teamMultiSig()")));
         selectors[1] = bytes4(keccak256(bytes("getProtocolParameters()")));  
         selectors[2] = bytes4(keccak256(bytes("getTimeSinceLastMint()")));
@@ -474,6 +525,9 @@ contract AuxVault {
         selectors[13] = bytes4(keccak256(bytes("setReferralEntity(bytes8,uint256)")));
         selectors[14] = bytes4(keccak256(bytes("getReferralEntity(address)")));
         // selectors[15] = bytes4(keccak256(bytes("selfRepayLoans(uint256,uint256,uint256)")));
+        selectors[15] = bytes4(keccak256(bytes("setProtocolParametersCreator((int24,int24,int24,uint256,uint256,uint256,uint256,uint256))")));
+        selectors[16] = bytes4(keccak256(bytes("getTotalCreatorEarnings()")));
+        selectors[17] = bytes4(keccak256(bytes("getTotalTeamEarnings()")));
         return selectors;
     }
 }        

@@ -121,7 +121,7 @@ contract StakingVault is BaseVault {
         uint256 totalStaked = IERC20(_v.tokenInfo.token0)
             .balanceOf(_v.stakingContract);
 
-        uint256 intrinsicMin = IModelHelper(modelHelper())
+        uint256 imv = IModelHelper(modelHelper())
             .getIntrinsicMinimumValue(address(this));
 
         uint256 circulating = IModelHelper(modelHelper())
@@ -134,7 +134,7 @@ contract StakingVault is BaseVault {
             .calculateRewards(
                 RewardParams(excessReserves, circulating, totalStaked)
             );
-        toMint = DecimalMath.divideDecimal(toMintEth, intrinsicMin);
+        toMint = DecimalMath.divideDecimal(toMintEth, imv);
     }
 
 
@@ -176,9 +176,11 @@ contract StakingVault is BaseVault {
         }
         if (teamMultisig != address(0) && teamFee > 0) {
             IERC20(token0).safeTransfer(teamMultisig, teamFee);
+            _v.totalTeamFees += teamFee;
         }
         if (_v.manager != address(0) && creatorFee > 0) {
             IERC20(token0).safeTransfer(_v.manager, creatorFee);
+            _v.totalCreatorFees += creatorFee;
         }
         if (vToken() != address(0) && vNomaShare > 0) {
             IERC20(token0).safeTransfer(vToken(), vNomaShare);

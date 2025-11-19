@@ -67,6 +67,10 @@ struct VaultStorage {
     uint256 feesAccumulatorToken0;
     uint256 feesAccumulatorToken1;
 
+    // Team & Creator Fees
+    uint256 totalTeamFees;
+    uint256 totalCreatorFees;
+
     // Referral information
     mapping(bytes8 => ReferralEntity) referrals;
 
