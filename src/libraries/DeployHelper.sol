@@ -51,59 +51,54 @@ library DeployHelper {
             LiquidityType liquidityType
         ) 
     {
-        // Get the current square root price ratio from the pool
-        (uint160 sqrtRatioX96,,,,,,) = pool.slot0();   
+        bytes memory data;
 
-        // Retrieve the number of decimals for token0
-        uint8 decimals = IERC20Metadata(address(pool.token0())).decimals();
-
-        // Convert price to tick and determine lower tick
-        int24 lowerTick = TickMath.getTickAtSqrtRatio(
-            Conversions.priceToSqrtPriceX96(
-                int256(_floorPrice), 
-                tickSpacing,
-                decimals
-            )
-        );
-
-        lowerTick = TickMathExtra.ceilToSpacing(lowerTick, tickSpacing);
-
-        // Sets the upper tick value to lower tick + minimum tick spacing value
-        int24 upperTick = lowerTick + tickSpacing;
-
-        upperTick = TickMathExtra.ceilToSpacing(upperTick, tickSpacing);
-
-        // Compute the liquidity amount based on the provided token0 amount
-        uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
-            sqrtRatioX96,
-            TickMath.getSqrtRatioAtTick(lowerTick),
-            TickMath.getSqrtRatioAtTick(upperTick),
-            _amount0,
-            0 // No token1 contribution for floor liquidity
-        );
+        (int24 lowerTick, int24 upperTick, uint128 liquidity) = 
+        getAmounts(_floorPrice, _amount0, pool, false, tickSpacing);
 
         // Ensure that the computed liquidity is non-zero before minting
         if (liquidity > 0) {
-            Uniswap.mint(
-                address(pool), 
-                receiver,
-                lowerTick, 
-                upperTick, 
-                liquidity, 
-                LiquidityType.Floor, 
-                false
-            );
+
+            string memory op = "mint";
+
+            if (liquidityType == LiquidityType.Floor) {
+                data = abi.encode(0, op);
+            } 
+
+            IUniswapV3Pool(pool).mint(receiver, lowerTick, upperTick, liquidity, data);
+
         } else {
-            revert(
-                string(
-                    abi.encodePacked(
-                        "deployFloor: liquidity is 0, spot price: ", 
-                        Utils._uint2str(uint256(
-                            Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, decimals)
-                        ))
-                    )
-                )
-            );             
+
+            (lowerTick, upperTick, liquidity) = 
+            getAmounts(_floorPrice, _amount0, pool, true, tickSpacing);
+            
+            if (liquidity > 0) {
+
+                IUniswapV3Pool(pool).mint(receiver, lowerTick, upperTick, liquidity, data);
+
+            } else {
+
+                (lowerTick, upperTick, liquidity) = 
+                getAmounts(_floorPrice, _amount0, pool, true, tickSpacing);
+
+                try  IUniswapV3Pool(pool).mint(receiver, lowerTick, upperTick, liquidity, data) {
+
+                } catch {
+                    revert(
+                        string(
+                            abi.encodePacked(
+                                "deployFloor: liquidity is: ", 
+                                Utils._uint2str(uint256(
+                                    // Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, decimals)
+                                    liquidity
+                                ))
+                            )
+                        )
+                    );   
+                }
+                
+            }
+          
         }
 
         // Store the new liquidity position
@@ -120,4 +115,38 @@ library DeployHelper {
             LiquidityType.Floor
         );
     }
+
+    function getAmounts(
+        uint256 _floorPrice, 
+        uint256 _amount0, 
+        IUniswapV3Pool pool, 
+        bool isCeil, 
+        int24 tickSpacing
+    ) internal view
+    returns (int24 lowerTick, int24 upperTick, uint128 liquidity) {
+        // Get the current square root price ratio from the pool
+        (uint160 sqrtRatioX96,,,,,,) = pool.slot0();   
+
+        uint8 decimals = IERC20Metadata(address(pool.token0())).decimals();
+
+        int24 targetTick = Conversions.priceToTick(int256(_floorPrice), tickSpacing, decimals);
+        lowerTick = isCeil ? TickMathExtra.ceilToSpacing(targetTick, tickSpacing) : 
+        TickMathExtra.floorToSpacing(targetTick, tickSpacing);
+
+        // Sets the upper tick value to lower tick + minimum tick spacing value
+        upperTick = lowerTick + tickSpacing;
+
+        upperTick = isCeil ? TickMathExtra.ceilToSpacing(upperTick, tickSpacing) : 
+        TickMathExtra.floorToSpacing(upperTick, tickSpacing);
+
+        // Compute the liquidity amount based on the provided token0 amount
+        liquidity = LiquidityAmounts.getLiquidityForAmounts(
+            sqrtRatioX96,
+            TickMath.getSqrtRatioAtTick(lowerTick),
+            TickMath.getSqrtRatioAtTick(upperTick),
+            _amount0,
+            0 // No token1 contribution for floor liquidity
+        );
+    }
+
 }
