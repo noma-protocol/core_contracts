@@ -2,20 +2,47 @@
 pragma solidity ^0.8.0;
 
 import { VaultStorage } from "../libraries/LibAppStorage.sol";
-import { LoanPosition, OutstandingLoan } from "../types/Types.sol";
+import { 
+    LoanPosition, 
+    OutstandingLoan, 
+    LiquidityPosition, 
+    LiquidityType, 
+    ProtocolAddresses, 
+    LiquidityInternalPars,
+    AmountsToMint
+} from "../types/Types.sol";
 import { Utils } from "../libraries/Utils.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IVault } from "../interfaces/IVault.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ITokenRepo } from "../TokenRepo.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol"; 
+import { IUniswapV3Pool } from "v3-core/interfaces/IUniswapV3Pool.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { TickMath } from "v3-core/libraries/TickMath.sol";
+import "../libraries/TickMathExtra.sol";
+import { IModelHelper } from "../interfaces/IModelHelper.sol";
+import { LiquidityDeployer } from "../libraries/LiquidityDeployer.sol";
+import { Conversions } from "../libraries/Conversions.sol";
+import { Uniswap } from "../libraries/Uniswap.sol";
+import { LiquidityOps } from "../libraries/LiquidityOps.sol";
+import { IDeployer } from "../interfaces/IDeployer.sol";
 
 error NotAuthorized();
 error OnlyInternalCalls();
+error NotInitialized();
+error LiquidityOpRequired();
 
 interface ILendingVault {
     function loanLTV(address who) external view returns (uint256 ltv1e18);
     function paybackLoan(address who, uint256 amount, bool isSelfRepaying) external;
+}
+
+interface INomaFactory {
+    function deferredDeploy(address deployer) external;
+    function mintTokens(address to, uint256 amount) external;
+    function burnFor(address from, uint256 amount) external;
+    function teamMultiSig() external view returns (address);
 }
 
 /**
@@ -150,6 +177,196 @@ contract LendingOpsVault {
         return (count, totalRepaid, nextIndex);
     }
 
+    function bumpFloor(uint256 ethAmount) public onlyManagerOrMultiSig {
+        if (!_v.initialized) revert NotInitialized();
+
+        uint256 currentLiquidityRatio = IModelHelper(_v.modelHelper)
+        .getLiquidityRatio(address(_v.pool), address(this));
+
+        if (currentLiquidityRatio < 95e16 || currentLiquidityRatio > 105e16) {
+            revert LiquidityOpRequired();
+        }
+
+        LiquidityPosition[3] memory positions = [
+            _v.floorPosition, 
+            _v.anchorPosition, 
+            _v.discoveryPosition
+        ];
+
+        (,,uint256 floorToken0Balance, uint256 floorToken1Balance) = 
+        IModelHelper(_v.modelHelper)
+        .getUnderlyingBalances(
+            address(_v.pool), 
+            address(this), 
+            LiquidityType.Floor
+        );
+
+        (,,, uint256 anchorToken1Balance) = IModelHelper(_v.modelHelper)
+        .getUnderlyingBalances(
+            address(_v.pool), 
+            address(this), 
+            LiquidityType.Anchor
+        );
+
+        (,, uint256 discoveryToken0Balance, ) = IModelHelper(_v.modelHelper)
+        .getUnderlyingBalances(
+            address(_v.pool), 
+            address(this), 
+            LiquidityType.Discovery
+        );
+
+        Uniswap.collect(
+            address(_v.pool),
+            address(this), 
+            positions[0].lowerTick, 
+            positions[0].upperTick
+        );
+
+        // Collect anchor liquidity
+        Uniswap.collect(
+            address(_v.pool),
+            address(this), 
+            positions[1].lowerTick, 
+            positions[1].upperTick
+        );
+
+        // Collect discovery liquidity
+        Uniswap.collect(
+            address(_v.pool),
+            address(this), 
+            positions[2].lowerTick, 
+            positions[2].upperTick
+        );
+        
+        uint256 circulatingSupply = IModelHelper(_v.modelHelper)
+        .getCirculatingSupply(address(_v.pool), address(this));
+
+        uint256 newFloorPrice = LiquidityDeployer
+        .computeNewFloorPrice(
+            ethAmount, 
+            floorToken1Balance,
+            circulatingSupply,
+            positions
+        );
+
+        int24 newFloorLowerTick = Conversions.priceToTick(
+            int256(newFloorPrice),
+            _v.tickSpacing,
+            IERC20Metadata(_v.pool.token0()).decimals()
+        );
+
+        newFloorLowerTick = TickMathExtra.ceilToSpacing(newFloorLowerTick, _v.tickSpacing);
+
+        positions[0].lowerTick = newFloorLowerTick;
+        positions[0].upperTick = newFloorLowerTick + _v.tickSpacing;
+        
+        LiquidityPosition memory newFloorPos = LiquidityDeployer
+        .reDeployFloor(
+            address(_v.pool), 
+            address(this), 
+            floorToken0Balance, 
+            floorToken1Balance + ethAmount, 
+            positions
+        );     
+
+        LiquidityPosition memory newAnchorPosition = 
+        _redeployAnchor(
+            positions,
+            ethAmount,
+            anchorToken1Balance,
+            true
+        );
+
+        LiquidityPosition memory newDiscoveryPosition = 
+        _redeployDiscovery(
+            positions, 
+            discoveryToken0Balance
+        );
+
+        positions = [
+            newFloorPos, 
+            newAnchorPosition, 
+            newDiscoveryPosition
+        ];
+
+        _updatePositions(positions);
+        IModelHelper(_v.modelHelper).enforceSolvencyInvariant(address(this));
+    }
+
+    function _redeployAnchor(
+        LiquidityPosition[3] memory positions,
+        uint256 ethAmount,
+        uint256 anchorToken1Balance,
+        bool isShift
+    ) internal returns (LiquidityPosition memory newAnchorPosition) {
+        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(_v.pool).slot0();
+
+        // Deploy new anchor position
+        newAnchorPosition = LiquidityOps
+        .reDeploy(
+            ProtocolAddresses({
+                pool: address(_v.pool),
+                modelHelper: _v.modelHelper,
+                vault: address(this),
+                deployer: _v.deployerContract,
+                presaleContract: _v.presaleContract,
+                adaptiveSupplyController: _v.adaptiveSupplyController
+            }),
+            LiquidityInternalPars({
+                lowerTick: positions[0].upperTick,
+                upperTick: Utils.addBipsToTick(
+                    TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
+                    IVault(address(this))
+                    .getProtocolParameters().shiftAnchorUpperBips,
+                    IERC20Metadata(
+                        IUniswapV3Pool(_v.pool).token1()
+                    ).decimals(),
+                    positions[0].tickSpacing
+                ),
+                amount1ToDeploy: anchorToken1Balance - ethAmount,
+                liquidityType: LiquidityType.Anchor
+            }),
+            isShift
+        );
+    }
+
+    function _redeployDiscovery(
+        LiquidityPosition[3] memory positions,
+        uint256 discoveryToken0Balance
+    ) internal returns (LiquidityPosition memory newDiscoveryPosition) {
+        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(_v.pool).slot0();
+
+        newDiscoveryPosition = IDeployer(_v.deployerContract)
+        .deployPosition(
+            address(_v.pool), 
+            address(this), 
+            positions[1].upperTick,
+            Utils.addBipsToTick(
+                TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
+                IVault(address(this)).getProtocolParameters()
+                .discoveryBips,
+                IERC20Metadata(address(IUniswapV3Pool(_v.pool).token0())).decimals(),
+                positions[0].tickSpacing
+            ),
+            LiquidityType.Discovery, 
+            AmountsToMint({
+                amount0: discoveryToken0Balance,
+                amount1: 0
+            })
+        ); 
+    }
+
+    /**
+     * @notice Internal function to update the liquidity positions.
+     * @param _positions The new liquidity positions.
+     */
+    function _updatePositions(LiquidityPosition[3] memory _positions) internal {   
+        _v.floorPosition = _positions[0];
+        _v.anchorPosition = _positions[1];
+        _v.discoveryPosition = _positions[2];
+    }
+    
+    
     /**
      * @notice Modifier to restrict access to internal calls.
      */
@@ -158,13 +375,22 @@ contract LendingOpsVault {
         _;        
     }
 
+    modifier onlyManagerOrMultiSig() {
+        address multiSig = INomaFactory(_v.factory).teamMultiSig();
+        if (msg.sender != _v.manager && msg.sender != multiSig) {
+            revert NotAuthorized();
+        }
+        _;
+    }
+
     /**
      * @notice Retrieves the function selectors for this contract.
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](1);
+        bytes4[] memory selectors = new bytes4[](2);
         selectors[0] = bytes4(keccak256(bytes("vaultSelfRepayLoans(uint256,uint256,uint256)")));
+        selectors[1] = bytes4(keccak256(bytes("bumpFloor(uint256)")));
         return selectors;
     }
 }        
