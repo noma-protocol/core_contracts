@@ -4,6 +4,7 @@ pragma solidity ^0.8.23;
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {MathInt} from "../../libraries/MathInt.sol";
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
+import {ProtocolParameters} from "../../types/Types.sol";
 
 interface IERC20 { 
     function decimals() external view returns (uint8);
@@ -11,6 +12,10 @@ interface IERC20 {
 
 interface IVault {
     function pool() external view returns (IUniswapV3Pool);
+}
+
+interface IAuxVault {
+    function getProtocolParameters() external view returns (ProtocolParameters memory);
 }
 
 /// @title AdaptiveSupply
@@ -78,17 +83,25 @@ contract AdaptiveSupply {
     /// @param deltaSupply The change in supply.
     /// @param timeElapsed The time elapsed since the last computation.
     /// @return sigmoid The computed sigmoid value.
-    function computeSigmoid(uint256 deltaSupply, uint256 timeElapsed) internal pure returns (uint256) {
+    function computeSigmoid(uint256 deltaSupply, uint256 timeElapsed) internal view returns (uint256) {
         uint256 denominator = deltaSupply + timeElapsed;
         if (denominator == 0) revert InvalidDenominator();
         uint256 r = deltaSupply.divWadDown(denominator);
+        
+        ProtocolParameters memory params = 
+        IAuxVault(msg.sender).getProtocolParameters();
+
+        uint256 half = params.halfStep;
+
+        if (half < 0.1e18 || half > 0.9e18) {
+            half = 0.5e18;
+        }
 
         uint256 maxR = 0.99e18;
         if (r > maxR) {
             r = maxR;
         }
 
-        uint256 half = 0.5e18;
         int256 diff = int256(half) - int256(r);
         int256 kr = int256(5e18);
         int256 exponent = -((kr * diff) / int256(1e18));
