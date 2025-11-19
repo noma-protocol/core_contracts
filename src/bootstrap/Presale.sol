@@ -170,10 +170,10 @@
         uint256 normalizedInitialPrice = initialPrice * (10 ** (18 - initialPriceDecimals));
 
         hardCap = (
-            (
+            ((
                 normalizedLaunchSupply * normalizedInitialPrice
             ) / 1e18
-        ) * params.floorPercentage / 100;
+        ) * params.floorPercentage )/ 100;
 
         if (softCap > hardCap * _protocolParams.maxSoftCap / 100) revert InvalidParameters();
         if (softCap > hardCap) revert InvalidHardCap();
