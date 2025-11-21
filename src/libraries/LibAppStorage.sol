@@ -22,6 +22,10 @@ struct VaultStorage {
     address manager;
     IAddressResolver resolver;
 
+    // Setup state
+    bool isLendingSetup;
+    bool isStakingSetup;
+
     // Loans
     address[] loanAddresses;
     uint256 totalLoans;
@@ -45,6 +49,8 @@ struct VaultStorage {
     address adaptiveSupplyController;
     address tokenRepo;
     address vNOMAContract;
+    address orchestrator;
+    address sToken;
 
     // Liquidity positions
     LiquidityPosition  floorPosition;

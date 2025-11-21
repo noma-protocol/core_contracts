@@ -13,6 +13,9 @@ interface IVaultUpgrade {
      */
     function doUpgradeStart(address diamond, address _vaultUpgradeFinalize) external;
 
+    function doUpgradeStart(address diamond, address _vaultUpgradeFinalize, bool isExtended) external;
+    function doUpgradeStart(address diamond) external;
+
     /**
      * @notice Finalizes the upgrade process for a vault.
      * @param diamond The address of the diamond contract that has been upgraded.
