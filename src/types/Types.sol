@@ -78,6 +78,9 @@ struct VaultInfo {
     address token1;
     uint256 newFloor;
     uint256 totalInterest;
+    bool initialized;
+    address stakingContract;
+    address sToken;
 }
 
 /// @notice Parameters for deploying a vault.
@@ -122,6 +125,7 @@ struct VaultDescription {
     address vault;
     address presaleContract;
     address stakingContract;
+    address deployerContract;
 }
 
 /// @notice Parameters for initializing a vault.
@@ -374,4 +378,11 @@ struct ReferralEntity {
 struct ExistingDeployData {
     address token0;
     address pool;
+}
+
+struct PostInitParams {
+    address stakingContract;
+    address tokenRepo;
+    address sToken;
+    address vToken;   
 }
