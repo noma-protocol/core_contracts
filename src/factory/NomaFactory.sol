@@ -1,6 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+// ███╗   ██╗ ██████╗ ███╗   ███╗ █████╗                               
+// ████╗  ██║██╔═══██╗████╗ ████║██╔══██╗                              
+// ██╔██╗ ██║██║   ██║██╔████╔██║███████║                              
+// ██║╚██╗██║██║   ██║██║╚██╔╝██║██╔══██║                              
+// ██║ ╚████║╚██████╔╝██║ ╚═╝ ██║██║  ██║                              
+// ╚═╝  ╚═══╝ ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═╝                              
+                                                                    
+// ██████╗ ██████╗  ██████╗ ████████╗ ██████╗  ██████╗ ██████╗ ██╗     
+// ██╔══██╗██╔══██╗██╔═══██╗╚══██╔══╝██╔═══██╗██╔════╝██╔═══██╗██║     
+// ██████╔╝██████╔╝██║   ██║   ██║   ██║   ██║██║     ██║   ██║██║     
+// ██╔═══╝ ██╔══██╗██║   ██║   ██║   ██║   ██║██║     ██║   ██║██║     
+// ██║     ██║  ██║╚██████╔╝   ██║   ╚██████╔╝╚██████╗╚██████╔╝███████╗
+// ╚═╝     ╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝  ╚═════╝ ╚═════╝ ╚══════╝
+//
+// Contract: NomaFactory.sol
+// Author: 0xsufi@noma.money
+// Copyright Noma Protocol 2024/2026
+
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -18,7 +36,7 @@ import { Utils } from "../libraries/Utils.sol";
 import { BaseVault } from "../vault/BaseVault.sol";
 import { NomaToken } from "../token/NomaToken.sol";
 import { Deployer } from "../Deployer.sol";
-
+import { VaultUpgrade, VaultUpgradeStep1 } from "../vault/init/VaultUpgrade.sol";
 import {
     VaultInitParams,
     PresaleUserParams,
@@ -27,7 +45,8 @@ import {
     ProtocolParameters,
     PresaleProtocolParams,
     DeploymentData,
-    ExistingDeployData
+    ExistingDeployData,
+    PostInitParams
 } from "../types/Types.sol";
 
 import {IVaultUpgrade, IEtchVault, IExtFactory, IDeployerFactory} from "../interfaces/IVaultUpgrades.sol";
@@ -57,6 +76,20 @@ interface ITokenFactory {
     function deployNomaToken(VaultDeployParams memory vaultDeployParams) external returns (NomaToken, ERC1967Proxy, bytes32);
 }
 
+/**
+ * @title IDiamondInterface
+ * @notice Interface for the Diamond proxy contract.
+ */
+interface IDiamondInterface {
+    function initialize() external;
+    function transferOwnership(address) external;
+}
+
+interface IVault {
+    function postInit(PostInitParams memory params) external;
+}
+
+error Unauthorized();
 error OnlyVaultsError();
 error NotAuthorityError();
 error SupplyTransferError();
@@ -65,6 +98,8 @@ error ZeroAddressError();
 error InvalidTickSpacing();
 error TokenAlreadyExistsError();
 error InvalidParameters();
+error UpgradeFailed();
+error InvalidStep();
 
 /**
  * @title NomaFactory
@@ -76,7 +111,7 @@ contract NomaFactory {
     
     // Noma Factory state
     IAddressResolver private resolver;
-    Deployer private deployer;
+    // Deployer private deployer;
     bool bogus = false;
 
     address private presaleFactory;
@@ -99,7 +134,7 @@ contract NomaFactory {
     mapping(bytes32 => bool) private deployedTokenHashes;
 
     mapping(address => VaultDeployParams) private deferredDeployParams;
-    mapping(address => address) private poolToVaultMap;
+    mapping(address => address) private poolToVaultMapping;
 
     /**
      * @notice Constructor to initialize the NomaFactory contract.
@@ -147,8 +182,9 @@ contract NomaFactory {
         _validateToken1(vaultDeployParams.token1);
         int24 tickSpacing = Utils._validateFeeTier(vaultDeployParams.feeTier);
     
-        bytes32 tokenHash = keccak256(abi.encodePacked(vaultDeployParams.name, vaultDeployParams.symbol));
-        if (deployedTokenHashes[tokenHash]) revert TokenAlreadyExistsError();
+        if (
+            deployedTokenHashes[keccak256(abi.encodePacked(vaultDeployParams.name, vaultDeployParams.symbol))]
+        ) revert TokenAlreadyExistsError();
 
         ERC1967Proxy proxy; 
         IUniswapV3Pool pool;
@@ -156,7 +192,7 @@ contract NomaFactory {
         if (vaultDeployParams.isFreshDeploy) {
             (, proxy, ) =
             ITokenFactory(tokenFactory())
-                .deployNomaToken(vaultDeployParams);
+            .deployNomaToken(vaultDeployParams);
 
             pool = _deployPool(
                 vaultDeployParams.IDOPrice,
@@ -171,13 +207,6 @@ contract NomaFactory {
             pool = IUniswapV3Pool(existingDeployData.pool);
         }
 
-        DeploymentData memory data;
-        data.presaleParams = presaleParams;
-        data.vaultDeployParams = vaultDeployParams;
-        data.pool = pool;
-        data.proxy = proxy;
-        data.tickSpacing = tickSpacing;
-
         if (vaultDeployParams.presale == 1 && msg.sender != authority) {
             if (msg.value < getProtocolParameters().deployFee) {
                 revert InvalidParameters();
@@ -190,13 +219,30 @@ contract NomaFactory {
             }
         }
 
-        return _finalizeVaultDeployment(vaultDeployParams, data);
+        return _finalizeVaultDeployment(
+            vaultDeployParams, 
+            DeploymentData({
+                presaleParams: presaleParams,
+                vaultDeployParams: vaultDeployParams,
+                pool: pool,
+                proxy: proxy,
+                tickSpacing: tickSpacing,
+                vaultAddress: address(0),
+                vaultUpgrade: address(0),
+                sNOMA: address(0),
+                stakingContract: address(0),
+                presaleContract: address(0),
+                tokenRepo: address(0),
+                vToken: address(0)
+            })
+        );
     }
 
     function _finalizeVaultDeployment(
         VaultDeployParams memory vaultDeployParams,
         DeploymentData memory data
     ) internal returns (address, address, address) {
+
         (
             data.vaultAddress, 
             data.vaultUpgrade
@@ -207,26 +253,12 @@ contract NomaFactory {
             )
         ).preDeployVault(address(resolver));
 
-        (
-            data.sNOMA, 
-            data.stakingContract, 
-            data.tokenRepo, 
-            data.vToken
-        ) = IExtFactory(extFactory)
-            .deployAll(
-                vaultDeployParams.name,
-                vaultDeployParams.symbol,
-                address(this),
-                data.vaultAddress,
-                address(data.proxy)
-            );
-
-        deployer = Deployer(
+        Deployer deployer = Deployer(
             IDeployerFactory(deployerFactory)
-                .deployDeployer(
-                    address(this), 
-                    address(resolver)
-                )
+            .deployDeployer(
+                address(this), 
+                address(resolver)
+            )
         );
 
         deployer.initialize(
@@ -236,63 +268,149 @@ contract NomaFactory {
             modelHelper()
         );
 
-        IVaultUpgrade(data.vaultUpgrade).doUpgradeStart(
-            data.vaultAddress, 
-            resolver.requireAndGetAddress(
-                Utils.stringToBytes32("VaultUpgradeFinalize"), 
-                "no vaultUpgradeFinalize"
-            )
+        // Basic Vault setup
+        IVaultUpgrade(data.vaultUpgrade)
+        .doUpgradeStart(
+            data.vaultAddress
         );
 
         IERC20(address(data.proxy)).safeTransfer(address(deployer), data.vaultDeployParams.initialSupply);
         if (IERC20(address(data.proxy)).balanceOf(address(deployer)) != data.vaultDeployParams.initialSupply) revert SupplyTransferError();
 
-        data.presaleContract = _configurePresale(
-            address(data.proxy),
-            address(deployer),
-            data.stakingContract,
-            address(data.pool),
-            data.vaultAddress,
-            data.tokenRepo,
-            data.vaultDeployParams,
-            data.presaleParams
-        );
+        if (vaultDeployParams.presale == 1) {
+            data.presaleContract = _configurePresale(
+                address(deployer),
+                address(data.proxy),
+                address(deployer),
+                data.stakingContract,
+                address(data.pool),
+                data.vaultAddress,
+                data.tokenRepo,
+                data.vaultDeployParams,
+                data.presaleParams
+            );        
+        } else {
+            _deferDeploy(
+                address(deployer),
+                address(data.pool), 
+                data.vaultAddress,
+                data.stakingContract,
+                data.tokenRepo,
+                data.vaultDeployParams, 
+                data.presaleParams
+            );
+        }
 
-        VaultDescription memory vaultDesc = VaultDescription({
+        vaultsRepository[data.vaultAddress] = VaultDescription({
             tokenName: data.vaultDeployParams.name,
             tokenSymbol: data.vaultDeployParams.symbol,
             tokenDecimals: data.vaultDeployParams.decimals,
             token0: address(data.proxy),
             token1: data.vaultDeployParams.token1,
             deployer: msg.sender,
+            deployerContract: address(deployer),
             vault: data.vaultAddress,
             presaleContract: data.presaleContract,
             stakingContract: data.stakingContract
-        }); 
+        });
 
-        vaultsRepository[data.vaultAddress] = vaultDesc;
         _vaults[msg.sender].add(data.vaultAddress);
-        poolToVaultMap[address(data.pool)] = data.vaultAddress;
+        poolToVaultMapping[address(data.pool)] = data.vaultAddress;
 
         deployers.add(msg.sender);
         totalVaults += 1;
 
-        Utils.configureVaultResolver(
-            address(resolver),
-            data.vaultAddress,
-            data.stakingContract,
-            data.sNOMA,
-            data.presaleContract,
-            adaptiveSupply(),
-            modelHelper(),
-            address(deployer),
-            data.vToken
-        );
-
         return (data.vaultAddress, address(data.pool), address(data.proxy));
     }
 
+    function configureVault(address vaultAddress, uint8 step)
+        public
+        returns (DeploymentData memory data)
+    {
+        VaultDescription memory vaultDesc = vaultsRepository[vaultAddress];
+
+        if (msg.sender != vaultDesc.deployer) {
+            revert Unauthorized();
+        }
+
+        data = executeStep1(vaultAddress);
+        doUpgrade(vaultAddress, "VaultUpgradeStep1");        
+        doUpgrade(vaultAddress, "VaultUpgradeStep2");   
+        doUpgrade(vaultAddress, "VaultUpgradeStep3");   
+        doUpgrade(vaultAddress, "VaultUpgradeStep4");   
+        doUpgrade(vaultAddress, "VaultUpgradeStep5");                           
+
+        return data;
+    }
+
+    function doUpgrade(address vaultAddress, string memory contractName) internal {
+        address vaultUpgradeStep = resolver.requireAndGetAddress(
+            Utils.stringToBytes32(contractName),
+            "Error etching vault"
+        );
+        IDiamondInterface(vaultAddress).transferOwnership(vaultUpgradeStep);
+        VaultUpgrade(vaultUpgradeStep).doUpgradeStart(vaultAddress);        
+    }
+
+    function executeStep1(address vaultAddress)
+        internal
+        returns (DeploymentData memory data)
+    {
+        VaultDescription memory vaultDesc = vaultsRepository[vaultAddress];
+
+        // Original Step 1 logic
+        (
+            data.sNOMA, 
+            data.stakingContract, 
+            data.tokenRepo, 
+            data.vToken
+        ) = IExtFactory(extFactory)
+            .deployAll(
+                vaultDesc.tokenName,
+                vaultDesc.tokenSymbol,
+                address(this),
+                vaultAddress,
+                vaultDesc.token0
+            );
+
+        address vaultUpgrade = resolver
+        .requireAndGetAddress(
+            Utils.stringToBytes32("VaultUpgrade"),
+            "no VaultUpgrade"
+        );
+
+        IDiamondInterface(vaultAddress).transferOwnership(vaultUpgrade);
+        VaultUpgrade(vaultUpgrade).doUpgradeStart(vaultAddress);
+
+        Utils.configureVaultResolver(
+            address(resolver),
+            vaultAddress,
+            data.stakingContract,
+            data.sNOMA,
+            vaultDesc.presaleContract,
+            adaptiveSupply(),
+            modelHelper(),
+            vaultDesc.deployerContract,
+            data.vToken
+        );
+
+        // This ideally should be executed after step 2, 3 and 4 
+        IVault(vaultAddress)
+        .postInit(
+            PostInitParams({
+                stakingContract: data.stakingContract,
+                tokenRepo: data.tokenRepo,
+                sToken: data.sNOMA,
+                vToken: data.vToken
+            })
+        );
+
+        // `data` is populated only for step 1; for others it stays default
+        return data;
+    }
+
     function _configurePresale(
+        address deployerContract,
         address proxy,
         address deployer,
         address stakingContract,
@@ -305,6 +423,7 @@ contract NomaFactory {
 
         address presaleContract = 
         _deferDeploy(
+            deployerContract,
             address(pool), 
             vaultAddress,
             stakingContract,
@@ -313,26 +432,25 @@ contract NomaFactory {
             presaleParams
         );
 
-        if (vaultDeployParams.presale == 1) {
-            _initializeVault(
-                VaultInitParams({
-                    vaultAddress: vaultAddress,
-                    owner: msg.sender,
-                    deployer: address(deployer),
-                    pool: pool,
-                    stakingContract: stakingContract,
-                    presaleContract: presaleContract,
-                    token0: proxy,
-                    tokenRepo: tokenRepo,
-                    protocolParameters: getProtocolParameters()
-                })
-            );
-        }
+        _initializeVault(
+            VaultInitParams({
+                vaultAddress: vaultAddress,
+                owner: msg.sender,
+                deployer: address(deployer),
+                pool: pool,
+                stakingContract: stakingContract,
+                presaleContract: presaleContract,
+                token0: proxy,
+                tokenRepo: tokenRepo,
+                protocolParameters: getProtocolParameters()
+            })
+        );
         
         return presaleContract;
     }
 
     function _deferDeploy(
+        address deployerContract,
         address pool,
         address vaultAddress,
         address stakingContract,
@@ -345,7 +463,7 @@ contract NomaFactory {
         uint256 initialPrice = _calculatePresalePremium(vaultDeployParams.IDOPrice);
 
         if (vaultDeployParams.presale == 1) {
-            
+            // Deferred deploy - create parameters
             deferredDeployParams[vaultAddress] = vaultDeployParams;
 
             presaleAddress = IPresaleFactory(presaleFactory)
@@ -370,35 +488,37 @@ contract NomaFactory {
             return presaleAddress;
 
         } else {
+            // Deploy immediately
             _initializeVault(
                 VaultInitParams({
                     vaultAddress: vaultAddress,
                     owner: msg.sender,
-                    deployer: address(deployer),
+                    deployer: deployerContract,
                     pool: pool,
                     stakingContract: stakingContract,
-                    presaleContract: presaleAddress,
+                    presaleContract: address(0), // no presale contract
                     token0: IUniswapV3Pool(pool).token0(),
                     tokenRepo: tokenRepo,
                     protocolParameters: getProtocolParameters()
                 })
             );
             _deployLiquidity(
+                deployerContract,
                 vaultDeployParams.IDOPrice, 
                 vaultDeployParams.initialSupply, 
                 tickSpacing, 
                 getProtocolParameters()
             );
-            deployer.finalize();
+            Deployer(deployerContract).finalize();
         }    
     }
 
     function deferredDeploy(address _deployerContract) public onlyVaults {
         VaultDeployParams memory _params = deferredDeployParams[msg.sender];   
-
         int24 tickSpacing = Utils._validateFeeTier(_params.feeTier); 
 
         _deployLiquidity(
+            _deployerContract,
             _params.IDOPrice, 
             _params.initialSupply, 
             tickSpacing, 
@@ -408,13 +528,6 @@ contract NomaFactory {
         Deployer(_deployerContract).finalize();
         delete deferredDeployParams[msg.sender];        
     }
-
-    function _calculatePresalePremium(uint256 _idoPrice) internal view returns (uint256) {
-        if (getProtocolParameters().presalePremium == 0) revert InvalidParameters();
-        uint256 presalePrice =_idoPrice + (_idoPrice * getProtocolParameters().presalePremium / 100);         
-        return presalePrice;
-    }
-
 
     /**
     * @notice Deploys a Uniswap V3 pool for the given token pair and initializes it with the specified price.
@@ -469,18 +582,19 @@ contract NomaFactory {
     * @dev This internal function deploys floor, anchor, and discovery liquidity using the deployer contract.
     */
     function _deployLiquidity(
+        address deployerContract,
         uint256 IDOPrice,
         uint256 totalSupply,
         int24 _tickSpacing,
         ProtocolParameters memory _liquidityParams
     ) internal {
-        deployer.deployFloor(IDOPrice, totalSupply * _liquidityParams.floorPercentage / 100, _tickSpacing);  
-        deployer.deployAnchor(
+        Deployer(deployerContract).deployFloor(IDOPrice, totalSupply * _liquidityParams.floorPercentage / 100, _tickSpacing);  
+        Deployer(deployerContract).deployAnchor(
             _liquidityParams.floorBips[0], 
             _liquidityParams.floorBips[1], 
             totalSupply * _liquidityParams.anchorPercentage / 100
         );
-        deployer.deployDiscovery(IDOPrice * _liquidityParams.idoPriceMultiplier, false);
+        Deployer(deployerContract).deployDiscovery(IDOPrice * _liquidityParams.idoPriceMultiplier, false);
     }
 
 
@@ -499,7 +613,6 @@ contract NomaFactory {
             _params.pool,
             _params.stakingContract,
             _params.presaleContract,
-            _params.tokenRepo,
             _params.protocolParameters
         );
     }
@@ -562,9 +675,14 @@ contract NomaFactory {
     * It reverts if the provided address is zero.
     */
     function setMultiSigAddress(address _address) public {
-        if (msg.sender != teamMultisigAddress) revert NotAuthorityError();
+        if (msg.sender != teamMultisigAddress || msg.sender != authority) revert NotAuthorityError();
         if (_address == address(0)) revert ZeroAddressError();
         teamMultisigAddress = _address;
+    }
+
+    function setVaultOwnership(address vaultAddress, address newOwner) public {
+        if (msg.sender != teamMultisigAddress || msg.sender != authority) revert NotAuthorityError();
+        IDiamondInterface(vaultAddress).transferOwnership(newOwner);
     }
 
     /**
@@ -579,6 +697,12 @@ contract NomaFactory {
         address _newImplementation
     ) public isAuthority {
         NomaToken(_token).upgradeToAndCall(_newImplementation, new bytes(0));
+    }
+
+    function _calculatePresalePremium(uint256 _idoPrice) internal view returns (uint256) {
+        if (getProtocolParameters().presalePremium == 0) revert InvalidParameters();
+        uint256 presalePrice =_idoPrice + (_idoPrice * getProtocolParameters().presalePremium / 100);         
+        return presalePrice;
     }
 
     /**
@@ -694,13 +818,17 @@ contract NomaFactory {
         return _vaults[_deployer].at(index);
     }
 
+    function getVaultsRepository(address vault) public view returns (VaultDescription memory) {
+        return vaultsRepository[vault];
+    }
+    
     /**
      * @notice Retrieves the vault address associated with a given Uniswap V3 pool.
      * @param pool The address of the Uniswap V3 pool.
      * @return The address of the vault associated with the specified pool.
      */
     function getVaultFromPool(address pool) public view returns (address) {
-        return poolToVaultMap[pool];
+        return poolToVaultMapping[pool];
     }
 
     /**
@@ -717,10 +845,10 @@ contract NomaFactory {
      */
     function modelHelper() public view returns (address) {
         return resolver
-                .requireAndGetAddress(
-                    Utils.stringToBytes32("ModelHelper"), 
-                    "no modelHelper"
-                );
+        .requireAndGetAddress(
+            Utils.stringToBytes32("ModelHelper"), 
+            "no modelHelper"
+        );
     }
 
     /**
@@ -729,18 +857,18 @@ contract NomaFactory {
      */
     function adaptiveSupply() public view returns (address) {
         return resolver
-                .requireAndGetAddress(
-                    Utils.stringToBytes32("AdaptiveSupply"), 
-                    "no AdaptiveSupply"
-                );
+        .requireAndGetAddress(
+            Utils.stringToBytes32("AdaptiveSupply"), 
+            "no AdaptiveSupply"
+        );
     }
 
     function tokenFactory() public view returns (address) {
         return resolver
-                .requireAndGetAddress(
-                    Utils.stringToBytes32("TokenFactory"), 
-                    "no TokenFactory"
-                );
+        .requireAndGetAddress(
+            Utils.stringToBytes32("TokenFactory"), 
+            "no TokenFactory"
+        );
     }
 
     /**

@@ -1,5 +1,22 @@
   // SPDX-License-Identifier: MIT
   pragma solidity ^0.8.23;
+  
+  // ███╗   ██╗ ██████╗ ███╗   ███╗ █████╗                               
+  // ████╗  ██║██╔═══██╗████╗ ████║██╔══██╗                              
+  // ██╔██╗ ██║██║   ██║██╔████╔██║███████║                              
+  // ██║╚██╗██║██║   ██║██║╚██╔╝██║██╔══██║                              
+  // ██║ ╚████║╚██████╔╝██║ ╚═╝ ██║██║  ██║                              
+  // ╚═╝  ╚═══╝ ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═╝                              
+                                                                        
+  // ██████╗ ██████╗  ██████╗ ████████╗ ██████╗  ██████╗ ██████╗ ██╗     
+  // ██╔══██╗██╔══██╗██╔═══██╗╚══██╔══╝██╔═══██╗██╔════╝██╔═══██╗██║     
+  // ██████╔╝██████╔╝██║   ██║   ██║   ██║   ██║██║     ██║   ██║██║     
+  // ██╔═══╝ ██╔══██╗██║   ██║   ██║   ██║   ██║██║     ██║   ██║██║     
+  // ██║     ██║  ██║╚██████╔╝   ██║   ╚██████╔╝╚██████╗╚██████╔╝███████╗
+  // ╚═╝     ╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝  ╚═════╝ ╚═════╝ ╚══════╝
+  //
+  // Author: 0xsufi@noma.money
+  // Copyright Noma Protocol 2025/2026
 
   import {pAsset} from "./token/pAsset.sol";
   import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -131,6 +148,9 @@
     error HardCapExceeded();
     error NoContributionsToWithdraw();
     error CallbackCaller();
+    error InvalidParametersDuration();
+    error InvalidParametersSoftcap();
+    error InvalidParametersPct();
     error InvalidParameters();
     error InvalidHardCap();
     error InvalidSoftCap();
@@ -161,7 +181,7 @@
         factory = _factory;
         teamFeePct = _protocolParams.teamFee;
 
-        if (params.deadline < 3 days || params.deadline > 90 days) revert InvalidParameters();
+        if (params.deadline < 3 days || params.deadline > 90 days) revert InvalidParametersDuration();
 
         uint256 launchSupplyDecimals = IERC20Metadata(pool.token0()).decimals(); 
         uint256 initialPriceDecimals = 18; 
@@ -175,7 +195,7 @@
             ) / 1e18
         ) * params.floorPercentage )/ 100;
 
-        if (softCap > hardCap * _protocolParams.maxSoftCap / 100) revert InvalidParameters();
+        if (softCap > hardCap * _protocolParams.maxSoftCap / 100) revert InvalidParametersSoftcap();
         if (softCap > hardCap) revert InvalidHardCap();
 
         tokenInfo = TokenInfo({
@@ -292,7 +312,7 @@
         // 1) load & validate parameters
         PresaleProtocolParams memory p = protocolParams;
         uint256 pct = p.presalePercentage;
-        if (pct == 0 || pct > 100) revert InvalidParameters();
+        if (pct == 0 || pct > 100) revert InvalidParametersPct();
 
         // 2) compute amounts
         uint256 raisedBalance      = address(this).balance;
