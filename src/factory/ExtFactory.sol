@@ -8,7 +8,13 @@ import { IAddressResolver }  from "../interfaces/IAddressResolver.sol";
 import { Utils } from "../libraries/Utils.sol";
 import { TokenRepo } from "../TokenRepo.sol";
 import { vToken } from "../token/vToken/vToken.sol";
+import { VaultDescription, VaultInfo } from "../types/Types.sol";
+import { IVault } from "../interfaces/IVault.sol";
 
+interface INomaFactory {
+    function getVaultsRepository(address vault) external view returns (VaultDescription memory);
+}
+ 
 /**
  * @title ExtFactory
  * @dev This contract is responsible for deploying both `GonsToken` and `Staking` contracts.
@@ -22,8 +28,9 @@ contract ExtFactory {
     event DeployerCreated(address deployerAddress);
 
     /// @notice Error thrown when the caller is not the authorized factory.
-    error OnlyFactory();
-    
+    error OnlyFactoryOrOwner();
+    error AlreadyInitialized();
+
     /// @notice Address resolver used to retrieve contract addresses.
     IAddressResolver public resolver;
 
@@ -64,12 +71,18 @@ contract ExtFactory {
         address deployerAddress,
         address vaultAddress,
         address token0
-    ) external onlyFactory returns (
+    ) external onlyFactoryOrOwner(vaultAddress) returns (
         address gonsTokenAddress, 
         address stakingContractAddress, 
         address tokenRepoAddress,
         address vtokenAddress
     ) {
+        VaultInfo memory vaultInfo = IVault(vaultAddress).getVaultInfo();
+
+        if (vaultInfo.initialized) {
+            revert AlreadyInitialized();
+        }
+
         // Deploy GonsToken contract
         gonsToken = new GonsToken(
             string(abi.encodePacked(name, " Staked")), 
@@ -102,13 +115,18 @@ contract ExtFactory {
      * @dev Uses the Address Resolver to retrieve the factory address.
      *      Reverts with `OnlyFactory()` if the caller is not the registered factory.
      */
-    modifier onlyFactory() {
+    modifier onlyFactoryOrOwner(address vaultAddress) {
         address factory = resolver.requireAndGetAddress(
             Utils.stringToBytes32("NomaFactory"), 
             "no factory"
         );        
-        if (msg.sender != factory) {
-            revert OnlyFactory();
+        
+        VaultDescription memory vaultDesc = 
+        INomaFactory(factory).getVaultsRepository(vaultAddress);
+
+
+        if (msg.sender != factory && msg.sender != vaultDesc.deployer) {
+            revert OnlyFactoryOrOwner();
         }
         _;
     }
