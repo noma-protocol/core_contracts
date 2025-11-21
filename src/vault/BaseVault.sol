@@ -1,17 +1,37 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+// ███╗   ██╗ ██████╗ ███╗   ███╗ █████╗                               
+// ████╗  ██║██╔═══██╗████╗ ████║██╔══██╗                              
+// ██╔██╗ ██║██║   ██║██╔████╔██║███████║                              
+// ██║╚██╗██║██║   ██║██║╚██╔╝██║██╔══██║                              
+// ██║ ╚████║╚██████╔╝██║ ╚═╝ ██║██║  ██║                              
+// ╚═╝  ╚═══╝ ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═╝                              
+                                                                    
+// ██████╗ ██████╗  ██████╗ ████████╗ ██████╗  ██████╗ ██████╗ ██╗     
+// ██╔══██╗██╔══██╗██╔═══██╗╚══██╔══╝██╔═══██╗██╔════╝██╔═══██╗██║     
+// ██████╔╝██████╔╝██║   ██║   ██║   ██║   ██║██║     ██║   ██║██║     
+// ██╔═══╝ ██╔══██╗██║   ██║   ██║   ██║   ██║██║     ██║   ██║██║     
+// ██║     ██║  ██║╚██████╔╝   ██║   ╚██████╔╝╚██████╗╚██████╔╝███████╗
+// ╚═╝     ╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝  ╚═════╝ ╚═════╝ ╚══════╝
+//
+// Contract: BaseVault.sol
+// Author: 0xsufi@noma.money
+// Copyright Noma Protocol 2024/2026
+
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
 import {VaultStorage} from "../libraries/LibAppStorage.sol";
 import {LibDiamond} from "../libraries/LibDiamond.sol";
 import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
 import {
+    VaultDescription,
     LiquidityPosition, 
     LiquidityType,
     VaultInfo,
     ProtocolAddresses,
-    ProtocolParameters
+    ProtocolParameters,
+    PostInitParams
 } from "../types/Types.sol";
 
 import {Utils} from "../libraries/Utils.sol";
@@ -22,6 +42,7 @@ interface INomaFactory {
     function mintTokens(address to, uint256 amount) external;
     function burnFor(address from, uint256 amount) external;
     function teamMultiSig() external view returns (address);
+    function getVaultsRepository(address vault) external view returns (VaultDescription memory);
 }
 
 interface IAdaptiveSupplyController {
@@ -41,6 +62,7 @@ error OnlyInternalCalls();
 error CallbackCaller();
 error ResolverNotSet();
 error Locked();
+error NotInitialized();
 
 /**
  * @title BaseVault
@@ -117,7 +139,6 @@ contract BaseVault  {
         address _pool, 
         address _stakingContract,
         address _presaleContract,
-        address _tokenRepo,
         ProtocolParameters memory _params
     ) public onlyFactory {
         LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
@@ -131,21 +152,37 @@ contract BaseVault  {
         _v.factory = _factory;
         _v.tokenInfo.token0 = _v.pool.token0();
         _v.tokenInfo.token1 = _v.pool.token1();
-        _v.initialized = false;
-        _v.stakingEnabled = true;
+        _v.tickSpacing = _v.pool.tickSpacing();
+        _v.initialized = false; // Should configure
+        _v.stakingEnabled = false; // Should be enabled when the feature is deployed
         _v.timeLastMinted = 0;
         _v.loanFee = uint8(_params.loanFee);
         _v.totalInterest = 0;
-        _v.stakingContract = _stakingContract;
         _v.presaleContract = _presaleContract;
         _v.collateralAmount = 0;
-        _v.tokenRepo = _tokenRepo;
+
         _v.deployerContract = _deployer;
         _v.modelHelper = modelHelper();
         _v.protocolParameters = _params;
         _v.manager = _owner;
         _v.isLocked[address(this)] = false;
+
         IERC20(_v.pool.token0()).approve(_deployer, type(uint256).max);
+    }
+
+    function postInit(
+        PostInitParams memory params
+    ) public onlyFactory {
+        if (_v.initialized) {
+            revert AlreadyInitialized();
+        }
+        _v.stakingContract = params.stakingContract;
+        _v.tokenRepo = params.tokenRepo;
+        _v.sToken = params.sToken;
+        _v.vNOMAContract = params.vToken;
+        _v.stakingEnabled = true;
+        _v.isStakingSetup = true;
+        _v.initialized = true;
     }
     
     // *** MUTATIVE FUNCTIONS *** //
@@ -165,7 +202,7 @@ contract BaseVault  {
             positions[2].liquidity == 0
         ) revert InvalidPosition();
                 
-        _v.initialized = true;
+        // _v.initialized = true; // replace with _v.initializedLiquidity 
 
         _v.floorPosition = positions[0];
         _v.anchorPosition = positions[1];
@@ -173,19 +210,35 @@ contract BaseVault  {
     }
 
     /**
-     * @notice Sets the accumulated fees for token0 and token1.
-     * @param _feesAccumulatedToken0 The accumulated fees for token0.
-     * @param _feesAccumulatedToken1 The accumulated fees for token1.
+     * @notice Handles the post-presale actions.
      */
-    function setFees(
-        uint256 _feesAccumulatedToken0, 
-        uint256 _feesAccumulatedToken1
-    ) public onlyInternalCalls {
-        _v.feesAccumulatorToken0 += _feesAccumulatedToken0;
-        _v.feesAccumulatorToken1 += _feesAccumulatedToken1;
+    function afterPresale() public  {
+        if (msg.sender != _v.presaleContract) revert OnlyInternalCalls();
+        INomaFactory(
+            _v.factory
+        ).deferredDeploy(
+            //  _v.resolver.requireAndGetAddress(
+            //     Utils.stringToBytes32("Deployer"), 
+            //     "no Deployer"
+            // )
+            INomaFactory(_v.factory).getVaultsRepository(address(this)).deployerContract
+        );
     }
 
     // *** VIEW FUNCTIONS *** //
+
+    /**
+     * @notice Retrieves the current liquidity positions.
+     * @return positions The current liquidity positions.
+     */
+    function getPositions() public view
+    returns (LiquidityPosition[3] memory positions) {
+        positions = [
+            _v.floorPosition, 
+            _v.anchorPosition, 
+            _v.discoveryPosition
+        ];
+    }
 
     /**
      * @notice Retrieves the underlying balances for a specific liquidity type.
@@ -231,6 +284,9 @@ contract BaseVault  {
         );
 
         vaultInfo.totalInterest = _v.totalInterest;
+        vaultInfo.initialized = _v.initialized;
+        vaultInfo.stakingContract = _v.stakingContract;
+        vaultInfo.sToken = _v.sToken;
     }
 
     /**
@@ -263,6 +319,35 @@ contract BaseVault  {
             adaptiveSupplyController: adaptiveSupply()
         });
     }
+
+    /**
+     * @notice Retrieves the protocol parameters.
+     * @return The protocol parameters.
+     */
+    function getProtocolParameters() public view returns 
+    (ProtocolParameters memory ) {
+        return _v.protocolParameters;
+    }
+
+    /*-------------------------------------- USED BY MODEL HELPER --------------------------------------*/
+
+    /**
+     * @notice Retrieves the staking contract address.
+     * @return The address of the staking contract.
+     */
+    function getStakingContract() external virtual view returns (address) {
+        return _v.stakingContract;
+    }
+
+    /**
+     * @notice Retrieves the total collateral amount.
+     * @return The total collateral amount.
+     */
+    function getCollateralAmount() public view returns (uint256) {
+        return _v.collateralAmount;
+
+    }
+    /*-------------------------------------- USED BY MODEL HELPER --------------------------------------*/
 
     // *** ADDRESS RESOLVER *** //
 
@@ -339,7 +424,13 @@ contract BaseVault  {
      * @notice Modifier to restrict access to internal calls.
      */
     modifier onlyInternalCalls() {
-        if (msg.sender != _v.factory && msg.sender != address(this)) revert OnlyInternalCalls();
+        IAddressResolver resolver = _getResolver();
+        if (
+            msg.sender != _v.factory && 
+            msg.sender != address(this) &&
+            msg.sender !=  _v.orchestrator
+        ) revert OnlyInternalCalls();
+
         _;        
     }
 
@@ -357,16 +448,22 @@ contract BaseVault  {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](9);
+        bytes4[] memory selectors = new bytes4[](14);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
-        selectors[1] = bytes4(keccak256(bytes("initialize(address,address,address,address,address,address,address,(uint8,uint8,uint8,uint16[2],uint256,uint256,int24,int24,int24,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256))")));
+        selectors[1] = bytes4(keccak256(bytes("initialize(address,address,address,address,address,address,(uint8,uint8,uint8,uint16[2],uint256,uint256,int24,int24,int24,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256))")));
         selectors[2] = bytes4(keccak256(bytes("initializeLiquidity((int24,int24,uint128,uint256,int24)[3])")));
         selectors[3] = bytes4(keccak256(bytes("uniswapV3MintCallback(uint256,uint256,bytes)")));
         selectors[4] = bytes4(keccak256(bytes("getUnderlyingBalances(uint8)")));
         selectors[5] = bytes4(keccak256(bytes("getExcessReserveToken1()")));
         selectors[6] = bytes4(keccak256(bytes("getProtocolAddresses()")));
-        selectors[7] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));
-        selectors[8] = bytes4(keccak256(bytes("pancakeV3MintCallback(uint256,uint256,bytes)")));
+        selectors[7] = bytes4(keccak256(bytes("pancakeV3MintCallback(uint256,uint256,bytes)")));
+        selectors[8] = bytes4(keccak256(bytes("getPositions()")));
+        selectors[9] = bytes4(keccak256(bytes("getProtocolParameters()")));  
+        selectors[10] = bytes4(keccak256(bytes("afterPresale()")));
+        selectors[11] = bytes4(keccak256(bytes("postInit((address,address,address,address))")));
+        selectors[12] = bytes4(keccak256(bytes("getStakingContract()")));
+        selectors[13] = bytes4(keccak256(bytes("getCollateralAmount()")));
+
         return selectors;
     }
 }
