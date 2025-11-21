@@ -308,20 +308,20 @@ contract StakingVault is BaseVault {
         return _vToken;
     }
 
+    // /**
+    //  * @notice Retrieves the staking contract address.
+    //  * @return The address of the staking contract.
+    //  */
+    // function getStakingContract() external virtual view returns (address) {
+    //     return _v.stakingContract;
+    // }
+
     /**
      * @notice Sets the staking contract address.
      * @param _stakingContract The address of the staking contract.
      */
     function setStakingContract(address _stakingContract) external onlyManager {
         _v.stakingContract = _stakingContract;
-    }
-
-    /**
-     * @notice Retrieves the staking contract address.
-     * @return The address of the staking contract.
-     */
-    function getStakingContract() external view returns (address) {
-        return _v.stakingContract;
     }
 
     /**
@@ -355,13 +355,12 @@ contract StakingVault is BaseVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure  override returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](6);
+        bytes4[] memory selectors = new bytes4[](5);
         selectors[0] = bytes4(keccak256(bytes("mintAndDistributeRewards(address,(address,address,address,address,address,address))"))); 
         selectors[1] = bytes4(keccak256(bytes("setStakingContract(address)")));
-        selectors[2] = bytes4(keccak256(bytes("getStakingContract()")));
-        selectors[3] = bytes4(keccak256(bytes("stakingEnabled()")));
-        selectors[4] = bytes4(keccak256(bytes("setvNOMAContract(address)")));
-        selectors[5] = bytes4(keccak256(bytes("getVNOMAContract()")));
+        selectors[2] = bytes4(keccak256(bytes("stakingEnabled()")));
+        selectors[3] = bytes4(keccak256(bytes("setvNOMAContract(address)")));
+        selectors[4] = bytes4(keccak256(bytes("getVNOMAContract()")));
         return selectors;
     }
 }

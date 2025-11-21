@@ -249,7 +249,8 @@ contract LendingOpsVault {
             positions
         );
 
-        int24 newFloorLowerTick = Conversions.priceToTick(
+        int24 newFloorLowerTick = Conversions
+        .priceToTick(
             int256(newFloorPrice),
             _v.tickSpacing,
             IERC20Metadata(_v.pool.token0()).decimals()

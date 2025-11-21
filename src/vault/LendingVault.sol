@@ -277,7 +277,7 @@ contract LendingVault is BaseVault {
      * @notice Internal function to update the liquidity positions.
      * @param _positions The new liquidity positions.
      */
-    function _updatePositions(LiquidityPosition[3] memory _positions) internal {   
+    function _updatePositions(LiquidityPosition[3] memory _positions) internal  {   
         if (_positions[0].liquidity == 0 || _positions[1].liquidity == 0 || _positions[2].liquidity == 0) revert NoLiquidity();
 
         _v.floorPosition = _positions[0];
@@ -318,15 +318,6 @@ contract LendingVault is BaseVault {
             loan.expiry,
             loan.duration
         );
-    }
-
-
-    /**
-     * @notice Retrieves the total collateral amount.
-     * @return The total collateral amount.
-     */
-    function getCollateralAmount() public view returns (uint256) {
-        return _v.collateralAmount;
     }
 
     // Count / index access
@@ -372,18 +363,17 @@ contract LendingVault is BaseVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure override returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](10);
+        bytes4[] memory selectors = new bytes4[](9);
 
         selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,uint256)")));    
         selectors[1] = bytes4(keccak256(bytes("paybackLoan(address,uint256,bool)")));
         selectors[2] = bytes4(keccak256(bytes("rollLoan(address,uint256)")));
-        selectors[3] = bytes4(keccak256(bytes("getCollateralAmount()")));
-        selectors[4] = bytes4(keccak256(bytes("getActiveLoan(address)")));
-        selectors[5] = bytes4(keccak256(bytes("calculateLoanFees(uint256,uint256)")));
-        selectors[6] = bytes4(keccak256(bytes("addCollateral(address,uint256)")));
-        selectors[7] = bytes4(keccak256(bytes("loanLTV(address)")));
-        selectors[8] = bytes4(keccak256(bytes("loanCount()")));
-        selectors[9] = bytes4(keccak256(bytes("selfRepayLtvTreshold()")));
+        selectors[3] = bytes4(keccak256(bytes("getActiveLoan(address)")));
+        selectors[4] = bytes4(keccak256(bytes("calculateLoanFees(uint256,uint256)")));
+        selectors[5] = bytes4(keccak256(bytes("addCollateral(address,uint256)")));
+        selectors[6] = bytes4(keccak256(bytes("loanLTV(address)")));
+        selectors[7] = bytes4(keccak256(bytes("loanCount()")));
+        selectors[8] = bytes4(keccak256(bytes("selfRepayLtvTreshold()")));
 
         return selectors;
     }

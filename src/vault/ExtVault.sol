@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { LiquidityOps } from "../libraries/LiquidityOps.sol"; 
 import {
     LiquidityPosition, 
     ProtocolAddresses
@@ -10,6 +9,7 @@ import {
 import { IVault } from "../interfaces/IVault.sol";
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
 import { VaultStorage } from "../libraries/LibAppStorage.sol";
+import { LiquidityOps } from "../libraries/LiquidityOps.sol"; 
 
 interface IStakingVault {
     function mintAndDistributeRewards(address caller, ProtocolAddresses memory addresses) external;
@@ -26,6 +26,10 @@ interface ILendingVault {
 interface ILiquidationVault {
     function vaultDefaultLoans() external returns (uint256 totalBurned, uint256 loansDefaulted);
     function vaultDefaultLoansRange(uint256 start, uint256 limit) external returns (uint256 totalBurned, uint256 loansDefaulted);
+}
+
+interface IOrchestrator {
+    function shift(ProtocolAddresses memory addresses,LiquidityPosition[3] memory positions) external; 
 }
 
 // Events
@@ -126,8 +130,10 @@ contract ExtVault {
             positions
         );
 
-        IStakingVault(address(this))
-        .mintAndDistributeRewards(msg.sender, addresses);
+        if (_v.isStakingSetup) {
+            IStakingVault(address(this))
+            .mintAndDistributeRewards(msg.sender, addresses);
+        }
         
         emit Shift();
     }    
