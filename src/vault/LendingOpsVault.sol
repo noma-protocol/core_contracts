@@ -32,6 +32,7 @@ error NotAuthorized();
 error OnlyInternalCalls();
 error NotInitialized();
 error LiquidityOpRequired();
+error InvalidTick();
 
 interface ILendingVault {
     function loanLTV(address who) external view returns (uint256 ltv1e18);
@@ -193,27 +194,12 @@ contract LendingOpsVault {
             _v.discoveryPosition
         ];
 
-        (,,uint256 floorToken0Balance, uint256 floorToken1Balance) = 
-        IModelHelper(_v.modelHelper)
-        .getUnderlyingBalances(
-            address(_v.pool), 
-            address(this), 
-            LiquidityType.Floor
-        );
-
-        (,,, uint256 anchorToken1Balance) = IModelHelper(_v.modelHelper)
-        .getUnderlyingBalances(
-            address(_v.pool), 
-            address(this), 
-            LiquidityType.Anchor
-        );
-
-        (,, uint256 discoveryToken0Balance, ) = IModelHelper(_v.modelHelper)
-        .getUnderlyingBalances(
-            address(_v.pool), 
-            address(this), 
-            LiquidityType.Discovery
-        );
+        (
+            uint256 floorToken0Balance,
+            uint256 floorToken1Balance,
+            uint256 anchorToken1Balance,
+            uint256 discoveryToken0Balance
+        ) = getUnderlyingBalances();
 
         Uniswap.collect(
             address(_v.pool),
@@ -257,6 +243,10 @@ contract LendingOpsVault {
         );
 
         newFloorLowerTick = TickMathExtra.ceilToSpacing(newFloorLowerTick, _v.tickSpacing);
+
+        if (newFloorLowerTick < positions[0].lowerTick) {
+            revert InvalidTick();
+        }
 
         positions[0].lowerTick = newFloorLowerTick;
         positions[0].upperTick = newFloorLowerTick + _v.tickSpacing;
@@ -355,6 +345,32 @@ contract LendingOpsVault {
                 amount1: 0
             })
         ); 
+    }
+
+    function getUnderlyingBalances() internal view returns (uint256, uint256, uint256, uint256) {
+        (,,uint256 floorToken0Balance, uint256 floorToken1Balance) = 
+        IModelHelper(_v.modelHelper)
+        .getUnderlyingBalances(
+            address(_v.pool), 
+            address(this), 
+            LiquidityType.Floor
+        );
+
+        (,,, uint256 anchorToken1Balance) = IModelHelper(_v.modelHelper)
+        .getUnderlyingBalances(
+            address(_v.pool), 
+            address(this), 
+            LiquidityType.Anchor
+        );
+
+        (,, uint256 discoveryToken0Balance, ) = IModelHelper(_v.modelHelper)
+        .getUnderlyingBalances(
+            address(_v.pool), 
+            address(this), 
+            LiquidityType.Discovery
+        );     
+
+        return (floorToken0Balance, floorToken1Balance, anchorToken1Balance, discoveryToken0Balance);   
     }
 
     /**
