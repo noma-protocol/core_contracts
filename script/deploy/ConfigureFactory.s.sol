@@ -1,45 +1,69 @@
+
+
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import "forge-std/Script.sol";
+import { stdJson } from "forge-std/StdJson.sol";
 import { Utils } from "../../src/libraries/Utils.sol";
-import { IAddressResolver } from "../../src/interfaces/IAddressResolver.sol";
 import { Resolver } from "../../src/Resolver.sol";
-import { ModelHelper } from "../../src/model/Helper.sol";
-
+import { EtchVault } from "../../src/vault/deploy/EtchVault.sol";
 
 struct ContractInfo {
     string name;
     address addr;
 }
 
-contract DeployFactory is Script {
+struct ContractAddressesJson {
+    address Factory;
+    address ModelHelper;
+    address Resolver;
+}
+
+contract ConfigureFactory is Script {
+    using stdJson for string;
     // Get environment variables.
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address deployer = vm.envAddress("DEPLOYER");
+    bool isMainnet = vm.envBool("DEPLOY_FLAG_MAINNET"); 
+    bool isChainFork = vm.envBool("DEPLOY_FLAG_FORK");     
 
     ContractInfo[] private expectedAddressesInResolver;
 
-    IAddressResolver private resolver;
-    ModelHelper private modelHelper;
-
-    address resolverAddress = 0x4363087aC747128b53A74f5eB7c8DeAa678B00fe;
+    EtchVault private etchVault;
+    Resolver private resolver;
 
     function run() public {  
-
         vm.startBroadcast(privateKey);
 
-        // Model Helper
-        modelHelper = new ModelHelper();
+        // Define the file path
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/deploy_helper/out/out_dummy.json");
+
+        // Read the JSON file
+        string memory json = vm.readFile(path);
+        string memory networkId = isChainFork ? "1337" : isMainnet ? "143" : "10143"; 
+
+        // Parse the data for network ID 
+        bytes memory data = vm.parseJson(json, string.concat(string("."), networkId));
+
+        // Decode the data into the ContractAddresses struct
+        ContractAddressesJson memory addresses = abi.decode(data, (ContractAddressesJson));
         
-        console.log("Model Helper address: ", address(modelHelper));
+        // Log parsed addresses for verification
+        console2.log("Factory Address:", addresses.Factory);
+        
+        etchVault = new EtchVault(addresses.Factory, addresses.Resolver);
+
+        resolver = Resolver(addresses.Resolver);
         
         expectedAddressesInResolver.push(
-            ContractInfo("ModelHelper", address(modelHelper))
+            ContractInfo("EtchVault", address(etchVault))
         );
-
-        // Resolver
-        resolver =  IAddressResolver(resolverAddress);
+        
+        expectedAddressesInResolver.push(
+            ContractInfo("RootAuthority", deployer)
+        );
 
         // Configure resolver
         configureResolver();
@@ -64,6 +88,7 @@ contract DeployFactory is Script {
 
         areAddressesInResolver = resolver.areAddressesImported(names, addresses);
         console.log("Addresses are imported in resolver: %s", areAddressesInResolver);
+        
     }    
 
-}   
+}

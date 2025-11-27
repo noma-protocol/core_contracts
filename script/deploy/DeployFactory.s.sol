@@ -2,34 +2,19 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Script.sol";
-import { BaseVault } from  "../../src/vault/BaseVault.sol";
 import { Utils } from "../../src/libraries/Utils.sol";
 import { IUniswapV3Pool } from "v3-core/interfaces/IUniswapV3Pool.sol";
 import { IAddressResolver } from "../../src/interfaces/IAddressResolver.sol";
-import { Resolver } from "../../src/Resolver.sol";
-import { ModelHelper } from "../../src/model/Helper.sol";
 import { Deployer } from "../../src/Deployer.sol";
 import { NomaFactory } from "../../src/factory/NomaFactory.sol";
 import { VaultDeployParams, VaultDescription, ProtocolParameters, PresaleProtocolParams } from "../../src/types/Types.sol";
-import { 
-    VaultUpgrade, 
-    VaultUpgradeStep1, 
-    VaultUpgradeStep2,
-    VaultUpgradeStep3,
-    VaultUpgradeStep4
-} from "../../src/vault/init/VaultUpgrade.sol";
-import { VaultAux } from "../../src/vault/init/VaultAux.sol";
-import { VaultFinalize } from "../../src/vault/init/VaultFinalize.sol";
-import { EtchVault } from "../../src/vault/deploy/EtchVault.sol";
-import { Staking } from "../../src/staking/Staking.sol";
-import { GonsToken } from "../../src/token/Gons.sol";
+import { PresaleFactory } from "../../src/factory/PresaleFactory.sol";
+
+
 import { DeployerFactory } from "../../src/factory/DeployerFactory.sol"; 
 import { ExtFactory } from "../../src/factory/ExtFactory.sol";
-import { AdaptiveSupply } from "../../src/controllers/supply/AdaptiveSupply.sol";
-import { RewardsCalculator } from "../../src/controllers/supply/RewardsCalculator.sol";
-import { PresaleFactory } from "../../src/factory/PresaleFactory.sol";
-import { TokenFactory } from "../../src/factory/TokenFactory.sol";
-import { ExchangeHelper } from "../../src/ExchangeHelper.sol";
+import { Resolver } from "../../src/Resolver.sol";
+import { NomaDividends } from "../../src/controllers/NomaDividends.sol";
 import { WETH9 } from "../../src/token/WETH9.sol";
 
 interface IWETH {
@@ -54,23 +39,29 @@ contract DeployFactory is Script {
     // Get environment variables.
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address deployer = vm.envAddress("DEPLOYER");
+    bool isMainnet = vm.envBool("DEPLOY_FLAG_MAINNET"); 
 
     // Constants
-    address WMON = 0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A;
-    address uniswapFactory = 0x204FAca1764B154221e35c0d20aBb3c525710498;
-    address pancakeSwapFactory = 0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865;
+    address WMON_monad_mainnet = 0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A;
+    address uniswapFactory_monad_mainnet = 0x204FAca1764B154221e35c0d20aBb3c525710498;
+    address pancakeSwapFactory__monad_mainnet = 0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865;
+
+    address WMON_monad_testnet = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
+    address uniswapFactory_monad_testnet = 0x961235a9020B05C44DF1026D956D1F4D78014276;
+    address pancakeSwapFactory__monad_testnet = 0x3b7838D96Fc18AD1972aFa17574686be79C50040;
+    address WMON = isMainnet ? WMON_monad_mainnet : WMON_monad_testnet;
+
+    // uniswapV3Factory: "0x961235a9020B05C44DF1026D956D1F4D78014276",
+    // pancakeV3Factory: "0x3b7838D96Fc18AD1972aFa17574686be79C50040",
+    // pancakeQuoterV2: "0x7f988126C2c5d4967Bb5E70bDeB7e26DB6BD5C28",
+    // uniswapQuoterV2: "0x1b4E313fEF15630AF3e6F2dE550Dbf4cC9D3081d",
+    // WMON: "0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701",
 
     ContractInfo[] private expectedAddressesInResolver;
 
-    Resolver private resolver;
-    ModelHelper private modelHelper;
     NomaFactory private nomaFactory;
-    EtchVault private etchVault;
-    GonsToken private sNoma;
-    AdaptiveSupply private adaptiveSupply;
-    RewardsCalculator private rewardsCalculator;
-    TokenFactory private tokenFactory;
-    ExchangeHelper private exchangeHelper;
+    Resolver private resolver;
+    NomaDividends private dividendDistributor;
 
     function run() public {  
 
@@ -80,26 +71,6 @@ contract DeployFactory is Script {
             ContractInfo("WMON", WMON)
         );
         
-        // Model Helper
-        modelHelper = new ModelHelper();
-
-        expectedAddressesInResolver.push(
-            ContractInfo("ModelHelper", address(modelHelper))
-        );
-
-        // Adaptive Supply
-        adaptiveSupply = new AdaptiveSupply();
-
-        rewardsCalculator = new RewardsCalculator();
-        
-        expectedAddressesInResolver.push(
-            ContractInfo("AdaptiveSupply", address(adaptiveSupply))
-        );
-
-        expectedAddressesInResolver.push(
-            ContractInfo("RewardsCalculator", address(rewardsCalculator))
-        );
-
         // Resolver
         resolver = new Resolver(deployer);
 
@@ -109,12 +80,6 @@ contract DeployFactory is Script {
 
         console.log("Resolver address: ", address(resolver));
 
-        // Token Factory
-        tokenFactory = new TokenFactory(address(resolver));
-
-        expectedAddressesInResolver.push(
-            ContractInfo("TokenFactory", address(tokenFactory))
-        );
         
         // Presale Factory
         PresaleFactory presaleFactory = new PresaleFactory(address(resolver));
@@ -128,8 +93,8 @@ contract DeployFactory is Script {
 
         // Noma Factory
         nomaFactory = new NomaFactory(
-            uniswapFactory,
-            pancakeSwapFactory,
+            isMainnet ? uniswapFactory_monad_mainnet : uniswapFactory_monad_testnet,
+            isMainnet ? pancakeSwapFactory__monad_mainnet : pancakeSwapFactory__monad_testnet,
             address(resolver),
             address(deploymentFactory),
             address(extFactory),
@@ -139,18 +104,6 @@ contract DeployFactory is Script {
         expectedAddressesInResolver.push(
             ContractInfo("NomaFactory", address(nomaFactory))
         );
-
-        // Exchange Helper
-        exchangeHelper = new ExchangeHelper(
-            address(nomaFactory),
-            WMON
-        );
-
-        expectedAddressesInResolver.push(
-            ContractInfo("ExchangeHelper", address(exchangeHelper))
-        );
-
-        console.log("Exchange Helper address: ", address(exchangeHelper));
 
         ProtocolParameters memory _params =
         ProtocolParameters(
@@ -166,10 +119,12 @@ contract DeployFactory is Script {
             5,          // lowBalanceThresholdFactor
             2,          // highBalanceThresholdFactor
             5,          // inflationFee
+            25,         // maxLoanUtilization
             27,         // loan interest fee
             0.1e18,     // deployFee (ETH)
             25,         // presalePremium (25%)
-            1_250       // selfRepayLtvTreshold
+            1_250,      // selfRepayLtvTreshold
+            0.5e18      // Adaptive supply curve half step
         );
 
         PresaleProtocolParams memory _presaleParams =
@@ -187,50 +142,20 @@ contract DeployFactory is Script {
         nomaFactory.setProtocolParameters(_params);
         nomaFactory.setPresaleProtocolParams(_presaleParams);
 
+        dividendDistributor = new NomaDividends(address(nomaFactory), address(resolver));
+
+        expectedAddressesInResolver.push(
+            ContractInfo("DividendDistributor", address(dividendDistributor))
+        );
+        
+        console.log("DividendDistributor deployed to address: ", address(dividendDistributor));
+
         resolver.initFactory(address(nomaFactory));
-        etchVault = new EtchVault(address(nomaFactory), address(resolver));
 
-        expectedAddressesInResolver.push(
-            ContractInfo("EtchVault", address(etchVault))
-        );
-        
-        VaultUpgrade vaultUpgrade = new VaultUpgrade(deployer, address(nomaFactory));
-        VaultUpgradeStep1 vaultUpgradeStep1 = new VaultUpgradeStep1(deployer);
-        VaultUpgradeStep2 vaultUpgradeStep2 = new VaultUpgradeStep2(deployer);
-        VaultUpgradeStep3 vaultUpgradeStep3 = new VaultUpgradeStep3(deployer);
-        VaultUpgradeStep4 vaultUpgradeStep4 = new VaultUpgradeStep4(deployer);
-        
-        VaultAux vaultAux = new VaultAux(deployer);
-        VaultFinalize vaultFinalize = new VaultFinalize(deployer);
-
-        vaultUpgrade.init(address(vaultUpgradeStep1));
-        vaultUpgradeStep1.init(address(vaultUpgradeStep2), address(vaultUpgrade));
-        vaultUpgradeStep2.init(address(vaultUpgradeStep3), address(vaultUpgradeStep1));
-        vaultUpgradeStep3.init(address(vaultUpgradeStep4), address(vaultUpgradeStep2));
-        vaultUpgradeStep4.init(address(vaultAux), address(vaultUpgradeStep3));
-
-        vaultAux.init(deployer, address(vaultUpgradeStep4), address(vaultFinalize));
-        vaultFinalize.init(deployer, address(vaultAux));
-
-        expectedAddressesInResolver.push(
-            ContractInfo("VaultUpgrade", address(vaultUpgrade))
-        );
-        
-        expectedAddressesInResolver.push(
-            ContractInfo("VaultUpgradeFinalize", address(vaultFinalize))
-        );
-
-        expectedAddressesInResolver.push(
-            ContractInfo("RootAuthority", deployer)
-        );
-
-        // Configure resolver
         configureResolver();
 
         console.log("Factory deployed to address: ", address(nomaFactory));
-        console.log("ModelHelper deployed to address: ", address(modelHelper));
-        console.log("AdaptiveSupply deployed to address: ", address(adaptiveSupply));
-        console.log("RewardsCalculator deployed to address: ", address(rewardsCalculator));
+
 
         vm.stopBroadcast();
     }

@@ -16,6 +16,7 @@ import {
 import { IDOHelper } from "../../test/IDO_Helper/IDOHelper.sol";
 import { BaseVault } from  "../../src/vault/BaseVault.sol";
 import { Migration } from "../../src/bootstrap/Migration.sol";
+
 struct ContractAddressesJson {
     address Factory;
     address ModelHelper;
@@ -32,9 +33,14 @@ contract DeployVault is Script {
     // Get environment variables.
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address deployer = vm.envAddress("DEPLOYER");
+    bool isMainnet = vm.envBool("DEPLOY_FLAG_MAINNET"); 
+    bool isChainFork = vm.envBool("DEPLOY_FLAG_FORK"); 
 
     // Constants
-    address WMON = 0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A;
+    address WMON_monad_mainnet = 0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A;
+    address WMON_monad_testnet = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
+    address WMON = isMainnet ? WMON_monad_mainnet : WMON_monad_testnet;
+
     address private nomaFactoryAddress;
     address private modelHelper;
 
@@ -45,13 +51,13 @@ contract DeployVault is Script {
 
         // Define the file path
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/deploy_helper/out/out.json");
+        string memory path = string.concat(root, "/deploy_helper/out/out_dummy.json");
 
         // Read the JSON file
         string memory json = vm.readFile(path);
-        string memory networkId = "1337"; //"10143"; 
+        string memory networkId = isChainFork ? "1337" : isMainnet ? "143" : "10143"; 
 
-        // Parse the data for network ID `1337`
+        // Parse the data for network ID 
         bytes memory data = vm.parseJson(json, string.concat(string("."), networkId));
 
         // Decode the data into the ContractAddresses struct
@@ -72,24 +78,24 @@ contract DeployVault is Script {
 
         VaultDeployParams memory vaultDeployParams = 
         VaultDeployParams(
-            "BUNAD",
-            "BUN",
+            "NOMA TOKEN",
+            "NOMA",
             18,
             14000000000000000000000000,
             1400000000000000000000000000,
-            2000000000000000,
-            0,
+            25000000000000000,
+            1,
             WMON,
-            useUniswap ? 3000 : 2500,
-            0, // 0 = no presale
-            isFreshDeploy, // isFreshDeploy
-            useUniswap // useUniswap 
+            useUniswap ? 3000 : 2500,   
+            1,                          // 0 = no presale
+            isFreshDeploy,              // isFreshDeploy
+            useUniswap                  // useUniswap 
         );
 
         PresaleUserParams memory presaleParams =
         PresaleUserParams(
-            27000000000000000000,   // softCap
-            900 //2592000          // duration (seconds)
+            9000000000000000000000,   // softCap
+            86400 * 3//2592000          // duration (seconds)
         );
 
         (address vault, address pool, address proxy) = 
@@ -98,8 +104,8 @@ contract DeployVault is Script {
             presaleParams,
             vaultDeployParams,
             ExistingDeployData({
-                pool: 0x104bab30b2983df47dd504114353B0A73bF663CE,
-                token0: 0x614da16Af43A8Ad0b9F419Ab78d14D163DEa6488
+                pool: address(0),
+                token0: address(0)
             })            
         );
 
@@ -113,4 +119,6 @@ contract DeployVault is Script {
         console.log("Proxy address: ", proxy);
         console.log("IDOHelper address: ", address(idoManager));
     }
+
+    
 }
