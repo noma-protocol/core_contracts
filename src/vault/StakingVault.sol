@@ -34,6 +34,10 @@ interface ILendingVault {
     function vaultSelfRepayLoans(uint256 fundsToPull, uint256 start, uint256 limit) external returns (uint256 eligibleCount, uint256 totalRepaid, uint256 nextIndex);
 }
 
+interface INomaDividends {
+    function distribute(address rewardToken, uint256 amount) external;
+}
+
 // Custom errors
 error StakingContractNotSet();
 error Unauthorized();
@@ -81,12 +85,28 @@ contract StakingVault is BaseVault {
             
             if (ret) {
                 // 3) distribute fees, returns post-fee amount
-                uint256 postFee = _distributeInflationFees(
+                (
+                    uint256 postFee, 
+                    uint256 protocolFee
+                ) = _distributeInflationFees(
                     caller,
                     addresses.pool,
                     toMint
                 );
                 _v.totalMinted += postFee;
+
+                if (protocolFee > 0) {
+                    IERC20(IUniswapV3Pool(addresses.pool).token0())
+                    .approve(
+                        dividendDistributor(),
+                        protocolFee
+                    );
+                    INomaDividends(dividendDistributor())
+                    .distribute(
+                        IUniswapV3Pool(addresses.pool).token0(),
+                        protocolFee
+                    );
+                }
 
                 // 4) send to staking & notify
                 _notifyStaking(postFee);
@@ -142,7 +162,7 @@ contract StakingVault is BaseVault {
         address caller,
         address poolAddr,
         uint256 toMint
-    ) internal returns (uint256 remain) {
+    ) internal returns (uint256 remain, uint256 protocolFee) {
         IVault v = IVault(address(this));
         uint256 inflationFeePct = v.getProtocolParameters().inflationFee; // e.g. 5 means 5%
         
@@ -158,7 +178,7 @@ contract StakingVault is BaseVault {
             if (_v.vNOMAContract != address(0)) {
                 IERC20(IUniswapV3Pool(poolAddr).token0()).safeTransfer(_v.vNOMAContract, vNomaShare);
             }
-            return baseAfterVnoma; // all else remains
+            return (baseAfterVnoma, 0); // all else remains
         }
 
         // 1.25% caller fee out of inflation
@@ -166,33 +186,47 @@ contract StakingVault is BaseVault {
         uint256 remAfterCaller = inflation - callerFee;
 
         // split remaining inflation pot equally between team + creator
-        uint256 teamFee = remAfterCaller / 2;
-        uint256 creatorFee = remAfterCaller - teamFee;
+        protocolFee = remAfterCaller / 2;
+        uint256 creatorFee = remAfterCaller - protocolFee;
 
-        address token0 = IUniswapV3Pool(poolAddr).token0();
+        // Caller
+        _pay(IUniswapV3Pool(poolAddr).token0(), caller, callerFee);
 
-        if (caller != address(0) && callerFee > 0) {
-            IERC20(token0).safeTransfer(caller, callerFee);
-        }
-        if (teamMultisig != address(0) && teamFee > 0) {
-            IERC20(token0).safeTransfer(teamMultisig, teamFee);
-            _v.totalTeamFees += teamFee;
-        }
-        if (_v.manager != address(0) && creatorFee > 0) {
-            IERC20(token0).safeTransfer(_v.manager, creatorFee);
-            _v.totalCreatorFees += creatorFee;
-        }
-        if (vToken() != address(0) && vNomaShare > 0) {
-            IERC20(token0).safeTransfer(vToken(), vNomaShare);
-        } else {
-            // if no vToken, send to team
-            if (teamMultisig != address(0) && vNomaShare > 0) {
-                IERC20(token0).safeTransfer(teamMultisig, vNomaShare);
+        // Team
+        if (protocolFee > 0 && teamMultisig != address(0)) {
+            if (dividendDistributor() == address(0)) {
+                _pay(IUniswapV3Pool(poolAddr).token0(), teamMultisig, protocolFee);
+                _v.totalTeamFees += protocolFee;
+                // do this to avoid double distribution
+                protocolFee = 0; 
             }
         }
 
+        // Creator / manager
+        if (creatorFee > 0 && _v.manager != address(0)) {
+            _pay(IUniswapV3Pool(poolAddr).token0(), _v.manager, creatorFee);
+            _v.totalCreatorFees += creatorFee;
+        }
+
+        // vToken share (or fallback to team)
+        if (vNomaShare > 0) {
+            address vTokenAddr = vToken();
+            address recipient = vTokenAddr != address(0) ? vTokenAddr : teamMultisig;
+            _pay(IUniswapV3Pool(poolAddr).token0(), recipient, vNomaShare);
+        }
+       
         // remain is the base minus inflation 
         remain = baseAfterVnoma - inflation;
+    }
+
+    function _pay(
+        address token,
+        address to,
+        uint256 amount
+    ) internal {
+        if (to != address(0) && amount > 0) {
+            IERC20(token).safeTransfer(to, amount);
+        }
     }
 
     function _notifyStaking(uint256 amount) internal {
@@ -298,7 +332,7 @@ contract StakingVault is BaseVault {
      * @notice Retrieves the address of the vToken contract.
      * @return The address of the contract.
      */
-    function vToken() public view returns (address) {
+    function vToken() internal view returns (address) {
         IAddressResolver resolver = _v.resolver;
         address _vToken = resolver
         .getVaultAddress(
@@ -307,6 +341,20 @@ contract StakingVault is BaseVault {
         );
         return _vToken;
     }
+
+    /**
+     * @notice Retrieves the address of the dividend distributor contract.
+     * @return The address of the contract.
+     */
+    function dividendDistributor() public view returns (address) {
+        IAddressResolver resolver = _v.resolver;
+        address _dd = resolver
+        .requireAndGetAddress(
+            Utils.stringToBytes32("DividendDistributor"),
+            "No Dividend Distributor"
+        );
+        return _dd;
+    }    
 
     // /**
     //  * @notice Retrieves the staking contract address.

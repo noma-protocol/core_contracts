@@ -71,28 +71,18 @@ contract TokenFactory {
             bytes32 proxySalt
         )
     {
-        // 1) Implementation salt & predicted address
         tokenHash = keccak256(abi.encodePacked(p.name, p.symbol));
         implSalt = bytes32(uint256(tokenHash));
         implAddr = Utils.getAddress(type(NomaToken).creationCode, uint256(implSalt));
 
-        // 2) Proxy creation code (constructor(impl, data))
-        bytes memory initCalldata = abi.encodeWithSelector(
-            NomaToken.initialize.selector,
-            initialOwner,
-            p.initialSupply,
-            p.maxTotalSupply,
-            p.name,
-            p.symbol,
-            address(resolver)
-        );
+        // ✅ Use the same builder as deploy
+        bytes memory initCalldata = _buildInitCalldata(p, initialOwner);
 
         bytes memory proxyBytecode = abi.encodePacked(
             type(ERC1967Proxy).creationCode,
             abi.encode(implAddr, initCalldata)
         );
 
-        // 3) Find salt such that predicted proxy < p.token1
         uint256 nonce = uint256(implSalt);
         address candidate;
 
@@ -121,59 +111,79 @@ contract TokenFactory {
      *      Owner passed to initialize() is msg.sender (the factory) to mirror your original code.
      */
     function deployNomaToken(
-        VaultDeployParams memory p
+        VaultDeployParams memory p,
+        address owner
     )
         external
         onlyFactory
         returns (NomaToken nomaImpl, ERC1967Proxy proxy, bytes32 tokenHash)
     {
-        // 1) Predict the addresses & salts (using msg.sender as initialize() owner)
         (
             address predictedImpl,
             address predictedProxy,
             bytes32 _tokenHash,
             bytes32 implSalt,
             bytes32 proxySalt
-        ) = predictNomaToken(p, msg.sender);
+        ) = predictNomaToken(p, owner);
 
         tokenHash = _tokenHash;
 
-        // 2) Deploy the implementation at predictedImpl
-        //    (init code: type(NomaToken).creationCode, no constructor args)
-        {
-            bytes memory implCode = type(NomaToken).creationCode;
-            address implAddr = _doDeploy(implCode, uint256(implSalt));
-            require(implAddr == predictedImpl, "Impl address mismatch");
-            nomaImpl = NomaToken(implAddr);
-        }
+        // 1) Deploy implementation
+        nomaImpl = _deployImpl(predictedImpl, implSalt);
 
-        // 3) Build proxy bytecode with the *actual* impl address (should equal predictedImpl)
-        bytes memory initCalldata = abi.encodeWithSelector(
+        // 2) Deploy proxy
+        proxy = _deployProxy(p, owner, nomaImpl, predictedProxy, proxySalt);
+
+        // 3) Sanity checks
+        require(IERC20(address(proxy)).totalSupply() == p.initialSupply, "wrong parameters");
+        require(address(proxy) != address(0), "Token deploy failed");
+    }
+
+    function _deployImpl(
+        address predictedImpl,
+        bytes32 implSalt
+    ) internal returns (NomaToken nomaImpl) {
+        bytes memory implCode = type(NomaToken).creationCode;
+        address implAddr = _doDeploy(implCode, uint256(implSalt));
+        require(implAddr == predictedImpl, "Impl address mismatch");
+        nomaImpl = NomaToken(implAddr);
+    }
+
+    function _buildInitCalldata(
+        VaultDeployParams memory p,
+        address owner
+    ) internal view returns (bytes memory) {
+        return abi.encodeWithSelector(
             NomaToken.initialize.selector,
-            msg.sender,                // owner (same as used in prediction)
+            owner,          // token owner
+            factory(),      // factory address (stable, via resolver)
             p.initialSupply,
             p.maxTotalSupply,
             p.name,
             p.symbol,
             address(resolver)
         );
+    }
+
+    function _deployProxy(
+        VaultDeployParams memory p,
+        address owner,
+        NomaToken nomaImpl,
+        address predictedProxy,
+        bytes32 proxySalt
+    ) internal returns (ERC1967Proxy proxy) {
+        bytes memory initCalldata = _buildInitCalldata(p, owner);
 
         bytes memory proxyBytecode = abi.encodePacked(
             type(ERC1967Proxy).creationCode,
             abi.encode(address(nomaImpl), initCalldata)
         );
 
-        // 4) Deploy proxy at predictedProxy using proxySalt
-        {
-            address proxyAddr = _doDeploy(proxyBytecode, uint256(proxySalt));
-            require(proxyAddr == predictedProxy, "Proxy address mismatch");
-            require(proxyAddr < p.token1, "Proxy address fails token1 constraint");
-            proxy = ERC1967Proxy(payable(proxyAddr));
-        }
+        address proxyAddr = _doDeploy(proxyBytecode, uint256(proxySalt));
+        require(proxyAddr == predictedProxy, "Proxy address mismatch");
+        require(proxyAddr < p.token1, "Proxy address fails token1 constraint");
 
-        // 5) Sanity checks
-        require(IERC20(address(proxy)).totalSupply() == p.initialSupply, "wrong parameters");
-        require(address(proxy) != address(0), "Token deploy failed");
+        proxy = ERC1967Proxy(payable(proxyAddr));
     }
 
     // Low-level CREATE2 deployer

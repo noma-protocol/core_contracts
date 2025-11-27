@@ -32,7 +32,7 @@ import { VaultDescription } from "../types/Types.sol";
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
 import { Conversions } from "../libraries/Conversions.sol";
 import { Utils } from "../libraries/Utils.sol";
-
+import { SupplyRules } from "../libraries/SupplyRules.sol";
 import { BaseVault } from "../vault/BaseVault.sol";
 import { NomaToken } from "../token/NomaToken.sol";
 import { Deployer } from "../Deployer.sol";
@@ -73,7 +73,7 @@ interface IPresaleFactory {
 }  
 
 interface ITokenFactory {
-    function deployNomaToken(VaultDeployParams memory vaultDeployParams) external returns (NomaToken, ERC1967Proxy, bytes32);
+    function deployNomaToken(VaultDeployParams memory vaultDeployParams, address owner) external returns (NomaToken, ERC1967Proxy, bytes32);
 }
 
 /**
@@ -108,11 +108,10 @@ error InvalidStep();
 contract NomaFactory {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
-    
+    using SupplyRules for uint256;
+
     // Noma Factory state
     IAddressResolver private resolver;
-    // Deployer private deployer;
-    bool bogus = false;
 
     address private presaleFactory;
     address private deployerFactory;
@@ -132,7 +131,6 @@ contract NomaFactory {
     mapping(address => EnumerableSet.AddressSet) private _vaults;
     mapping(address => VaultDescription) private vaultsRepository;
     mapping(bytes32 => bool) private deployedTokenHashes;
-
     mapping(address => VaultDeployParams) private deferredDeployParams;
     mapping(address => address) private poolToVaultMapping;
 
@@ -181,9 +179,17 @@ contract NomaFactory {
     returns (address, address, address) {
         _validateToken1(vaultDeployParams.token1);
         int24 tickSpacing = Utils._validateFeeTier(vaultDeployParams.feeTier);
-    
+        SupplyRules.enforceMinTotalSupply(
+            vaultDeployParams.IDOPrice, 
+            vaultDeployParams.initialSupply
+        );
+
         if (
-            deployedTokenHashes[keccak256(abi.encodePacked(vaultDeployParams.name, vaultDeployParams.symbol))]
+            deployedTokenHashes[
+                keccak256(
+                    abi.encodePacked(vaultDeployParams.name, vaultDeployParams.symbol)
+                )
+            ]
         ) revert TokenAlreadyExistsError();
 
         ERC1967Proxy proxy; 
@@ -192,7 +198,10 @@ contract NomaFactory {
         if (vaultDeployParams.isFreshDeploy) {
             (, proxy, ) =
             ITokenFactory(tokenFactory())
-            .deployNomaToken(vaultDeployParams);
+            .deployNomaToken(
+                vaultDeployParams, 
+                msg.sender
+            );
 
             pool = _deployPool(
                 vaultDeployParams.IDOPrice,
@@ -275,10 +284,17 @@ contract NomaFactory {
         );
 
         IERC20(address(data.proxy)).safeTransfer(address(deployer), data.vaultDeployParams.initialSupply);
-        if (IERC20(address(data.proxy)).balanceOf(address(deployer)) != data.vaultDeployParams.initialSupply) revert SupplyTransferError();
+
+        if (
+            IERC20(address(data.proxy)).balanceOf(address(deployer)) != 
+            data.vaultDeployParams.initialSupply
+        ) {
+            revert SupplyTransferError();
+        }
 
         if (vaultDeployParams.presale == 1) {
-            data.presaleContract = _configurePresale(
+            data.presaleContract = 
+            _configurePresale(
                 address(deployer),
                 address(data.proxy),
                 address(deployer),
@@ -301,7 +317,8 @@ contract NomaFactory {
             );
         }
 
-        vaultsRepository[data.vaultAddress] = VaultDescription({
+        vaultsRepository[data.vaultAddress] = 
+        VaultDescription({
             tokenName: data.vaultDeployParams.name,
             tokenSymbol: data.vaultDeployParams.symbol,
             tokenDecimals: data.vaultDeployParams.decimals,
@@ -382,7 +399,8 @@ contract NomaFactory {
         IDiamondInterface(vaultAddress).transferOwnership(vaultUpgrade);
         VaultUpgrade(vaultUpgrade).doUpgradeStart(vaultAddress);
 
-        Utils.configureVaultResolver(
+        Utils
+        .configureVaultResolver(
             address(resolver),
             vaultAddress,
             data.stakingContract,
@@ -466,7 +484,8 @@ contract NomaFactory {
             // Deferred deploy - create parameters
             deferredDeployParams[vaultAddress] = vaultDeployParams;
 
-            presaleAddress = IPresaleFactory(presaleFactory)
+            presaleAddress = 
+            IPresaleFactory(presaleFactory)
             .createPresale(
                 PresaleDeployParams({
                     deployer: msg.sender,
@@ -611,7 +630,6 @@ contract NomaFactory {
             _params.owner,
             _params.deployer,
             _params.pool,
-            _params.stakingContract,
             _params.presaleContract,
             _params.protocolParameters
         );

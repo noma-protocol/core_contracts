@@ -1,12 +1,30 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+// ███╗   ██╗ ██████╗ ███╗   ███╗ █████╗                               
+// ████╗  ██║██╔═══██╗████╗ ████║██╔══██╗                              
+// ██╔██╗ ██║██║   ██║██╔████╔██║███████║                              
+// ██║╚██╗██║██║   ██║██║╚██╔╝██║██╔══██║                              
+// ██║ ╚████║╚██████╔╝██║ ╚═╝ ██║██║  ██║                              
+// ╚═╝  ╚═══╝ ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═╝                              
+                                                                    
+// ██████╗ ██████╗  ██████╗ ████████╗ ██████╗  ██████╗ ██████╗ ██╗     
+// ██╔══██╗██╔══██╗██╔═══██╗╚══██╔══╝██╔═══██╗██╔════╝██╔═══██╗██║     
+// ██████╔╝██████╔╝██║   ██║   ██║   ██║   ██║██║     ██║   ██║██║     
+// ██╔═══╝ ██╔══██╗██║   ██║   ██║   ██║   ██║██║     ██║   ██║██║     
+// ██║     ██║  ██║╚██████╔╝   ██║   ╚██████╔╝╚██████╗╚██████╔╝███████╗
+// ╚═╝     ╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝  ╚═════╝ ╚═════╝ ╚══════╝
+//
+// Author: 0xsufi@noma.money
+// Copyright Noma Protocol 2025/2026
+
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
 import {Utils} from "../libraries/Utils.sol";
+import {NomaDividends} from "../controllers/NomaDividends.sol";
 
 /**
  * @title NomaToken
@@ -17,6 +35,7 @@ contract NomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSU
 
     // State variables
     IAddressResolver public resolver; // The address resolver contract.
+    NomaDividends public dividendsManager;
     uint256 public maxTotalSupply; // The maximum total supply of the token.
 
     // Custom errors
@@ -46,6 +65,7 @@ contract NomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSU
      */
     function initialize(
         address _deployer,
+        address _factory,
         uint256 _initialSupply,
         uint256 _maxTotalSupply, 
         string memory _name, 
@@ -56,7 +76,7 @@ contract NomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSU
         __ERC20_init(_name, _symbol);
         __Ownable_init(_deployer);
         __UUPSUpgradeable_init();
-        _mint(_deployer, _initialSupply);
+        _mint(_factory, _initialSupply);
         maxTotalSupply = _maxTotalSupply;
         resolver = IAddressResolver(_resolver);
     }
@@ -77,6 +97,26 @@ contract NomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSU
      */
     function burn(address account, uint256 amount) public onlyFactory {
         _burn(account, amount);
+    }
+
+    /// @dev Hook called before *any* transfer, mint, or burn.
+    function _update(
+        address from,
+        address to,
+        uint256 value
+    ) internal override(ERC20Upgradeable) {
+        // call dividends hook BEFORE balances change
+        if (address(dividendsManager) != address(0)) {
+            dividendsManager.onSharesTransferHook(from, to);
+        }
+
+        // let OZ do its normal accounting
+        super._update(from, to, value);
+    }
+
+    /// @notice Set the dividends manager contract (only once or with some governance).
+    function setDividendsManager(NomaDividends _manager) external onlyOwner {
+        dividendsManager = _manager;
     }
 
     /**
