@@ -307,11 +307,11 @@ contract AuxVault {
         return _vToken;
     }
 
-    function getTotalCreatorEarnings() public returns (uint256) {
+    function getTotalCreatorEarnings() public view returns (uint256) {
         return _v.totalCreatorFees;
     }
 
-    function getTotalTeamEarnings() public  returns (uint256) {
+    function getTotalTeamEarnings() public view returns (uint256) {
         return _v.totalTeamFees;
     }
 
@@ -368,7 +368,7 @@ contract AuxVault {
         selectors[1] = bytes4(keccak256(bytes("getTimeSinceLastMint()")));
         selectors[2] = bytes4(keccak256(bytes("getAccumulatedFees()")));
         selectors[3] = bytes4(keccak256(bytes("pool()")));
-        selectors[4] = bytes4(keccak256(bytes("setProtocolParameters((uint8,uint8,uint8,uint16[2],uint256,uint256,int24,int24,int24,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256))")));
+        selectors[4] = bytes4(keccak256(bytes("setProtocolParameters((uint8,uint8,uint8,uint16[2],uint256,uint256,int24,int24,int24,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256))")));
         selectors[5] = bytes4(keccak256(bytes("setManager(address)")));
         selectors[6] = bytes4(keccak256(bytes("setModelHelper(address)")));
         selectors[7] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256,int24)[3])")));

@@ -297,6 +297,7 @@ struct ProtocolParameters {
     uint256 highBalanceThresholdFactor;
     uint256 inflationFee;
     uint256 loanFee;
+    uint256 maxLoanUtilization;
     uint256 deployFee;
     uint256 presalePremium;
     uint256 selfRepayLtvTreshold;

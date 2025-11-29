@@ -28,10 +28,6 @@ interface ILiquidationVault {
     function vaultDefaultLoansRange(uint256 start, uint256 limit) external returns (uint256 totalBurned, uint256 loansDefaulted);
 }
 
-interface IOrchestrator {
-    function shift(ProtocolAddresses memory addresses,LiquidityPosition[3] memory positions) external; 
-}
-
 // Events
 event Borrow(address indexed who, uint256 borrowAmount, uint256 duration);
 event Payback(address indexed who, uint256 amount);

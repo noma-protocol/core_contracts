@@ -6,7 +6,6 @@ import {ERC20, ERC20Permit} from "../abstract/ERC20Permit.sol";
 
 error AlreadyInitialized();
 error InvalidAmount();
-error InvalidAddress();
 error Unauthorized();
 error InvalidTransfer();
 

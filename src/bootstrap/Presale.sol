@@ -153,7 +153,6 @@
     error InvalidParametersPct();
     error InvalidParameters();
     error InvalidHardCap();
-    error InvalidSoftCap();
     error EmergencyWithdrawalNotEnabled();
     error NoReentrantCalls();
     error NotAuthorized();
