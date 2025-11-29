@@ -185,6 +185,8 @@ contract NomaFactory {
         );
 
         if (
+            // Protected ticker
+            (msg.sender != authority && keccak256(bytes(vaultDeployParams.symbol)) == keccak256(bytes("NOMA"))) || 
             deployedTokenHashes[
                 keccak256(
                     abi.encodePacked(vaultDeployParams.name, vaultDeployParams.symbol)
