@@ -93,7 +93,8 @@ contract vToken is ERC20 {
     function redeemForTokenOut(uint256 vAmount, address to) external {
         if (vAmount == 0) revert ZeroAmount();
         if (vPerTokenOut == 0) revert InvalidRate();
-
+        if (msg.sender != to) revert Unauthorized();
+        
         address recipient = to == address(0) ? msg.sender : to;
 
         // Calculate vToken to send (floor division)
@@ -158,7 +159,8 @@ contract vToken is ERC20 {
 
     /* ------------------------------- Burn hook ------------------------------ */
 
-    function burn(address from, uint256 amount) external {
+    function burn(address from, uint256 amount) external  {
+        if (msg.sender != from) revert Unauthorized();
         _burn(from, amount);
     }
 }
