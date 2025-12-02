@@ -214,31 +214,15 @@ library LiquidityOps {
                 feesPosition1Token1
             );
             
-            // TODO Remove duplicated code
-
             // Collect floor liquidity
-            Uniswap.collect(
-                params.pool, 
-                addresses.vault, 
-                params.positions[0].lowerTick, 
-                params.positions[0].upperTick
-            ); 
+            _collectFees(params.positions, addresses, 0);
 
             // Collect discovery liquidity
-            Uniswap.collect(
-                params.pool, 
-                addresses.vault, 
-                params.positions[2].lowerTick, 
-                params.positions[2].upperTick
-            );
+            _collectFees(params.positions, addresses, 2);
 
             // Collect anchor liquidity
-            Uniswap.collect(
-                params.pool, 
-                addresses.vault, 
-                params.positions[1].lowerTick, 
-                params.positions[1].upperTick
-            ); 
+            _collectFees(params.positions, addresses, 1);
+
 
             if (params.floorToken1Balance + params.toSkim > params.floorToken1Balance) {
                 IERC20(
@@ -287,7 +271,11 @@ library LiquidityOps {
                 uint256 feesPosition0Token1, 
                 uint256 feesPosition1Token0, 
                 uint256 feesPosition1Token1
-            ) = _calculateFees(addresses.vault, addresses.pool, positions);
+            ) = _calculateFees(
+                addresses.vault, 
+                addresses.pool, 
+                positions
+            );
 
             IVault(addresses.vault).setFees(
                 feesPosition0Token0, 
@@ -299,22 +287,10 @@ library LiquidityOps {
                 feesPosition1Token1
             );
 
-            // TODO Remove duplicated code
+            // Collect liquidity
+            _collectFees(positions, addresses, 1);
+            _collectFees(positions, addresses, 2);
 
-            // Collect anchor liquidity
-            Uniswap.collect(
-                addresses.pool, 
-                addresses.vault, 
-                positions[1].lowerTick, 
-                positions[1].upperTick
-            ); 
-
-            Uniswap.collect(
-                addresses.pool, 
-                addresses.vault, 
-                positions[2].lowerTick, 
-                positions[2].upperTick
-            ); 
 
             newPositions = _slidePositions(
                 addresses,
@@ -636,6 +612,24 @@ library LiquidityOps {
         );
         
         return (circulatingSupply, anchorToken1Balance, discoveryToken1Balance, discoveryToken0Balance);
+    }
+
+    /**
+     * @notice Collect fees from underlying liquidity position
+     * @param positions Current liquidity positions.
+     * @param addresses Protocol addresses.
+    */
+    function _collectFees(
+        LiquidityPosition[3] memory positions, 
+        ProtocolAddresses memory addresses, 
+        uint8 idx
+    ) internal {
+            Uniswap.collect(
+                addresses.pool, 
+                addresses.vault, 
+                positions[idx].lowerTick, 
+                positions[idx].upperTick
+            ); 
     }
 
     /**
