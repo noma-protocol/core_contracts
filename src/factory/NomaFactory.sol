@@ -111,14 +111,13 @@ contract NomaFactory {
     using SupplyRules for uint256;
 
     // Noma Factory state
-    IAddressResolver private resolver;
-
-    address private presaleFactory;
-    address private deployerFactory;
-    address private extFactory;
+    IAddressResolver private immutable resolver;
+    address private immutable presaleFactory;
+    address private immutable deployerFactory;
+    address private immutable extFactory;
+    address private immutable uniswapV3Factory;
+    address private immutable pancakeSwapV3Factory;
     address private authority;
-    address private uniswapV3Factory;
-    address private pancakeSwapV3Factory;
     address private teamMultisigAddress;
 
     uint256 private totalVaults;
@@ -644,7 +643,8 @@ contract NomaFactory {
     * @dev This function can only be called by authorized vaults.
     */
     function mintTokens(address to, uint256 amount) public onlyVaults {
-        IERC20Extended(vaultsRepository[msg.sender].token0).mint(to, amount);
+        address token0 = vaultsRepository[msg.sender].token0;
+        IERC20Extended(token0).mint(to, amount);
     }
 
     /**
@@ -654,7 +654,8 @@ contract NomaFactory {
     * @dev This function can only be called by authorized vaults.
     */
     function burnFor(address from, uint256 amount) public onlyVaults {
-        IERC20Extended(vaultsRepository[msg.sender].token0).burn(from, amount);
+        address token0 = vaultsRepository[msg.sender].token0;
+        IERC20Extended(token0).burn(from, amount);
     }
 
     /**
@@ -695,13 +696,13 @@ contract NomaFactory {
     * It reverts if the provided address is zero.
     */
     function setMultiSigAddress(address _address) public {
-        if (msg.sender != teamMultisigAddress || msg.sender != authority) revert NotAuthorityError();
+        if (msg.sender != teamMultisigAddress && msg.sender != authority) revert NotAuthorityError();
         if (_address == address(0)) revert ZeroAddressError();
         teamMultisigAddress = _address;
     }
 
     function setVaultOwnership(address vaultAddress, address newOwner) public {
-        if (msg.sender != teamMultisigAddress || msg.sender != authority) revert NotAuthorityError();
+        if (msg.sender != teamMultisigAddress && msg.sender != authority) revert NotAuthorityError();
         IDiamondInterface(vaultAddress).transferOwnership(newOwner);
     }
 
@@ -720,8 +721,9 @@ contract NomaFactory {
     }
 
     function _calculatePresalePremium(uint256 _idoPrice) internal view returns (uint256) {
-        if (getProtocolParameters().presalePremium == 0) revert InvalidParameters();
-        uint256 presalePrice =_idoPrice + (_idoPrice * getProtocolParameters().presalePremium / 100);         
+        uint256 premium = protocolParameters.presalePremium;
+        if (premium == 0) revert InvalidParameters();
+        uint256 presalePrice = _idoPrice + (_idoPrice * premium / 100);
         return presalePrice;
     }
 
@@ -765,12 +767,12 @@ contract NomaFactory {
     }
     
     /**
-    * @notice Retrieves the description of a vault deployed by a specific deployer.
-    * @param _deployer The address of the deployer.
-    * @return The vault description associated with the deployer.
+    * @notice Retrieves the description of a specific vault.
+    * @param vault The address of the vault.
+    * @return The vault description associated with the vault.
     */
-    function getVaultDescription(address _deployer) external view returns (VaultDescription memory) {
-        return vaultsRepository[_deployer];
+    function getVaultDescription(address vault) external view returns (VaultDescription memory) {
+        return vaultsRepository[vault];
     }
 
     /**
