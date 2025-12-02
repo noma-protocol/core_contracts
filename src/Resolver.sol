@@ -124,14 +124,6 @@ contract Resolver is Ownable {
         return true;
     }
 
-    /// @notice Retrieves the address associated with a given name.
-    /// @dev Returns `address(0)` if the name is not found in the repository.
-    /// @param name The name (as bytes32) to query in the repository.
-    /// @return The address associated with the provided name.
-    function getAddress(bytes32 name) external view returns (address) {
-        return repository[name];
-    }
-
     function getVaultAddress(address _vault, bytes32 name) external view returns (address) {
         return vaultAddressCache[_vault][name];
     }
@@ -156,6 +148,17 @@ contract Resolver is Ownable {
         } else  {
             address _foundAddress = repository[name];
             if (_foundAddress == address(0)) revert AddressNotFound(reason);
+            return _foundAddress;
+        }
+    }
+
+    function getAddress(bytes32 name) external view returns (address) {
+        // Check first if the vault has a specific address
+        address vaultAddress = vaultAddressCache[msg.sender][name];
+        if (vaultAddress != address(0)) {
+            return vaultAddress;
+        } else  {
+            address _foundAddress = repository[name];
             return _foundAddress;
         }
     }

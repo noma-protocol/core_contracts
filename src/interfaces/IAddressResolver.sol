@@ -27,7 +27,6 @@ interface IAddressResolver {
     /// @param destinations An array of contract addresses, each corresponding to the name at the same index in the names array.
     function importAddresses(bytes32[] calldata names, address[] calldata destinations) external;
 
-
     function configureDeployerACL(address _vault) external;
 
     /// @notice Checks if the provided name-address pairs are correctly imported in the resolver.
