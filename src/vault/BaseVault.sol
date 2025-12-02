@@ -71,9 +71,24 @@ error NotInitialized();
  */
 contract BaseVault  {
     VaultStorage internal _v;
+    
+    function _handleV3MintCallback(
+        uint256 amount0Owed,
+        uint256 amount1Owed
+    ) internal {
+        if (msg.sender != address(_v.pool)) revert CallbackCaller();
 
-    // Events
-    event FloorUpdated(uint256 floorPrice, uint256 floorCapacity);
+        // uint256 token0Balance = IERC20(_v.tokenInfo.token0).balanceOf(address(this));
+        // uint256 token1Balance = IERC20(_v.tokenInfo.token1).balanceOf(address(this));
+
+        if (amount0Owed > 0) {
+            IERC20(_v.tokenInfo.token0).transfer(msg.sender, amount0Owed);
+        }
+
+        if (amount1Owed > 0) {
+            IERC20(_v.tokenInfo.token1).transfer(msg.sender, amount1Owed);
+        }
+    }
 
     /**
      * @notice Uniswap V3 callback function, called back on pool.mint.
@@ -85,42 +100,22 @@ contract BaseVault  {
         uint256 amount0Owed, 
         uint256 amount1Owed, 
         bytes calldata data
-    )
-        external
-    {
-        if (msg.sender != address(_v.pool)) revert CallbackCaller();
-
-        uint256 token0Balance = IERC20(_v.tokenInfo.token0).balanceOf(address(this));
-        uint256 token1Balance = IERC20(_v.tokenInfo.token1).balanceOf(address(this));
-
-        if (token0Balance >= amount0Owed) {
-            if (amount0Owed > 0) IERC20(_v.tokenInfo.token0).transfer(msg.sender, amount0Owed);
-        } 
-
-        if (token1Balance >= amount1Owed) {
-            if (amount1Owed > 0) IERC20(_v.tokenInfo.token1).transfer(msg.sender, amount1Owed); 
-        } 
+    ) external {
+        _handleV3MintCallback(amount0Owed, amount1Owed);
     }
 
+    /**
+     * @notice Pancake V3 callback function, called back on pool.mint.
+     * @param amount0Owed The amount of token0 owed to the pool.
+     * @param amount1Owed The amount of token1 owed to the pool.
+     * @param data Additional data passed to the callback.
+     */
     function pancakeV3MintCallback(
         uint256 amount0Owed, 
         uint256 amount1Owed, 
         bytes calldata data
-    )
-        external
-    {
-        if (msg.sender != address(_v.pool)) revert CallbackCaller();
-
-        uint256 token0Balance = IERC20(_v.tokenInfo.token0).balanceOf(address(this));
-        uint256 token1Balance = IERC20(_v.tokenInfo.token1).balanceOf(address(this));
-
-        if (token0Balance >= amount0Owed) {
-            if (amount0Owed > 0) IERC20(_v.tokenInfo.token0).transfer(msg.sender, amount0Owed);
-        } 
-
-        if (token1Balance >= amount1Owed) {
-            if (amount1Owed > 0) IERC20(_v.tokenInfo.token1).transfer(msg.sender, amount1Owed); 
-        } 
+    ) external {
+        _handleV3MintCallback(amount0Owed, amount1Owed);
     }
 
     /**
@@ -129,7 +124,6 @@ contract BaseVault  {
      * @param _owner The address of the vault owner.
      * @param _deployer The address of the deployer contract.
      * @param _pool The address of the Uniswap V3 pool.
-     * @param _stakingContract The address of the staking contract.
      * @param _params The protocol parameters.
      */
     function initialize(
@@ -137,7 +131,6 @@ contract BaseVault  {
         address _owner,
         address _deployer,
         address _pool, 
-        address _stakingContract,
         address _presaleContract,
         ProtocolParameters memory _params
     ) public onlyFactory {
@@ -153,14 +146,13 @@ contract BaseVault  {
         _v.tokenInfo.token0 = _v.pool.token0();
         _v.tokenInfo.token1 = _v.pool.token1();
         _v.tickSpacing = _v.pool.tickSpacing();
-        _v.initialized = false; // Should configure
-        _v.stakingEnabled = false; // Should be enabled when the feature is deployed
+        _v.initialized = false; 
+        _v.stakingEnabled = false; 
         _v.timeLastMinted = 0;
         _v.loanFee = uint8(_params.loanFee);
         _v.totalInterest = 0;
         _v.presaleContract = _presaleContract;
         _v.collateralAmount = 0;
-
         _v.deployerContract = _deployer;
         _v.modelHelper = modelHelper();
         _v.protocolParameters = _params;
@@ -168,6 +160,28 @@ contract BaseVault  {
         _v.isLocked[address(this)] = false;
 
         IERC20(_v.pool.token0()).approve(_deployer, type(uint256).max);
+    }
+
+    // *** MUTATIVE FUNCTIONS *** //
+    
+    /**
+     * @notice Initializes the liquidity positions for the vault.
+     * @param positions An array of liquidity positions (Floor, Anchor, Discovery).
+     */
+    function initializeLiquidity(
+        LiquidityPosition[3] memory positions
+    ) public onlyDeployer {
+        if (_v.initialized) revert AlreadyInitialized();
+
+        if (
+            positions[0].liquidity == 0 || 
+            positions[1].liquidity == 0 || 
+            positions[2].liquidity == 0
+        ) revert InvalidPosition();
+                
+        _v.floorPosition = positions[0];
+        _v.anchorPosition = positions[1];
+        _v.discoveryPosition = positions[2];
     }
 
     function postInit(
@@ -184,30 +198,6 @@ contract BaseVault  {
         _v.isStakingSetup = true;
         _v.initialized = true;
     }
-    
-    // *** MUTATIVE FUNCTIONS *** //
-
-    /**
-     * @notice Initializes the liquidity positions for the vault.
-     * @param positions An array of liquidity positions (Floor, Anchor, Discovery).
-     */
-    function initializeLiquidity(
-        LiquidityPosition[3] memory positions
-    ) public onlyDeployer {
-        if (_v.initialized) revert AlreadyInitialized();
-
-        if (
-            positions[0].liquidity == 0 || 
-            positions[1].liquidity == 0 || 
-            positions[2].liquidity == 0
-        ) revert InvalidPosition();
-                
-        // _v.initialized = true; // replace with _v.initializedLiquidity 
-
-        _v.floorPosition = positions[0];
-        _v.anchorPosition = positions[1];
-        _v.discoveryPosition = positions[2];
-    }
 
     /**
      * @notice Handles the post-presale actions.
@@ -217,11 +207,8 @@ contract BaseVault  {
         INomaFactory(
             _v.factory
         ).deferredDeploy(
-            //  _v.resolver.requireAndGetAddress(
-            //     Utils.stringToBytes32("Deployer"), 
-            //     "no Deployer"
-            // )
-            INomaFactory(_v.factory).getVaultsRepository(address(this)).deployerContract
+            INomaFactory(_v.factory)
+            .getVaultsRepository(address(this)).deployerContract
         );
     }
 
@@ -424,7 +411,6 @@ contract BaseVault  {
      * @notice Modifier to restrict access to internal calls.
      */
     modifier onlyInternalCalls() {
-        IAddressResolver resolver = _getResolver();
         if (
             msg.sender != _v.factory && 
             msg.sender != address(this) &&
@@ -450,7 +436,13 @@ contract BaseVault  {
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](14);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
-        selectors[1] = bytes4(keccak256(bytes("initialize(address,address,address,address,address,address,(uint8,uint8,uint8,uint16[2],uint256,uint256,int24,int24,int24,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256))")));
+        selectors[1] = bytes4(
+            keccak256(
+                bytes(
+                    "initialize(address,address,address,address,address,(uint8,uint8,uint8,uint16[2],uint256,uint256,int24,int24,int24,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256))"
+                )
+            )
+        );
         selectors[2] = bytes4(keccak256(bytes("initializeLiquidity((int24,int24,uint128,uint256,int24)[3])")));
         selectors[3] = bytes4(keccak256(bytes("uniswapV3MintCallback(uint256,uint256,bytes)")));
         selectors[4] = bytes4(keccak256(bytes("getUnderlyingBalances(uint8)")));
