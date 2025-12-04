@@ -8,7 +8,7 @@ import { IAddressResolver }  from "../interfaces/IAddressResolver.sol";
 import { Utils } from "../libraries/Utils.sol";
 import { TokenRepo } from "../TokenRepo.sol";
 import { vToken } from "../token/vToken/vToken.sol";
-import { VaultDescription, VaultInfo } from "../types/Types.sol";
+import { VaultDescription, VaultInfo, ExtDeployParams} from "../types/Types.sol";
 import { IVault } from "../interfaces/IVault.sol";
 
 interface INomaFactory {
@@ -55,29 +55,15 @@ contract ExtFactory {
         resolver = IAddressResolver(_resolver);
     }
 
-    /**
-     * @notice Deploys both `GonsToken` and `Staking` contracts.
-     * @dev This function can only be called by the factory contract registered in the resolver.
-     * @param deployerAddress The address that will be assigned as the owner of `GonsToken`.
-     * @param vaultAddress The vault address for `Staking` contract.
-     * @param token0 The address of the token that will be staked.
-     * @return gonsTokenAddress The address of the newly deployed `GonsToken` contract.
-     * @return stakingContractAddress The address of the newly deployed `Staking` contract.
-     * @custom:require Only callable by the factory contract.
-     */
     function deployAll(
-        string memory name, 
-        string memory symbol,
-        address deployerAddress,
-        address vaultAddress,
-        address token0
-    ) external onlyFactoryOrOwner(vaultAddress) returns (
+        ExtDeployParams memory params
+    ) external onlyFactoryOrOwner(params.vaultAddress) returns (
         address gonsTokenAddress, 
         address stakingContractAddress, 
         address tokenRepoAddress,
         address vtokenAddress
     ) {
-        VaultInfo memory vaultInfo = IVault(vaultAddress).getVaultInfo();
+        VaultInfo memory vaultInfo = IVault(params.vaultAddress).getVaultInfo();
 
         if (vaultInfo.initialized) {
             revert AlreadyInitialized();
@@ -85,23 +71,24 @@ contract ExtFactory {
 
         // Deploy GonsToken contract
         gonsToken = new GonsToken(
-            string(abi.encodePacked(name, " Staked")), 
-            string(abi.encodePacked("s", symbol))
+            string(abi.encodePacked(params.name, " Staked")), 
+            string(abi.encodePacked("s", params.symbol)),
+            params.totalSupply
         );
 
         // Deploy Staking contract
-        stakingContract = new Staking(token0, address(gonsToken), vaultAddress);
+        stakingContract = new Staking(params.token0, address(gonsToken), params.vaultAddress);
 
         // Deploy Token Repo contract
-        tokenRepo = new TokenRepo(vaultAddress);
+        tokenRepo = new TokenRepo(params.vaultAddress);
 
         // Deploy vToken contract
         vtoken = new vToken(
             address(resolver),
-            vaultAddress,
-            token0,
-            string(abi.encodePacked("v", symbol)),
-            string(abi.encodePacked("v", symbol))
+            params.vaultAddress,
+            params.token0,
+            string(abi.encodePacked("v", params.symbol)),
+            string(abi.encodePacked("v", params.symbol))
         );
 
         emit DeployerCreated(address(stakingContract));

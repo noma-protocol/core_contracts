@@ -15,7 +15,7 @@ import {
     ProtocolParameters, 
     CreatorFacingParameters 
 } from "../types/Types.sol";
-import { DeployHelper } from "../libraries/DeployHelper.sol";
+// import { DeployHelper } from "../libraries/DeployHelper.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Uniswap } from "../libraries/Uniswap.sol";
 import { IVault } from "../interfaces/IVault.sol";
@@ -164,7 +164,6 @@ contract AuxVault {
     }
 
 
-
     function getReferralEntity(address who) public view returns (ReferralEntity memory) {
         // Get referral code directly as bytes8
         bytes8 code = Utils.getReferralCode(who);
@@ -248,22 +247,23 @@ contract AuxVault {
 
     /**
      * @notice Updates the liquidity positions in the vault.
-     * @param _positions The new liquidity positions.
+     * @param positions The new liquidity positions.
      */
-    function updatePositions(LiquidityPosition[3] memory _positions) public onlyInternalCalls {
+    function updatePositions(LiquidityPosition[3] memory positions) public onlyInternalCalls {
         if (!_v.initialized) revert NotInitialized();             
+        if (positions[0].liquidity == 0 /*|| positions[1].liquidity == 0 || positions[2].liquidity == 0*/) revert NoLiquidity();
         
-        _updatePositions(_positions);
+        _updatePositions(positions);
     }
 
     /**
      * @notice Internal function to update the liquidity positions.
-     * @param _positions The new liquidity positions.
+     * @param positions The new liquidity positions.
      */
-    function _updatePositions(LiquidityPosition[3] memory _positions) internal {   
-        _v.floorPosition = _positions[0];
-        _v.anchorPosition = _positions[1];
-        _v.discoveryPosition = _positions[2];
+    function _updatePositions(LiquidityPosition[3] memory positions) internal {   
+        _v.floorPosition = positions[0];
+        _v.anchorPosition = positions[1];
+        _v.discoveryPosition = positions[2];
     }
 
     function setProtocolParameters(
@@ -271,6 +271,7 @@ contract AuxVault {
     ) public onlyMultiSig {
         _v.protocolParameters = protocolParameters;
     }
+
 
     /**
      * @notice Retrieves the address of the exchange helper.
@@ -368,15 +369,15 @@ contract AuxVault {
         selectors[1] = bytes4(keccak256(bytes("getTimeSinceLastMint()")));
         selectors[2] = bytes4(keccak256(bytes("getAccumulatedFees()")));
         selectors[3] = bytes4(keccak256(bytes("pool()")));
-        selectors[4] = bytes4(keccak256(bytes("setProtocolParameters((uint8,uint8,uint8,uint16[2],uint256,uint256,int24,int24,int24,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256))")));
+        selectors[4] = bytes4(keccak256(bytes("setProtocolParameters((uint8,uint8,uint8,uint16[2],uint256,uint256,int24,int24,int24,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256))")));
         selectors[5] = bytes4(keccak256(bytes("setManager(address)")));
         selectors[6] = bytes4(keccak256(bytes("setModelHelper(address)")));
-        selectors[7] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256,int24)[3])")));
+        selectors[7] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256,int24,uint8)[3])")));
         selectors[8] = bytes4(keccak256(bytes("mintTokens(address,uint256)")));
         selectors[9] = bytes4(keccak256(bytes("burnTokens(uint256)")));
         selectors[10] = bytes4(keccak256(bytes("setReferralEntity(bytes8,uint256)")));
         selectors[11] = bytes4(keccak256(bytes("getReferralEntity(address)")));
-        selectors[12] = bytes4(keccak256(bytes("setProtocolParametersCreator((int24,int24,int24,uint256,uint256,uint256,uint256,uint256,uint256))")));
+        selectors[12] = bytes4(keccak256(bytes("setProtocolParametersCreator((int24,int24,int24,uint256,uint256,uint256,uint256,uint256,uint256,uint256))")));
         selectors[13] = bytes4(keccak256(bytes("getTotalCreatorEarnings()")));
         selectors[14] = bytes4(keccak256(bytes("getTotalTeamEarnings()")));
         selectors[15] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));

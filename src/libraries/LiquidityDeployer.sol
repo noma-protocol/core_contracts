@@ -3,50 +3,76 @@ pragma solidity ^0.8.0;
 
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
-import {TickMath} from "v3-core/libraries/TickMath.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {Uniswap} from "./Uniswap.sol";
 import {Utils} from "./Utils.sol";
+import {TickMath} from "v3-core/libraries/TickMath.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Conversions} from "./Conversions.sol";
-import {DecimalMath} from "./DecimalMath.sol";
-
 import {IVault} from "../interfaces/IVault.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {
     LiquidityPosition, 
-    LiquidityType, 
-    DeployLiquidityParameters, 
-    AmountsToMint
+    LiquidityType,
+    AmountsToMint,
+    DeployLiquidityParams
 } from "../types/Types.sol";
 
+// Custom errors
+error InvalidTicksFloor();
+error InvalidTicksAnchor();
+error InvalidTicksDiscovery();
+error InvalidFloor();
+error NoLiquidity();
+
 /**
- * @title LiquidityDeployer
+ * @title LiquidityManager
  * @notice A library for deploying and managing liquidity positions in a Uniswap V3 pool.
  */
 library LiquidityDeployer {
-    
-    // Custom errors
-    error InvalidTicks();
-    error EmptyFloor();
-    error NoLiquidity();
 
-    /**
-     * @notice Deploys an anchor liquidity position.
-     * @param pool The address of the Uniswap V3 pool.
-     * @param receiver The address that will receive the liquidity position.
-     * @param amount0 The amount of token0 to deploy.
-     * @param floorPosition The current floor liquidity position.
-     * @param deployParams Parameters for deploying the liquidity position.
-     * @return newPosition The new liquidity position.
-     * @return liquidityType The type of liquidity position (Anchor).
-     */
-    function deployAnchor(
+    function deployFloor(
         address pool,
         address receiver,
-        uint256 amount0,
+        uint256 floorPrice,
+        uint256 amount0ToDeploy,
+        uint256 amount1ToDeploy,
+        int24 tickSpacing
+        // LiquidityPosition[3] memory positions
+    ) internal returns (LiquidityPosition memory newPosition) {
+
+        uint8 decimals = IERC20Metadata(IUniswapV3Pool(pool).token0()).decimals();
+        // int24 lowerTick = Conversions.priceToTick(int256(floorPrice), tickSpacing, decimals);
+        (int24 lowerTick, int24 upperTick) = Conversions.computeSingleTick(floorPrice, tickSpacing, decimals);
+
+        // Ensuring valid tick range
+        if (upperTick <= lowerTick) {
+            revert InvalidTicksFloor();
+        }
+
+        // Deploying the new liquidity position
+        newPosition = deployPosition(
+            DeployLiquidityParams({
+                pool: pool,
+                receiver: receiver,
+                bips: 0,
+                lowerTick: lowerTick,
+                upperTick: upperTick,
+                tickSpacing: tickSpacing,
+                liquidityType: LiquidityType.Floor,
+                amounts: AmountsToMint({
+                    amount0: amount0ToDeploy,
+                    amount1: amount1ToDeploy
+                })
+            })            
+        );           
+    }
+
+    // Deploys anchor Position during initial provisioning 
+    function deployAnchor(
         LiquidityPosition memory floorPosition,
-        DeployLiquidityParameters memory deployParams
+        DeployLiquidityParams memory deployParams
     )
         internal
         returns (
@@ -54,59 +80,47 @@ library LiquidityDeployer {
             LiquidityType liquidityType
         )
     {
-        (int24 lowerTick, int24 upperTick) = Conversions
-        .computeRangeTicks(
-            Conversions.sqrtPriceX96ToPrice(
-                Conversions.tickToSqrtPriceX96(floorPosition.upperTick),
-                IERC20Metadata(address(IUniswapV3Pool(pool).token0())).decimals()
-            ),
-            Utils.addBips(
-                Conversions.sqrtPriceX96ToPrice(
-                    Conversions.tickToSqrtPriceX96(floorPosition.upperTick),
-                    IERC20Metadata(address(IUniswapV3Pool(pool).token0())).decimals()
-                ),
-                int256(deployParams.bips)
-            ),
+        uint8 decimals = IERC20Metadata(IUniswapV3Pool(deployParams.pool).token0()).decimals();
+
+        uint256 floorUpperPrice = Conversions.sqrtPriceX96ToPrice(
+            Conversions.tickToSqrtPriceX96(floorPosition.upperTick),
+            decimals
+        );
+
+        (int24 lowerTick, int24 upperTick) = Conversions.computeRangeTicks(
+            floorUpperPrice,
+            Utils.addBips(floorUpperPrice, int256(deployParams.bips)),
             deployParams.tickSpacing,
-            IERC20Metadata(address(IUniswapV3Pool(pool).token0())).decimals()
+            decimals
         );
 
         if (upperTick <= lowerTick) {
-            revert InvalidTicks();
+            revert InvalidTicksAnchor();
         }
 
-        (newPosition) = _deployPosition(
-            pool,
-            receiver,
-            lowerTick,
-            upperTick,
-            floorPosition.tickSpacing,
-            LiquidityType.Anchor,
-            AmountsToMint({
-                amount0: amount0,
-                amount1: 0
+        (newPosition) = deployPosition(
+            DeployLiquidityParams({
+                pool: deployParams.pool,
+                receiver: deployParams.receiver,
+                bips: 0,
+                lowerTick: lowerTick,
+                upperTick: upperTick,
+                tickSpacing: deployParams.tickSpacing,
+                liquidityType: LiquidityType.Anchor,
+                amounts: AmountsToMint({
+                    amount0: deployParams.amounts.amount0,
+                    amount1: deployParams.amounts.amount1
+                })
             })
         );
-
+        
         return (newPosition, LiquidityType.Anchor);
     }
 
-    /**
-     * @notice Deploys a discovery liquidity position.
-     * @param pool The address of the Uniswap V3 pool.
-     * @param receiver The address that will receive the liquidity position.
-     * @param upperDiscoveryPrice The upper price bound for the discovery position.
-     * @param discoveryTickSpacing The tick spacing for the discovery position.
-     * @param anchorPosition The current anchor liquidity position.
-     * @return newPosition The new liquidity position.
-     * @return liquidityType The type of liquidity position (Discovery).
-     */
     function deployDiscovery(
-        address pool,
-        address receiver,
         uint256 upperDiscoveryPrice,
-        int24 discoveryTickSpacing,
-        LiquidityPosition memory anchorPosition
+        LiquidityPosition memory anchorPosition,
+        DeployLiquidityParams memory deployParams
     )
         internal
         returns (
@@ -114,7 +128,7 @@ library LiquidityDeployer {
             LiquidityType liquidityType
         )
     {
-        uint8 decimals = IERC20Metadata(address(IUniswapV3Pool(pool).token0())).decimals();
+        uint8 decimals = IERC20Metadata(address(IUniswapV3Pool(deployParams.pool).token0())).decimals();
 
         uint256 lowerDiscoveryPrice = Conversions.sqrtPriceX96ToPrice(
             Conversions.tickToSqrtPriceX96(anchorPosition.upperTick),
@@ -127,29 +141,30 @@ library LiquidityDeployer {
         .computeRangeTicks(
             lowerDiscoveryPrice,
             upperDiscoveryPrice,
-            discoveryTickSpacing,
+            anchorPosition.tickSpacing,
             decimals
         );
 
         if (lowerTick <= anchorPosition.upperTick) {
-            revert InvalidTicks();
+            revert InvalidTicksDiscovery();
         }
 
-        uint256 balanceToken0 = IERC20Metadata(IUniswapV3Pool(pool).token0()).balanceOf(
-            address(this)
-        );
+        uint256 balanceToken0 = IERC20Metadata(IUniswapV3Pool(deployParams.pool).token0()).balanceOf(address(this));
 
-        newPosition = _deployPosition(
-            pool,
-            receiver,
-            lowerTick,
-            upperTick,
-            anchorPosition.tickSpacing,
-            LiquidityType.Discovery,
-            AmountsToMint({
-                amount0: balanceToken0, 
-                amount1: 0
-            })
+        newPosition = deployPosition(
+            DeployLiquidityParams({
+                pool: deployParams.pool,
+                receiver: deployParams.receiver,
+                bips: 0,
+                lowerTick: lowerTick,
+                upperTick: upperTick,
+                tickSpacing: deployParams.tickSpacing,
+                liquidityType: LiquidityType.Discovery,
+                amounts: AmountsToMint({
+                    amount0: balanceToken0,
+                    amount1: 0
+                })
+            })            
         );
 
         newPosition.price = upperDiscoveryPrice;
@@ -157,226 +172,104 @@ library LiquidityDeployer {
         return (newPosition, LiquidityType.Discovery);
     }
 
-    /**
-     * @notice Shifts the floor liquidity position to a new price range.
-     * @param pool The address of the Uniswap V3 pool.
-     * @param receiver The address that will receive the new liquidity position.
-     * @param currentFloorPrice The current floor price.
-     * @param newFloorPrice The new floor price.
-     * @param newFloorBalance The new balance of token1 for the floor position.
-     * @param currentFloorBalance The current balance of token1 for the floor position.
-     * @param floorPosition The current floor liquidity position.
-     * @return newPosition The new liquidity position.
-     */
     function shiftFloor(
         address pool,
         address receiver,
-        uint256 currentFloorPrice,
         uint256 newFloorPrice,
         uint256 newFloorBalance,
-        uint256 currentFloorBalance,
         LiquidityPosition memory floorPosition
-    ) public returns (LiquidityPosition memory newPosition) {
+    ) internal returns (LiquidityPosition memory newPosition) {
         
-        if (newFloorPrice < currentFloorPrice) {
-            newFloorPrice = currentFloorPrice;
-        }
-
-        (uint160 sqrtRatioX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
+        (uint160 sqrtRatioX96,,,,,, ) = IUniswapV3Pool(pool).slot0();
         uint8 decimals = IERC20Metadata(address(IUniswapV3Pool(pool).token0())).decimals();
 
-        if (floorPosition.liquidity > 0) {
+        (int24 lowerTick, int24 upperTick) = 
+        Conversions.computeSingleTick(
+            newFloorPrice,
+            floorPosition.tickSpacing,
+            decimals
+        );
+
+        if (lowerTick < floorPosition.lowerTick) revert InvalidFloor();
+
+        uint128 liquidity = LiquidityAmounts
+        .getLiquidityForAmounts(
+            sqrtRatioX96,
+            TickMath.getSqrtRatioAtTick(lowerTick),
+            TickMath.getSqrtRatioAtTick(upperTick),
+            0,
+            newFloorBalance
+        );
+
+        if (liquidity > 0) {
+
+            Uniswap.mint(
+                pool,
+                receiver,
+                lowerTick,
+                upperTick,
+                liquidity,
+                LiquidityType.Floor,
+                false
+            );
+
+            newPosition.liquidity = liquidity;
+            newPosition.upperTick = upperTick;
+            newPosition.lowerTick = lowerTick;
+            newPosition.tickSpacing = floorPosition.tickSpacing;
+            newPosition.liquidityType = LiquidityType.Floor;
             
-            (int24 lowerTick, int24 upperTick) = 
-            Conversions.computeSingleTick(
-                newFloorPrice,
-                floorPosition.tickSpacing,
-                decimals
-            );
-
-            uint128 newLiquidity = LiquidityAmounts
-            .getLiquidityForAmounts(
-                sqrtRatioX96,
-                TickMath.getSqrtRatioAtTick(lowerTick),
-                TickMath.getSqrtRatioAtTick(upperTick),
-                0,
-                newFloorBalance > currentFloorBalance ? newFloorBalance : currentFloorBalance
-            );
-
-            if (newLiquidity > 0) {
-
-                Uniswap.mint(
-                    pool,
-                    receiver,
-                    lowerTick,
-                    upperTick,
-                    newLiquidity,
-                    LiquidityType.Floor,
-                    false
-                );
-
-                newPosition.liquidity = newLiquidity;
-                newPosition.upperTick = upperTick;
-                newPosition.lowerTick = lowerTick;
-                newPosition.tickSpacing = floorPosition.tickSpacing;
-
-            } else {
-                revert(
-                    string(
-                        abi.encodePacked(
-                            "shiftFloor: liquidity is 0 : ", 
-                            Utils._uint2str(uint256(newFloorBalance > currentFloorBalance ? newFloorBalance : currentFloorBalance))
-                        )
-                    )
-                );
-            }
-
         } else {
-            revert EmptyFloor();
+
+            revert(
+                string(
+                    abi.encodePacked(
+                        "shiftFloor: liquidity is 0 : ", 
+                        Utils._uint2str(uint256(newFloorPrice))
+                    )
+                )
+            );
+
         }
 
         return newPosition;
     }
 
-    /**
-     * @notice Internal function to deploy a liquidity position.
-     * @param pool The address of the Uniswap V3 pool.
-     * @param receiver The address that will receive the liquidity position.
-     * @param lowerTick The lower tick of the position.
-     * @param upperTick The upper tick of the position.
-     * @param tickSpacing The tick spacing of the position.
-     * @param liquidityType The type of liquidity position (Floor, Anchor, Discovery).
-     * @param amounts The amounts of token0 and token1 to deploy.
-     * @return newPosition The new liquidity position.
-     */
-    function _deployPosition(
-        address pool,
-        address receiver,
-        int24 lowerTick, 
-        int24 upperTick,
-        int24 tickSpacing,
-        LiquidityType liquidityType,
-        AmountsToMint memory amounts
+    function deployPosition(
+      DeployLiquidityParams memory params
     ) internal returns (LiquidityPosition memory newPosition) {
-        
-        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
+        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(params.pool).slot0();
 
-        uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(
+        uint128 liquidity = LiquidityAmounts
+        .getLiquidityForAmounts(
             sqrtRatioX96,
-            TickMath.getSqrtRatioAtTick(lowerTick),
-            TickMath.getSqrtRatioAtTick(upperTick),
-            amounts.amount0, 
-            amounts.amount1
+            TickMath.getSqrtRatioAtTick(params.lowerTick),
+            TickMath.getSqrtRatioAtTick(params.upperTick),
+            params.amounts.amount0, 
+            params.amounts.amount1
         );
-
-        if (liquidityType == LiquidityType.Discovery) {
-            if (amounts.amount0 == 0) {
-                revert(
-                    string(
-                        abi.encodePacked(
-                            "_deployPosition(1): liquidity is 0 : ", 
-                            Utils._uint2str(uint256(amounts.amount0))
-                        )
-                    )
-                );
-            }
-        }
 
         if (liquidity > 0) {
             Uniswap.mint(
-                pool, 
-                receiver, 
-                lowerTick, 
-                upperTick, 
+                params.pool, 
+                params.receiver, 
+                params.lowerTick, 
+                params.upperTick, 
                 liquidity, 
-                liquidityType, 
+                params.liquidityType, 
                 false
             );
         } else {
-            revert(
-                string(
-                    abi.encodePacked(
-                        "_deployPosition(2): amount0 is : ", 
-                        Utils._uint2str(uint256(amounts.amount0))
-                    )
-                )
-            );
-        }
+            revert NoLiquidity();
+        }   
 
         newPosition = LiquidityPosition({
-            lowerTick: lowerTick, 
-            upperTick: upperTick, 
+            lowerTick: params.lowerTick, 
+            upperTick: params.upperTick, 
             liquidity: liquidity, 
             price: 0,
-            tickSpacing: tickSpacing
-        });    
-    }
-
-    /**
-     * @notice Redeploys the floor liquidity position.
-     * @param pool The address of the Uniswap V3 pool.
-     * @param amount1ToDeploy The amount of token1 to deploy.
-     * @param positions The current liquidity positions.
-     * @return newPosition The new floor liquidity position.
-     */
-    function reDeployFloor(
-        address pool,
-        address vault,
-        uint256 amount0ToDeploy,
-        uint256 amount1ToDeploy,
-        LiquidityPosition[3] memory positions
-    ) internal returns (LiquidityPosition memory newPosition) {
-        // Ensuring valid tick range
-        if (positions[0].upperTick <= positions[0].lowerTick) {
-            revert InvalidTicks();
-        }
-
-        // Deploying the new liquidity position
-        newPosition = _deployPosition(
-            pool, 
-            vault, 
-            positions[0].lowerTick,
-            positions[0].upperTick,
-            positions[0].tickSpacing,
-            LiquidityType.Floor, 
-            AmountsToMint({
-                amount0: amount0ToDeploy,
-                amount1: amount1ToDeploy
-            })
-        );
-
-        LiquidityPosition[3] memory newPositions = [
-            newPosition, 
-            positions[1], 
-            positions[2]
-        ];
-
-        IVault(vault)
-        .updatePositions(
-            newPositions
-        );            
-    }
-
-    /**
-     * @notice Computes the new floor price based on the provided parameters.
-     * @param toSkim The amount of token1 to skim.
-     * @param floorNewToken1Balance The new balance of token1 for the floor position.
-     * @param circulatingSupply The circulating supply of the vault.
-     * @param positions The current liquidity positions.
-     * @return newFloorPrice The new floor price.
-     */
-    function computeNewFloorPrice(
-        uint256 toSkim,
-        uint256 floorNewToken1Balance,
-        uint256 circulatingSupply,
-        LiquidityPosition[3] memory positions
-    ) internal pure returns (uint256) {
-
-        uint256 newFloorPrice = DecimalMath.divideDecimal(
-            floorNewToken1Balance + toSkim,
-            circulatingSupply
-        );
-
-        return newFloorPrice;  
+            tickSpacing: params.tickSpacing,
+            liquidityType: params.liquidityType
+        });          
     }
 }

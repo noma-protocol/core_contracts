@@ -34,11 +34,11 @@ contract GonsToken is ERC20Permit {
 
     uint256 private constant DECIMALS = 18;
     uint256 private constant MAX_UINT256 = ~uint256(0);
-    uint256 private constant INITIAL_FRAGMENTS_SUPPLY = 3.025 * 10**6 * 10**DECIMALS;
+    uint256 private INITIAL_FRAGMENTS_SUPPLY = 0;
 
     // TOTAL_GONS is a multiple of INITIAL_FRAGMENTS_SUPPLY so that _gonsPerFragment is an integer.
     // Use the highest value that fits in a uint256 for max granularity.
-    uint256 private constant TOTAL_GONS = MAX_UINT256 - (MAX_UINT256 % INITIAL_FRAGMENTS_SUPPLY);
+    uint256 private TOTAL_GONS = 0;
 
     // MAX_SUPPLY = maximum integer < (sqrt(4*TOTAL_GONS + 1) - 1) / 2
     uint256 private constant MAX_SUPPLY = ~uint128(0);  // (2^128) - 1
@@ -52,7 +52,16 @@ contract GonsToken is ERC20Permit {
     // This is denominated in Fragments, because the gons-fragments conversion might change before it's fully paid.
     mapping (address => mapping (address => uint256)) private _allowedFragments;
 
-    constructor(string memory name, string memory symbol) ERC20(name, symbol, 18) ERC20Permit("Staked Noma") {
+    constructor(string memory name, string memory symbol, uint256 initialSupply) ERC20(name, symbol, 18) ERC20Permit("Staked Noma") {
+        // Decide how many "fragments" per token we want based on initialSupply
+        uint256 fragmentsMultiplier = _computeFragmentsMultiplier(initialSupply);
+
+        INITIAL_FRAGMENTS_SUPPLY =
+            3025 * fragmentsMultiplier * 10**(DECIMALS - 3);
+
+
+        TOTAL_GONS = MAX_UINT256 - (MAX_UINT256 % INITIAL_FRAGMENTS_SUPPLY);
+
         _totalSupply = INITIAL_FRAGMENTS_SUPPLY;
         _gonBalances[address(this)] = TOTAL_GONS;
         _gonsPerFragment = TOTAL_GONS.div(_totalSupply);
@@ -284,6 +293,29 @@ contract GonsToken is ERC20Permit {
         }
         emit Approval(msg.sender, spender, _allowedFragments[msg.sender][spender]);
         return true;
+    }
+
+    /// @dev If initialSupply is 1M–100M, use 10**6; for larger supplies, increase by powers of 10.
+    function _computeFragmentsMultiplier(uint256 initialSupply)
+        internal
+        pure
+        returns (uint256 multiplier)
+    {
+        // Default for 1M–100M (or anything below)
+        multiplier = 10**6;
+
+        // For 1M or 100M, or anything <= 100M, we keep 10**6
+        if (initialSupply <= 100_000_000) {
+            return multiplier;
+        }
+
+        // For larger supplies, scale up by powers of 10
+        //  - 1_000_000_000 → 10**7
+        //  - 10_000_000_000 → 10**8
+        while (initialSupply > 100_000_000) {
+            initialSupply /= 10;
+            multiplier *= 10;
+        }
     }
 
     /**

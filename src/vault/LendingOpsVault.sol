@@ -227,12 +227,10 @@ contract LendingOpsVault {
         uint256 circulatingSupply = IModelHelper(_v.modelHelper)
         .getCirculatingSupply(address(_v.pool), address(this));
 
-        uint256 newFloorPrice = LiquidityDeployer
+        uint256 newFloorPrice = Utils
         .computeNewFloorPrice(
-            ethAmount, 
-            floorToken1Balance,
-            circulatingSupply,
-            positions
+            floorToken1Balance + ethAmount,
+            circulatingSupply
         );
 
         int24 newFloorLowerTick = Conversions
@@ -251,37 +249,37 @@ contract LendingOpsVault {
         positions[0].lowerTick = newFloorLowerTick;
         positions[0].upperTick = newFloorLowerTick + _v.tickSpacing;
         
-        LiquidityPosition memory newFloorPos = LiquidityDeployer
-        .reDeployFloor(
-            address(_v.pool), 
-            address(this), 
-            floorToken0Balance, 
-            floorToken1Balance + ethAmount, 
-            positions
-        );     
+        // LiquidityPosition memory newFloorPos = LiquidityDeployer
+        // .reDeployFloor(
+        //     address(_v.pool), 
+        //     address(this), 
+        //     floorToken0Balance, 
+        //     floorToken1Balance + ethAmount, 
+        //     positions
+        // );     
 
-        LiquidityPosition memory newAnchorPosition = 
-        _redeployAnchor(
-            positions,
-            ethAmount,
-            anchorToken1Balance,
-            true
-        );
+        // LiquidityPosition memory newAnchorPosition = 
+        // _redeployAnchor(
+        //     positions,
+        //     ethAmount,
+        //     anchorToken1Balance,
+        //     true
+        // );
 
-        LiquidityPosition memory newDiscoveryPosition = 
-        _redeployDiscovery(
-            positions, 
-            discoveryToken0Balance
-        );
+        // LiquidityPosition memory newDiscoveryPosition = 
+        // _redeployDiscovery(
+        //     positions, 
+        //     discoveryToken0Balance
+        // );
 
-        positions = [
-            newFloorPos, 
-            newAnchorPosition, 
-            newDiscoveryPosition
-        ];
+        // positions = [
+        //     newFloorPos, 
+        //     newAnchorPosition, 
+        //     newDiscoveryPosition
+        // ];
 
-        _updatePositions(positions);
-        IModelHelper(_v.modelHelper).enforceSolvencyInvariant(address(this));
+        // _updatePositions(positions);
+        // IModelHelper(_v.modelHelper).enforceSolvencyInvariant(address(this));
     }
 
     function _redeployAnchor(
@@ -382,7 +380,6 @@ contract LendingOpsVault {
         _v.anchorPosition = _positions[1];
         _v.discoveryPosition = _positions[2];
     }
-    
     
     /**
      * @notice Modifier to restrict access to internal calls.

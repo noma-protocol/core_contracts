@@ -12,7 +12,7 @@ import {Utils} from "../libraries/Utils.sol";
 import {Uniswap} from "../libraries/Uniswap.sol";
 import {IVault} from "../interfaces/IVault.sol";
 import {DecimalMath} from "../libraries/DecimalMath.sol";
-import {LiquidityDeployer} from "../libraries/LiquidityDeployer.sol";
+import {LiquidityDeployerMin} from "../libraries/LiquidityDeployerMin.sol";
 import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
 
 import {
@@ -82,7 +82,7 @@ contract StakingVault is BaseVault {
 
         if (toMint > 0) {
             bool ret = IVault(address(this)).mintTokens(address(this), toMint);
-            
+            address dd = dividendDistributor();
             if (ret) {
                 // 3) distribute fees, returns post-fee amount
                 (
@@ -95,13 +95,13 @@ contract StakingVault is BaseVault {
                 );
                 _v.totalMinted += postFee;
 
-                if (protocolFee > 0) {
+                if (protocolFee > 0 && dd != address(0)) {
                     IERC20(IUniswapV3Pool(addresses.pool).token0())
                     .approve(
-                        dividendDistributor(),
+                        dd,
                         protocolFee
                     );
-                    INomaDividends(dividendDistributor())
+                    INomaDividends(dd)
                     .distribute(
                         IUniswapV3Pool(addresses.pool).token0(),
                         protocolFee
@@ -154,6 +154,7 @@ contract StakingVault is BaseVault {
             .calculateRewards(
                 RewardParams(excessReserves, circulating, totalStaked)
             );
+            
         toMint = DecimalMath.divideDecimal(toMintEth, imv);
     }
 
@@ -243,12 +244,7 @@ contract StakingVault is BaseVault {
         uint256 toMintEth
     ) internal {
         // collect existing liquidity & balances
-        (
-            ,
-            ,
-            uint256 floor0,
-            uint256 floor1
-        ) = IModelHelper(modelHelper())
+        (,,uint256 floor0,uint256 floor1) = IModelHelper(modelHelper())
         .getUnderlyingBalances(
             poolAddr,
             address(this),
@@ -263,7 +259,7 @@ contract StakingVault is BaseVault {
             _v.floorPosition.upperTick
         );
 
-        LiquidityDeployer
+        LiquidityDeployerMin
         .reDeployFloor(
             poolAddr,
             address(this),
@@ -279,34 +275,19 @@ contract StakingVault is BaseVault {
      * @param positions The current liquidity positions.
      * @param addresses The protocol addresses.
      */
-    function _collectLiquidity(
-        LiquidityPosition[3] memory positions,
-        ProtocolAddresses memory addresses
-    ) internal {
-        // Collect floor liquidity
-        Uniswap.collect(
-            addresses.pool, 
-            address(this), 
-            positions[0].lowerTick, 
-            positions[0].upperTick
-        );
-
-        // Collect discovery liquidity
-        Uniswap.collect(
-            addresses.pool, 
-            address(this), 
-            positions[2].lowerTick, 
-            positions[2].upperTick
-        );
-
-        // Collect anchor liquidity
-        Uniswap.collect(
-            addresses.pool, 
-            address(this), 
-            positions[1].lowerTick, 
-            positions[1].upperTick
-        );
-    }
+    // function _collectLiquidity(
+    //     LiquidityPosition[3] memory positions,
+    //     ProtocolAddresses memory addresses
+    // ) internal {
+    //     for (uint256 i = 0; i < positions.length; i++) {
+    //         Uniswap.collect(
+    //             addresses.pool, 
+    //             address(this), 
+    //             positions[i].lowerTick, 
+    //             positions[i].upperTick
+    //         );          
+    //     }
+    // }
 
     /**
      * @notice Retrieves the address of the rewards calculator.
@@ -349,20 +330,11 @@ contract StakingVault is BaseVault {
     function dividendDistributor() public view returns (address) {
         IAddressResolver resolver = _v.resolver;
         address _dd = resolver
-        .requireAndGetAddress(
-            Utils.stringToBytes32("DividendDistributor"),
-            "No Dividend Distributor"
+        .getAddress(
+            Utils.stringToBytes32("DividendDistributor")
         );
         return _dd;
     }    
-
-    // /**
-    //  * @notice Retrieves the staking contract address.
-    //  * @return The address of the staking contract.
-    //  */
-    // function getStakingContract() external virtual view returns (address) {
-    //     return _v.stakingContract;
-    // }
 
     /**
      * @notice Sets the staking contract address.

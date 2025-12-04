@@ -90,7 +90,7 @@ contract EtchVault {
 
         vaultUpgrade = resolver
         .requireAndGetAddress(
-            Utils.stringToBytes32("VaultUpgrade"), 
+            Utils.stringToBytes32("VaultStep1"), 
             "no VaultUpgrade"
         );
 

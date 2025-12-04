@@ -263,8 +263,7 @@
             if (msg.value < MIN_CONTRIBUTION || msg.value > MAX_CONTRIBUTION) revert InvalidParameters();
         }
 
-        uint256 balance = address(this).balance;
-        if (balance > hardCap) revert HardCapExceeded();
+        if (totalDeposited + msg.value > hardCap) revert HardCapExceeded();
 
         // Track contributions
         contributions[msg.sender] += msg.value;
@@ -299,7 +298,7 @@
         if (finalized) revert AlreadyFinalized();
 
         bool expired = hasExpired();
-        bool reachedSoftCap = address(this).balance >= softCap;
+        bool reachedSoftCap = totalDeposited >= softCap;
 
         if (!expired) {
             // before deadline: only allow if soft cap reached AND caller is owner
@@ -314,7 +313,7 @@
         if (pct == 0 || pct > 100) revert InvalidParametersPct();
 
         // 2) compute amounts
-        uint256 raisedBalance      = address(this).balance;
+        uint256 raisedBalance      = totalDeposited;
         uint256 feeTaken           = (raisedBalance * pct) / 100;
         uint256 contributionAmount = migrationContract != address(0) ? raisedBalance : raisedBalance - feeTaken;
 
@@ -496,7 +495,7 @@
     * @return True if the soft cap has been reached, false otherwise.
     */
     function softCapReached() external view returns (bool) {
-        return address(this).balance >= softCap;
+        return totalDeposited >= softCap;
     }
 
     /**
@@ -603,6 +602,13 @@
         });
     }
 
+   function sweepUnexpectedETH() external onlyOwner {
+       uint256 unexpected = address(this).balance - totalDeposited;
+       if (unexpected > 0) {
+           payable(owner()).transfer(unexpected);
+       }
+   }
+   
     modifier emergencyWithdrawalEnabled () {
         if (!emergencyWithdrawalFlag) revert EmergencyWithdrawalNotEnabled();
         _;

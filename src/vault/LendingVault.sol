@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {BaseVault} from "./BaseVault.sol";
+// import {BaseVault} from "./BaseVault.sol";
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
 import {DecimalMath} from "../libraries/DecimalMath.sol";
 import {Uniswap} from "../libraries/Uniswap.sol";
-import {LiquidityDeployer} from "../libraries/LiquidityDeployer.sol";
+import {LiquidityDeployerMin} from "../libraries/LiquidityDeployerMin.sol";
 import {IVault} from "../interfaces/IVault.sol";
 import {ITokenRepo} from "../TokenRepo.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol"; 
+import { VaultStorage } from "../libraries/LibAppStorage.sol";
+import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
+import {Utils} from "../libraries/Utils.sol";
 
 import {
     LiquidityPosition, 
@@ -34,14 +37,17 @@ error OnlyVault();
 error InvalidRepayAmount();
 error InvalidParams();
 error NotPermitted();
+error OnlyInternalCalls();
 
 /**
  * @title LendingVault
  * @notice A contract for managing lending and borrowing functionality within a vault.
  * @dev This contract extends the `BaseVault` contract and provides functionality for borrowing, repaying loans, and managing collateral.
  */
-contract LendingVault is BaseVault {
+contract LendingVault {
     using SafeERC20 for IERC20;
+    
+    VaultStorage internal _v;
 
     /**
      * @notice Calculates the total collateral required for a given borrow amount.
@@ -237,27 +243,26 @@ contract LendingVault is BaseVault {
         if (amount <= 0) revert InvalidParams();
 
         if (remove) {
+            if (amount > floorToken1Balance * _v.protocolParameters.maxLoanUtilization / 100) revert InvalidParams();
             if (floorToken1Balance < amount) revert InsufficientFloorBalance();
         }
 
         LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
         Uniswap.collect(address(_v.pool), address(this), _v.floorPosition.lowerTick, _v.floorPosition.upperTick);
 
-        LiquidityDeployer
+        LiquidityDeployerMin
         .reDeployFloor(
-            address(_v.pool), 
-            address(this), 
-            floorToken0Balance, 
+            address(_v.pool),
+            address(this),
+            floorToken0Balance,
             (
                 remove ? 
                 floorToken1Balance - amount : 
                 floorToken1Balance + amount
             ), 
             positions
-        );
-        
+        );        
     }
-
 
     /**
      * @notice Removes a borrower's address from the list of loan addresses.
@@ -351,6 +356,23 @@ contract LendingVault is BaseVault {
     }
 
     /**
+     * @notice Retrieves the address of the model helper.
+     * @return The address of the model helper.
+     */
+    function modelHelper() public view returns (address) {
+        IAddressResolver resolver = _v.resolver;
+        address _modelHelper = resolver.getVaultAddress(address(this), Utils.stringToBytes32("ModelHelper"));
+        if (_modelHelper == address(0)) {
+            _modelHelper = resolver
+                .requireAndGetAddress(
+                    Utils.stringToBytes32("ModelHelper"), 
+                    "no ModelHelper"
+                );
+        }
+        return _modelHelper;
+    }
+
+    /**
      * @notice Modifier to restrict access to the vault contract.
      */
     modifier onlyVault() {
@@ -359,10 +381,18 @@ contract LendingVault is BaseVault {
     }
 
     /**
+     * @notice Modifier to restrict access to internal calls.
+     */
+    modifier onlyInternalCalls() {
+        if (msg.sender != _v.factory && msg.sender != address(this)) revert OnlyInternalCalls();
+        _;        
+    }
+
+    /**
      * @notice Retrieves the function selectors for this contract.
      * @return selectors An array of function selectors.
      */
-    function getFunctionSelectors() external pure override returns (bytes4[] memory) {
+    function getFunctionSelectors() external pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](9);
 
         selectors[0] = bytes4(keccak256(bytes("borrowFromFloor(address,uint256,uint256)")));    

@@ -24,14 +24,15 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {LiquidityDeployer} from "./libraries/LiquidityDeployer.sol";
-import {DeployHelper} from "./libraries/DeployHelper.sol";
+// import {DeployHelper} from "./libraries/DeployHelper.sol";
 import {
     AmountsToMint, 
     LiquidityPosition, 
     LiquidityType, 
-    DeployLiquidityParameters
+    DeployLiquidityParams
 } from "./types/Types.sol";
 import {IAddressResolver} from "./interfaces/IAddressResolver.sol";
+import {Utils} from "./libraries/Utils.sol";
 
 /// @title IVault Interface
 /// @notice Interface defining the functionality of the Vault contract.
@@ -219,11 +220,12 @@ contract Deployer is Ownable {
     /// @param _floorPrice The target floor price.
     /// @param _amount0 The amount of token0 to allocate.
     function deployFloor(uint256 _floorPrice, uint256 _amount0, int24 tickSpacing) public onlyFactory {
-        (LiquidityPosition memory newPosition, ) = DeployHelper.deployFloor(
-            pool, 
+        (LiquidityPosition memory newPosition ) = LiquidityDeployer.deployFloor(
+            address(pool), 
             vault, 
             _floorPrice,
             _amount0,
+            0,
             tickSpacing
         );
 
@@ -232,21 +234,24 @@ contract Deployer is Ownable {
     }
 
     /// @notice Deploys an anchor liquidity position.
-    /// @param _bipsBelowSpot Basis points below the spot price.
     /// @param _bipsWidth Width of the position in basis points.
     /// @param _amount0 Amount of token0 to allocate.
-    function deployAnchor(uint256 _bipsBelowSpot, uint256 _bipsWidth, uint256 _amount0) public onlyFactory {
-        (LiquidityPosition memory newPosition,) = LiquidityDeployer.deployAnchor(
-            address(pool),
-            vault,
-            _amount0,
+    function deployAnchor(uint256 _bipsWidth, uint256 _amount0) public onlyFactory {
+        (LiquidityPosition memory newPosition,) = LiquidityDeployer
+        .deployAnchor(
             floorPosition,
-            DeployLiquidityParameters({
+            DeployLiquidityParams({
+                pool: address(pool),
+                receiver: vault,
                 bips: _bipsWidth,
-                bipsBelowSpot: _bipsBelowSpot,
-                tickSpacing: floorPosition.tickSpacing,
                 lowerTick: 0,
-                upperTick: 0
+                upperTick: 0,
+                tickSpacing: floorPosition.tickSpacing,
+                liquidityType: LiquidityType.Anchor,
+                amounts: AmountsToMint({
+                    amount0: _amount0,
+                    amount1: 0
+                })
             })
         );
 
@@ -258,16 +263,26 @@ contract Deployer is Ownable {
     /// @param _upperDiscoveryPrice The upper discovery price.
     /// @return newPosition The deployed liquidity position.
     /// @return liquidityType The type of liquidity deployed.
-    function deployDiscovery(uint256 _upperDiscoveryPrice, bool isShiftOrSlide) public onlyFactory returns (
+    function deployDiscovery(uint256 _upperDiscoveryPrice) public onlyFactory returns (
         LiquidityPosition memory newPosition, 
         LiquidityType liquidityType
     ) {
         (newPosition,) = LiquidityDeployer.deployDiscovery(
-            address(pool), 
-            vault,
             _upperDiscoveryPrice, 
-            floorPosition.tickSpacing,
-            anchorPosition
+            anchorPosition,
+            DeployLiquidityParams({
+                pool: address(pool),
+                receiver: vault,
+                bips: 0,
+                lowerTick: 0,
+                upperTick: 0,
+                tickSpacing: anchorPosition.tickSpacing,
+                liquidityType: LiquidityType.Discovery,
+                amounts: AmountsToMint({
+                    amount0: 0, 
+                    amount1: 0
+                })
+            })
         );
 
         liquidityType = LiquidityType.Discovery;
@@ -275,17 +290,6 @@ contract Deployer is Ownable {
         emit DiscoveryDeployed(newPosition);
     }
 
-    /**
-     * @notice Deploys a new liquidity position on Uniswap V3.
-     * @dev This function interacts with the LiquidityDeployer library to create a new liquidity position.
-     * @param _pool The address of the Uniswap V3 pool where the liquidity will be deployed.
-     * @param receiver The address that will receive the liquidity position.
-     * @param lowerTick The lower tick range for the liquidity position.
-     * @param upperTick The upper tick range for the liquidity position.
-     * @param liquidityType The type of liquidity being deployed (Floor, Anchor, Discovery).
-     * @param amounts The token amounts (token0 and token1) to mint for the liquidity position.
-     * @return newPosition The newly deployed liquidity position.
-     */
     function deployPosition(
         address _pool,
         address receiver,
@@ -298,70 +302,74 @@ contract Deployer is Ownable {
         LiquidityPosition memory newPosition
     ) {
         return LiquidityDeployer
-        ._deployPosition(
-            _pool,
-            receiver,
-            lowerTick,
-            upperTick,
-            floorPosition.tickSpacing,
-            liquidityType,
-            amounts
+        .deployPosition(
+            DeployLiquidityParams({
+                pool: _pool,
+                receiver: receiver,
+                bips: 0,
+                lowerTick: lowerTick,
+                upperTick: upperTick,
+                tickSpacing: floorPosition.tickSpacing,
+                liquidityType: liquidityType,
+                amounts: AmountsToMint({
+                    amount0: amounts.amount0,
+                    amount1: amounts.amount1
+                })
+            }) 
         );
     }
 
     /**
      * @notice Adjusts the floor liquidity position by shifting it to a new price range.
      * @dev This function interacts with the LiquidityDeployer library to modify the floor position.
-     * @param _pool The address of the Uniswap V3 pool containing the floor position.
+     * @param pool The address of the Uniswap V3 pool containing the floor position.
      * @param receiver The address that will receive the adjusted floor position.
-     * @param currentFloorPrice The current price of the floor liquidity.
      * @param newFloorPrice The new price for the adjusted floor liquidity.
      * @param newFloorBalance The new balance of token1 for the adjusted floor liquidity.
-     * @param currentFloorBalance The current balance of token1 in the existing floor liquidity.
-     * @param _floorPosition The existing floor liquidity position to be adjusted.
+     * @param floorPosition The existing floor liquidity position to be adjusted.
      * @return newPosition The newly adjusted floor liquidity position.
      */
     function shiftFloor(
-        address _pool,
+        address pool,
         address receiver,
-        uint256 currentFloorPrice,
         uint256 newFloorPrice,
         uint256 newFloorBalance,
-        uint256 currentFloorBalance,
-        LiquidityPosition memory _floorPosition
+        LiquidityPosition memory floorPosition
     ) public isVault returns (LiquidityPosition memory newPosition) {
-        return LiquidityDeployer.shiftFloor(
-            _pool, 
+        if (receiver == address(0)) revert ("No receiver");
+        // revert(
+        //     string(
+        //         abi.encodePacked(
+        //             "shiftFloor: newFloorPrice is : ", 
+        //             Utils._uint2str(uint256(newFloorPrice))
+        //         )
+        //     )
+        // );        
+        return LiquidityDeployer
+        .shiftFloor(
+            pool, 
             receiver, 
-            currentFloorPrice, 
             newFloorPrice,
             newFloorBalance,
-            currentFloorBalance,
-            _floorPosition
+            floorPosition
         );
     }
     
     /**
      * @notice Calculates the new floor price after a liquidity adjustment.
      * @dev This function computes the floor price based on the provided parameters.
-     * @param toSkim The amount of token1 to skim from the pool for floor liquidity.
-     * @param floorNewToken1Balance The new balance of token1 for the floor position.
+     * @param newBalance The new balance of token1 for the floor position.
      * @param circulatingSupply The circulating supply of tokens.
-     * @param positions An array containing the existing liquidity positions (floor, anchor, discovery).
      * @return newFloorPrice The calculated new floor price.
      */
     function computeNewFloorPrice(
-        uint256 toSkim,
-        uint256 floorNewToken1Balance,
-        uint256 circulatingSupply,
-        LiquidityPosition[3] memory positions
+        uint256 newBalance,
+        uint256 circulatingSupply
     ) external pure returns (uint256 newFloorPrice) {
-        return LiquidityDeployer
+        return Utils
         .computeNewFloorPrice(
-            toSkim,
-            floorNewToken1Balance,
-            circulatingSupply,
-            positions
+            newBalance,
+            circulatingSupply
         );
     }
 

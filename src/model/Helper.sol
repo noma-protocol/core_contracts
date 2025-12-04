@@ -1,6 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+// ███╗   ██╗ ██████╗ ███╗   ███╗ █████╗                               
+// ████╗  ██║██╔═══██╗████╗ ████║██╔══██╗                              
+// ██╔██╗ ██║██║   ██║██╔████╔██║███████║                              
+// ██║╚██╗██║██║   ██║██║╚██╔╝██║██╔══██║                              
+// ██║ ╚████║╚██████╔╝██║ ╚═╝ ██║██║  ██║                              
+// ╚═╝  ╚═══╝ ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═╝                              
+                                                                    
+// ██████╗ ██████╗  ██████╗ ████████╗ ██████╗  ██████╗ ██████╗ ██╗     
+// ██╔══██╗██╔══██╗██╔═══██╗╚══██╔══╝██╔═══██╗██╔════╝██╔═══██╗██║     
+// ██████╔╝██████╔╝██║   ██║   ██║   ██║   ██║██║     ██║   ██║██║     
+// ██╔═══╝ ██╔══██╗██║   ██║   ██║   ██║   ██║██║     ██║   ██║██║     
+// ██║     ██║  ██║╚██████╔╝   ██║   ╚██████╔╝╚██████╗╚██████╔╝███████╗
+// ╚═╝     ╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝  ╚═════╝ ╚═════╝ ╚══════╝
+
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 import {TickMath} from 'v3-core/libraries/TickMath.sol';
@@ -8,7 +22,6 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {Conversions} from "../libraries/Conversions.sol";
 import {DecimalMath} from "../libraries/DecimalMath.sol";
-
 import {Underlying} from "../libraries/Underlying.sol";
 import {IVault} from "../interfaces/IVault.sol";
 import {Utils} from "../libraries/Utils.sol";
@@ -212,19 +225,20 @@ contract ModelHelper {
             TickMath.getTickAtSqrtRatio(sqrtRatioX96)
         );
 
-        return (
-            (totalSupply) - 
+        uint256 circulatingSupply = (
+            totalSupply - 
             (
                 amount0CurrentFloor + 
                 amount0CurrentAnchor + 
                 amount0CurrentDiscovery + 
                 protocolUnusedBalanceToken0 + 
-                staked + 
+                // staked + 
                 IVault(vault).getCollateralAmount() +
                 feesPosition0Token0
             )
         );
 
+        return circulatingSupply;
     } 
 
     /**
@@ -238,14 +252,16 @@ contract ModelHelper {
         bool isToken0
     ) public view returns (uint256 totalSupply) {
 
-        totalSupply =  ERC20(
-        address(
-            isToken0 ? 
-            IUniswapV3Pool(pool).token0() :
-            IUniswapV3Pool(pool).token1()
-        )).totalSupply();
+        totalSupply =  
+        ERC20(
+            address(
+                isToken0 ? 
+                IUniswapV3Pool(pool).token0() :
+                IUniswapV3Pool(pool).token1()
+            )
+        ).totalSupply();
 
-      return totalSupply;
+        return totalSupply;
     }
 
     /**
@@ -280,7 +296,9 @@ contract ModelHelper {
      * @param _vault The address of the vault.
      * @return The intrinsic minimum value of the vault.
      */
-    function getIntrinsicMinimumValue(address _vault) public view returns (uint256) {
+    function getIntrinsicMinimumValue(
+        address _vault
+    ) public view returns (uint256) {
         LiquidityPosition[3] memory positions = IVault(_vault).getPositions();
 
         int24 lowerTick = positions[0].lowerTick;

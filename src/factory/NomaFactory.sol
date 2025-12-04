@@ -19,16 +19,14 @@ pragma solidity ^0.8.0;
 // Author: 0xsufi@noma.money
 // Copyright Noma Protocol 2024/2026
 
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-
+import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { IUniswapV3Factory } from "v3-core/interfaces/IUniswapV3Factory.sol";
 import { IUniswapV3Pool } from "v3-core/interfaces/IUniswapV3Pool.sol";
 import { VaultDescription } from "../types/Types.sol";
-
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
 import { Conversions } from "../libraries/Conversions.sol";
 import { Utils } from "../libraries/Utils.sol";
@@ -46,7 +44,8 @@ import {
     PresaleProtocolParams,
     DeploymentData,
     ExistingDeployData,
-    PostInitParams
+    PostInitParams,
+    ExtDeployParams
 } from "../types/Types.sol";
 
 import {IVaultUpgrade, IEtchVault, IExtFactory, IDeployerFactory} from "../interfaces/IVaultUpgrades.sol";
@@ -375,6 +374,7 @@ contract NomaFactory {
         returns (DeploymentData memory data)
     {
         VaultDescription memory vaultDesc = vaultsRepository[vaultAddress];
+        uint256 totalSupply = IERC20(vaultDesc.token0).totalSupply();
 
         // Original Step 1 logic
         (
@@ -383,13 +383,16 @@ contract NomaFactory {
             data.tokenRepo, 
             data.vToken
         ) = IExtFactory(extFactory)
-            .deployAll(
-                vaultDesc.tokenName,
-                vaultDesc.tokenSymbol,
-                address(this),
-                vaultAddress,
-                vaultDesc.token0
-            );
+        .deployAll(
+            ExtDeployParams({
+                name: vaultDesc.tokenName,
+                symbol: vaultDesc.tokenSymbol,
+                deployerAddress: address(this),
+                vaultAddress: vaultAddress,
+                token0: vaultDesc.token0,
+                totalSupply: totalSupply
+            })
+        );
 
         address vaultUpgrade = resolver
         .requireAndGetAddress(
@@ -610,11 +613,11 @@ contract NomaFactory {
     ) internal {
         Deployer(deployerContract).deployFloor(IDOPrice, totalSupply * _liquidityParams.floorPercentage / 100, _tickSpacing);  
         Deployer(deployerContract).deployAnchor(
-            _liquidityParams.floorBips[0], 
+            // _liquidityParams.floorBips[0], 
             _liquidityParams.floorBips[1], 
             totalSupply * _liquidityParams.anchorPercentage / 100
         );
-        Deployer(deployerContract).deployDiscovery(IDOPrice * _liquidityParams.idoPriceMultiplier, false);
+        Deployer(deployerContract).deployDiscovery(IDOPrice * _liquidityParams.idoPriceMultiplier);
     }
 
 

@@ -23,6 +23,15 @@ struct TokenInfo {
     address token0;
     address token1;
 }
+
+/// @notice Enum representing the types of liquidity.
+/// @dev This is used to differentiate liquidity roles in the protocol.
+enum LiquidityType {
+    Floor,
+    Anchor,
+    Discovery
+}
+
 /// @notice Represents a liquidity position within specified tick ranges.
 /// @param lowerTick The lower tick of the position.
 /// @param upperTick The upper tick of the position.
@@ -34,15 +43,9 @@ struct LiquidityPosition {
     uint128 liquidity;
     uint256 price;
     int24 tickSpacing;
+    LiquidityType liquidityType;
 }
 
-/// @notice Enum representing the types of liquidity.
-/// @dev This is used to differentiate liquidity roles in the protocol.
-enum LiquidityType {
-    Floor,
-    Anchor,
-    Discovery
-}
 
 /// @notice Addresses used by the protocol.
 /// @param pool Address of the liquidity pool.
@@ -186,19 +189,15 @@ struct PresaleProtocolParams {
     uint256 teamFee;                    // unchanged (integer percent)
 }
 
-
-/// @notice Parameters for deploying liquidity positions.
-/// @param bips Basis points for the liquidity.
-/// @param bipsBelowSpot Basis points below the spot price.
-/// @param tickSpacing Tick spacing for the position.
-/// @param lowerTick The lower tick of the position.
-/// @param upperTick The upper tick of the position.
-struct DeployLiquidityParameters {
+struct DeployLiquidityParams {
+    address pool;
+    address receiver;
     uint256 bips;
-    uint256 bipsBelowSpot;
-    int24 tickSpacing;
-    int24 lowerTick;
+    int24 lowerTick; 
     int24 upperTick;
+    int24 tickSpacing;
+    LiquidityType liquidityType;
+    AmountsToMint amounts;
 }
 
 /// @notice Parameters used before a shift operation.
@@ -302,6 +301,7 @@ struct ProtocolParameters {
     uint256 presalePremium;
     uint256 selfRepayLtvTreshold;
     uint256 halfStep;
+    uint256 skimRatio;
 }
 
 /// @notice Parameters for configuring the protocol exposed to creators.
@@ -315,6 +315,7 @@ struct CreatorFacingParameters {
     uint256 loanFee;    
     uint256 selfRepayLtvTreshold;
     uint256 halfStep;
+    uint256 shiftRatio;
 }
 
 /// @notice Parameters for structuring liquidity.
@@ -386,4 +387,13 @@ struct PostInitParams {
     address tokenRepo;
     address sToken;
     address vToken;   
+}
+
+struct ExtDeployParams {
+    string name;
+    string symbol;
+    address deployerAddress;
+    address vaultAddress;
+    address token0;
+    uint256 totalSupply;
 }
