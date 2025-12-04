@@ -1,6 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+// ███╗   ██╗ ██████╗ ███╗   ███╗ █████╗                               
+// ████╗  ██║██╔═══██╗████╗ ████║██╔══██╗                              
+// ██╔██╗ ██║██║   ██║██╔████╔██║███████║                              
+// ██║╚██╗██║██║   ██║██║╚██╔╝██║██╔══██║                              
+// ██║ ╚████║╚██████╔╝██║ ╚═╝ ██║██║  ██║                              
+// ╚═╝  ╚═══╝ ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═╝                              
+                                                                    
+// ██████╗ ██████╗  ██████╗ ████████╗ ██████╗  ██████╗ ██████╗ ██╗     
+// ██╔══██╗██╔══██╗██╔═══██╗╚══██╔══╝██╔═══██╗██╔════╝██╔═══██╗██║     
+// ██████╔╝██████╔╝██║   ██║   ██║   ██║   ██║██║     ██║   ██║██║     
+// ██╔═══╝ ██╔══██╗██║   ██║   ██║   ██║   ██║██║     ██║   ██║██║     
+// ██║     ██║  ██║╚██████╔╝   ██║   ╚██████╔╝╚██████╗╚██████╔╝███████╗
+// ╚═╝     ╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝  ╚═════╝ ╚═════╝ ╚══════╝
+//
+// Contract: ExchangeHelper.sol
+// Author: 0xsufi@noma.money
+// Copyright Noma Protocol 2024/2026
+
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {SignedMath} from "@openzeppelin/contracts/utils/math/SignedMath.sol";
 import {IERC20} from "openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -9,9 +27,11 @@ import {Conversions} from "../src/libraries/Conversions.sol";
 import {Uniswap} from "../src/libraries/Uniswap.sol";
 import {Utils} from "../src/libraries/Utils.sol";
 import {ISwapRouter} from "v3-periphery/interfaces/ISwapRouter.sol";
+import {IVault} from "../src/interfaces/IVault.sol";
 import {
     TokenInfo,
-    SwapParams
+    SwapParams,
+    LiquidityType
 } from "../src/types/Types.sol";
 
 interface IWETH {
@@ -22,10 +42,6 @@ interface IWETH {
 
 interface INomaFactory {
     function getVaultFromPool(address pool) external view returns (address);
-}
-
-interface IVault {
-    function setReferralEntity(bytes8 code, uint256 amount) external;
 }
 
 contract ExchangeHelper {
@@ -314,14 +330,6 @@ contract ExchangeHelper {
         uint256 ethReceived = uint256(-amount1);
         IWETH(WMON).withdraw(ethReceived);
         payable(receiver).transfer(ethReceived);
-
-        // uint256 refund = IERC20Metadata(tokenInfo.token0).balanceOf(address(this)) > (amount - uint256(amount0)) ?
-        //     amount - uint256(amount0) :
-        //     IERC20Metadata(tokenInfo.token0).balanceOf(address(this));  
-
-        // if (refund > 0) {
-        //     IERC20(tokenInfo.token0).transfer(msg.sender, refund);
-        // }
 
         // track referrals if a code is provided
         if (referralCode != bytes8(0)) {

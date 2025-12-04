@@ -22,20 +22,16 @@ interface IDeployer {
      * @notice Adjusts the existing floor liquidity position to a new price and balance.
      * @param pool The address of the Uniswap V3 pool.
      * @param receiver The address that will receive the adjusted liquidity position.
-     * @param currentFloorPrice The current floor price.
      * @param newFloorPrice The desired new floor price.
      * @param newFloorBalance The desired new balance for the floor position.
-     * @param currentFloorBalance The current balance of the floor position.
      * @param floorPosition The current liquidity position details.
      * @return newPosition The updated liquidity position after the shift.
      */
     function shiftFloor(
         address pool,
         address receiver,
-        uint256 currentFloorPrice,
         uint256 newFloorPrice,
         uint256 newFloorBalance,
-        uint256 currentFloorBalance,
         LiquidityPosition memory floorPosition
     ) external returns (LiquidityPosition memory newPosition);
 

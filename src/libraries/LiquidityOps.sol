@@ -93,16 +93,6 @@ library LiquidityOps {
             currentLiquidityRatio <= IVault(addresses.vault).getProtocolParameters().shiftRatio
         ) {
             
-            // Shift --> ETH after skim at floor = 
-            // ETH before skim at anchor - (liquidity ratio * ETH before skim at anchor)
-            // uint256 toSkim = (anchorToken1Balance + discoveryToken1Balance) - (
-            //     DecimalMath
-            //     .multiplyDecimal(
-            //         currentLiquidityRatio, 
-            //         (anchorToken1Balance + discoveryToken1Balance)
-            //     )
-            // );
-
             if (circulatingSupply > 0) {
             
                 (,,, uint256 floorToken1Balance) = IModelHelper(addresses.modelHelper)
@@ -225,13 +215,6 @@ library LiquidityOps {
 
             // Collect anchor liquidity
             _collectFees(params.positions, addresses, 1);
-
-            // IERC20(
-            //     IUniswapV3Pool(params.pool).token1()
-            // ).approve(
-            //     params.deployer, 
-            //     type(uint256).max
-            // );
 
             newPositions = 
             _shiftPositions(
@@ -490,17 +473,6 @@ library LiquidityOps {
             );
         }
 
-        // uint256 token0Allowance = IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).allowance(addresses.vault, addresses.deployer);
-        // uint256 token1Allowance = IERC20Metadata(IUniswapV3Pool(addresses.pool).token1()).allowance(addresses.vault, addresses.deployer);
-
-        // if (token0Allowance != type(uint256).max) {
-        //     IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).approve(addresses.deployer, type(uint256).max);
-        // }
-
-        // if (token1Allowance != type(uint256).max) {
-        //     IERC20Metadata(IUniswapV3Pool(addresses.pool).token1()).approve(addresses.deployer, type(uint256).max);
-        // }
-
         if (params.liquidityType == LiquidityType.Discovery) {
 
             uint256 circulatingSupply = IModelHelper(addresses.modelHelper)
@@ -612,7 +584,7 @@ library LiquidityOps {
 
             if (currentBalance0 > backedBalance0) {
                 uint256 burnAmount = currentBalance0 - backedBalance0;
-                // vault.burnTokens(burnAmount);
+                vault.burnTokens(burnAmount);
             }
         }
 

@@ -516,7 +516,6 @@
         return referralParticipants[referralCode];
     }
 
-
     /**
     * @notice Returns the claimable referral rewards for a user.
     * @param user The address of the user.

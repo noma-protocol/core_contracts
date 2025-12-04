@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import { ExtDeployParams } from "../types/Types.sol";
+
 /**
  * @title IVaultUpgrade
  * @notice Interface for initiating and finalizing vault upgrades.
@@ -42,22 +44,9 @@ interface IEtchVault {
  * @notice Interface for deploying auxiliary contracts related to a vault.
  */
 interface IExtFactory {
-    /**
-     * @notice Deploys all necessary auxiliary contracts for a vault.
-     * @param name The name of the token to be created.
-     * @param symbol The symbol of the token to be created.
-     * @param deployerAddress The address of the deployer initiating the process.
-     * @param vaultAddress The address of the vault for which auxiliary contracts are being deployed.
-     * @param token0 The address of the primary token associated with the vault.
-     * @return auxiliaryContract1 The address of the first auxiliary contract deployed.
-     * @return auxiliaryContract2 The address of the second auxiliary contract deployed.
-     */
+
     function deployAll(
-        string memory name,
-        string memory symbol,
-        address deployerAddress,
-        address vaultAddress,
-        address token0
+        ExtDeployParams memory params
     ) external returns (
         address auxiliaryContract1, 
         address auxiliaryContract2, 

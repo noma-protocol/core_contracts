@@ -1,6 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
+// ███╗   ██╗ ██████╗ ███╗   ███╗ █████╗                               
+// ████╗  ██║██╔═══██╗████╗ ████║██╔══██╗                              
+// ██╔██╗ ██║██║   ██║██╔████╔██║███████║                              
+// ██║╚██╗██║██║   ██║██║╚██╔╝██║██╔══██║                              
+// ██║ ╚████║╚██████╔╝██║ ╚═╝ ██║██║  ██║                              
+// ╚═╝  ╚═══╝ ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═╝                              
+                                                                    
+// ██████╗ ██████╗  ██████╗ ████████╗ ██████╗  ██████╗ ██████╗ ██╗     
+// ██╔══██╗██╔══██╗██╔═══██╗╚══██╔══╝██╔═══██╗██╔════╝██╔═══██╗██║     
+// ██████╔╝██████╔╝██║   ██║   ██║   ██║   ██║██║     ██║   ██║██║     
+// ██╔═══╝ ██╔══██╗██║   ██║   ██║   ██║   ██║██║     ██║   ██║██║     
+// ██║     ██║  ██║╚██████╔╝   ██║   ╚██████╔╝╚██████╗╚██████╔╝███████╗
+// ╚═╝     ╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝  ╚═════╝ ╚═════╝ ╚══════╝
+//
+// Author: 0xsufi@noma.money
+// Copyright Noma Protocol 2025/2026
+
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IsNomaToken} from "../interfaces/IsNomaToken.sol";
@@ -113,9 +130,9 @@ contract Staking is ReentrancyGuard {
         }
         
         // Ensure 3 days have passed since the user's last stake/unstake operation
-        // if (block.timestamp < lastOperationTimestamp[msg.sender] + 3 days) {
-        //     revert CooldownNotElapsed();
-        // }
+        if (block.timestamp < lastOperationTimestamp[msg.sender] + 3 days) {
+            revert CooldownNotElapsed();
+        }
         
         // Update the last operation timestamp for the user
         lastOperationTimestamp[msg.sender] = block.timestamp;
@@ -143,9 +160,9 @@ contract Staking is ReentrancyGuard {
         }
 
         // Check if the user's tokens are locked in the lock-in period
-        // if (epoch.number < stakedEpochs[msg.sender] + lockInEpochs) {
-        //     revert LockInPeriodNotElapsed();
-        // }
+        if (epoch.number < stakedEpochs[msg.sender] + lockInEpochs) {
+            revert LockInPeriodNotElapsed();
+        }
 
         uint256 balance = Math.min(sNOMA.balanceOf(msg.sender), NOMA.balanceOf(address(this)));
 

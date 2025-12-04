@@ -6,7 +6,8 @@ import {
     VaultInfo,
     LiquidityPosition,
     ProtocolAddresses,
-    ProtocolParameters
+    ProtocolParameters,
+    LiquidityType
 } from "../types/Types.sol";
 
 /**
@@ -168,4 +169,7 @@ interface IVault {
     */
     function teamMultiSig() external view returns (address);
 
+    function getUnderlyingBalances(LiquidityType liquidityType) external view  returns (int24, int24, uint256, uint256);
+
+    function setReferralEntity(bytes8 code, uint256 amount) external;
 }

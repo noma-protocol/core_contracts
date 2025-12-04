@@ -176,24 +176,24 @@ library Uniswap {
                 revert SlippageExceeded();
             }
 
-            if (params.vaultAddress != address(0)) {
+            // if (params.vaultAddress != address(0)) {
 
-                int24 tickSpacing = IUniswapV3Pool(params.poolAddress).tickSpacing();
+            //     int24 tickSpacing = IUniswapV3Pool(params.poolAddress).tickSpacing();
 
-                LiquidityPosition[3] memory positions = 
-                IVault(params.vaultAddress)
-                .getPositions();
+            //     LiquidityPosition[3] memory positions = 
+            //     IVault(params.vaultAddress)
+            //     .getPositions();
 
-                int24 MAX_SAFE_TICK = positions[2].upperTick - tickSpacing;
+            //     int24 MAX_SAFE_TICK = positions[2].upperTick - tickSpacing;
 
-                // ---- Price impact guard (upper tick only) ----
-                // If the final tick is above MAX_SAFE_TICK, revert the whole swap.
-                // Because of revert, pool state and price both roll back.
-                (, int24 tickAfter,,,,,) = IUniswapV3Pool(params.poolAddress).slot0();
-                if (tickAfter > MAX_SAFE_TICK) {
-                    revert PriceImpactTooHigh();
-                }
-            }
+            //     // ---- Price impact guard (upper tick only) ----
+            //     // If the final tick is above MAX_SAFE_TICK, revert the whole swap.
+            //     // Because of revert, pool state and price both roll back.
+            //     (, int24 tickAfter,,,,,) = IUniswapV3Pool(params.poolAddress).slot0();
+            //     if (tickAfter > MAX_SAFE_TICK) {
+            //         revert PriceImpactTooHigh();
+            //     }
+            // }
 
         } catch {
             revert InvalidSwap();

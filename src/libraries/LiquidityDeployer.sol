@@ -43,7 +43,6 @@ library LiquidityDeployer {
     ) internal returns (LiquidityPosition memory newPosition) {
 
         uint8 decimals = IERC20Metadata(IUniswapV3Pool(pool).token0()).decimals();
-        // int24 lowerTick = Conversions.priceToTick(int256(floorPrice), tickSpacing, decimals);
         (int24 lowerTick, int24 upperTick) = Conversions.computeSingleTick(floorPrice, tickSpacing, decimals);
 
         // Ensuring valid tick range

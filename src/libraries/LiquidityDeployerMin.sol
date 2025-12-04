@@ -96,18 +96,15 @@ library LiquidityDeployerMin {
                 false
             );
         } else {
-            uint256 excessToken1 = IVault(params.receiver).getExcessReserveToken1();
             
             revert(
                 string(
                     abi.encodePacked(
-                        "deployPosition excessToken1: ", 
-                        Utils._uint2str(uint256(excessToken1))
+                        "deployPosition params.amounts.amount0: ", 
+                        Utils._uint2str(uint256(params.amounts.amount0))
                     )
                 )
             );                
-                   
-            // return deployPosition(params);
         }   
 
         newPosition = LiquidityPosition({
