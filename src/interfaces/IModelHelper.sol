@@ -40,9 +40,10 @@ interface IModelHelper {
      * @notice Retrieves the circulating supply of a token in a given vault and pool.
      * @param pool The address of the Uniswap V3 pool.
      * @param vault The address of the vault.
+     * @param includeStaked Include staked
      * @return circulatingSupply The calculated circulating supply.
      */
-    function getCirculatingSupply(address pool, address vault) external view returns (uint256 circulatingSupply);
+    function getCirculatingSupply(address pool, address vault, bool includeStaked) external view returns (uint256 circulatingSupply);
 
     /**
      * @notice Retrieves the underlying token balances for a given liquidity type.

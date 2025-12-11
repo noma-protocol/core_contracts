@@ -3,6 +3,9 @@ pragma solidity ^0.8.0;
 
 import {Conversions} from "./Conversions.sol";
 import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
+import {DecimalMath} from "./DecimalMath.sol";
+
+import {LiquidityPosition} from "../types/Types.sol";
 
 /**
  * @title Utils
@@ -51,7 +54,7 @@ library Utils {
      * @param _tickSpacing The tick spacing of the pool.
      * @return The new tick value after applying the bips.
      */
-    function addBipsToTick(int24 currentTick, int24 bips, uint8 decimals, int24 _tickSpacing) internal pure returns (int24) {
+    function addBipsToTick(int24 currentTick, int24 bips, uint8 decimals, int24 _tickSpacing) internal view returns (int24) {
 
         uint256 tickToPrice = Conversions
         .sqrtPriceX96ToPrice(
@@ -125,8 +128,11 @@ library Utils {
         destinations[5] = presaleContract;
         destinations[6] = vToken;
 
-        IAddressResolver(resolverAddress).configureDeployerACL(vaultAddress);  
-        IAddressResolver(resolverAddress).importVaultAddress(vaultAddress, names, destinations);
+        IAddressResolver(resolverAddress)
+        .configureDeployerACL(vaultAddress); 
+         
+        IAddressResolver(resolverAddress)
+        .importVaultAddress(vaultAddress, names, destinations);
     }
 
     /**
@@ -261,6 +267,8 @@ library Utils {
         }
     }
 
+    // MISC FUNCTIONS
+
     /**
     * @notice Generates an 8‐character hex referral code from an address
     * @param user Address to generate a referral code for.
@@ -358,5 +366,25 @@ library Utils {
 
         // NOTE: cast last 20 bytes of hash to address
         return address(uint160(uint256(hash)));
+    }    
+
+    /**
+     * @notice Computes the new floor price based on the provided parameters.
+     * @param newBalance The new balance of token1 for the floor position.
+     * @param circulatingSupply The circulating supply of the vault.
+     * @return newFloorPrice The new floor price.
+     */
+    function computeNewFloorPrice(
+        uint256 newBalance,
+        uint256 circulatingSupply
+    ) internal pure returns (uint256) {
+
+        uint256 newFloorPrice = DecimalMath
+        .divideDecimal(
+            newBalance,
+            circulatingSupply
+        );
+
+        return newFloorPrice;  
     }    
 }

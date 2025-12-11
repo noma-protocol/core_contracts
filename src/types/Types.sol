@@ -24,6 +24,11 @@ struct TokenInfo {
     address token1;
 }
 
+struct Decimals {
+    uint8 minDecimals;
+    uint8 maxDecimals;
+}
+
 /// @notice Enum representing the types of liquidity.
 /// @dev This is used to differentiate liquidity roles in the protocol.
 enum LiquidityType {
@@ -302,6 +307,8 @@ struct ProtocolParameters {
     uint256 selfRepayLtvTreshold;
     uint256 halfStep;
     uint256 skimRatio;
+    Decimals decimals;
+    uint256 basePriceDecimals;
 }
 
 /// @notice Parameters for configuring the protocol exposed to creators.

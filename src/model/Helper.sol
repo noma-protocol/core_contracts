@@ -179,7 +179,7 @@ contract ModelHelper {
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
         
         vaultInfo.liquidityRatio = getLiquidityRatio(pool, vault);
-        vaultInfo.circulatingSupply = getCirculatingSupply(pool, vault);
+        vaultInfo.circulatingSupply = getCirculatingSupply(pool, vault, false);
         vaultInfo.spotPriceX96 = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
         vaultInfo.anchorCapacity = getPositionCapacity(pool, vault, positions[1], LiquidityType.Anchor);
         vaultInfo.floorCapacity = getPositionCapacity(pool, vault, positions[0], LiquidityType.Floor);
@@ -197,7 +197,8 @@ contract ModelHelper {
      */
     function getCirculatingSupply(
         address pool,
-        address vault
+        address vault,
+        bool includeStaked
     ) public view returns (uint256) {
         LiquidityPosition[3] memory positions = IVault(vault).getPositions();
         uint256 totalSupply = ERC20(address(IUniswapV3Pool(pool).token0())).totalSupply();
@@ -209,10 +210,6 @@ contract ModelHelper {
         uint256 protocolUnusedBalanceToken0 = ERC20(address(IUniswapV3Pool(pool).token0())).balanceOf(vault);
         
         address stakingContract = IVault(vault).getStakingContract();
-
-        uint256 staked = stakingContract != address(0) ? 
-                ERC20(address(IUniswapV3Pool(pool).token0())).balanceOf(stakingContract) :
-                0;
 
         (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
 
@@ -232,7 +229,9 @@ contract ModelHelper {
                 amount0CurrentAnchor + 
                 amount0CurrentDiscovery + 
                 protocolUnusedBalanceToken0 + 
-                // staked + 
+                (includeStaked ? 
+                stakingContract != address(0) ? 
+                ERC20(address(IUniswapV3Pool(pool).token0())).balanceOf(stakingContract) : 0 : 0) + 
                 IVault(vault).getCollateralAmount() +
                 feesPosition0Token0
             )
@@ -276,20 +275,23 @@ contract ModelHelper {
         address vault,
         bool isToken0
     ) public view returns (uint256) {
-        ERC20 token = ERC20(isToken0 ? IUniswapV3Pool(pool).token0() : IUniswapV3Pool(pool).token1());
+        ERC20 token = ERC20(
+            isToken0 ? IUniswapV3Pool(pool).token0() : IUniswapV3Pool(pool).token1()
+        );
+
         uint256 protocolUnusedBalance = token.balanceOf(vault);
 
         VaultInfo memory vaultInfo = IVault(vault).getVaultInfo();
-        (uint256 accumulatedFeesToken0, uint256 accumulatedFeesToken1) = IVault(vault).getAccumulatedFees();
-        uint256 fees = isToken0 ? accumulatedFeesToken0 : accumulatedFeesToken1;
-        uint256 amountToSubtract = fees + vaultInfo.totalInterest;
+        (uint256 fees0, uint256 fees1) = IVault(vault).getAccumulatedFees();
+        uint256 fees = isToken0 ? fees0 : fees1;
 
-        if (protocolUnusedBalance <= amountToSubtract) {
-            return 0;
-        } else {
-            return protocolUnusedBalance - amountToSubtract;
-        }
+        uint256 reserved = fees + vaultInfo.totalInterest;
+
+        return protocolUnusedBalance > reserved
+            ? protocolUnusedBalance - reserved
+            : 0;
     }
+
 
     /**
      * @notice Retrieves the intrinsic minimum value of the vault.

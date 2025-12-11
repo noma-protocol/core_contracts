@@ -147,7 +147,8 @@ contract StakingVault is BaseVault {
         uint256 circulating = IModelHelper(modelHelper())
             .getCirculatingSupply(
                 addresses.pool,
-                address(this)
+                address(this), 
+                false
             );
 
         toMintEth = IRewardsCalculator(rewardsCalculator())

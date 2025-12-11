@@ -4,7 +4,8 @@ pragma solidity ^0.8.0;
 import {Logarithm} from "./Logarithm.sol";
 import {FullMath} from 'v3-core/libraries/FullMath.sol';
 import {TickMath} from 'v3-core/libraries/TickMath.sol';
-
+import {IVault} from "../interfaces/IVault.sol";
+import {LiquidityPosition} from "../types/Types.sol";
 /**
  * @title Conversions Library
  * @dev Provides functions for converting prices to Uniswap V3 tick values and vice versa.
@@ -134,18 +135,32 @@ library Conversions {
     }
 
     /**
-     * @notice Converts a square root price (Q96.32 format) to a token price with a specified number of decimals.
-     * @param sqrtPriceX96 The square root price value in Q96.32 format.
-     * @param decimals The number of decimals to use for the resulting price.
-     * @return The corresponding token price.
-     */
-    function sqrtPriceX96ToPrice(uint160 sqrtPriceX96, uint8 decimals) 
-        public 
-        pure 
-        returns (uint256) 
-    {
+    * @notice Converts a square root price (Q96.32 format) to a token price with a specified number of decimals.
+    * @param sqrtPriceX96 The square root price value in Q96.32 format.
+    * @param decimals The number of decimals to use for the resulting price.
+    * @return The corresponding token price.
+    */
+    function sqrtPriceX96ToPrice(
+        uint160 sqrtPriceX96,
+        uint8 decimals
+    ) public view returns (uint256) {
+        // Handle the “upper bound” / exhausted liquidity case explicitly
+        if (sqrtPriceX96 >= TickMath.MAX_SQRT_RATIO - 1) {
+            LiquidityPosition[3] memory positions = IVault(msg.sender).getPositions();
+
+            int24 discoveryUpperTick = positions[2].upperTick;
+            uint256 upperTickToPrice = tickToSqrtPriceX96(int24(discoveryUpperTick));
+            if (upperTickToPrice != 0) {
+                return upperTickToPrice;
+            } else {
+                // Fallback to max uint256 if upper tick price is also zero
+                return type(uint256).max;
+            }
+        }
+
         uint256 numerator1 = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
         uint256 numerator2 = 10 ** decimals;
         return FullMath.mulDiv(numerator1, numerator2, 1 << 192);
     }
+
 }

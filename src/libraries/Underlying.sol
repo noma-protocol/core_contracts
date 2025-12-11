@@ -46,7 +46,7 @@ library Underlying {
                 position.upperTick
                 )
             )            
-        );
+        );          
 
         if (isToken0) {
             feeGrowthGlobal = IUniswapV3Pool(pool).feeGrowthGlobal0X128();

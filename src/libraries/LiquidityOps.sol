@@ -478,7 +478,8 @@ library LiquidityOps {
             uint256 circulatingSupply = IModelHelper(addresses.modelHelper)
             .getCirculatingSupply(
                 addresses.pool,
-                addresses.vault
+                addresses.vault,
+                false
             );        
 
             uint256 totalSupply = IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).totalSupply();        
@@ -641,7 +642,8 @@ library LiquidityOps {
         uint256 circulatingSupply = IModelHelper(addresses.modelHelper)
         .getCirculatingSupply(
             addresses.pool,
-            addresses.vault
+            addresses.vault,
+            false
         );
         
         return (circulatingSupply, anchorToken1Balance, discoveryToken1Balance, discoveryToken0Balance);

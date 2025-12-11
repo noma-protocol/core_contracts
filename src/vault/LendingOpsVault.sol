@@ -225,7 +225,7 @@ contract LendingOpsVault {
         );
         
         uint256 circulatingSupply = IModelHelper(_v.modelHelper)
-        .getCirculatingSupply(address(_v.pool), address(this));
+        .getCirculatingSupply(address(_v.pool), address(this), false);
 
         uint256 newFloorPrice = Utils
         .computeNewFloorPrice(

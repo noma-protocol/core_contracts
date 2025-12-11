@@ -94,11 +94,11 @@ error NotAuthorityError();
 error SupplyTransferError();
 error InvalidSymbol();
 error ZeroAddressError();
-error InvalidTickSpacing();
 error TokenAlreadyExistsError();
 error InvalidParameters();
 error UpgradeFailed();
 error InvalidStep();
+error Unused();
 
 /**
  * @title NomaFactory
@@ -179,18 +179,29 @@ contract NomaFactory {
         int24 tickSpacing = Utils._validateFeeTier(vaultDeployParams.feeTier);
         SupplyRules.enforceMinTotalSupply(
             vaultDeployParams.IDOPrice, 
-            vaultDeployParams.initialSupply
+            vaultDeployParams.initialSupply,
+            getProtocolParameters().basePriceDecimals
         );
 
         if (
             // Protected ticker
-            (msg.sender != authority && keccak256(bytes(vaultDeployParams.symbol)) == keccak256(bytes("NOMA"))) || 
+            (
+                msg.sender != authority && 
+                keccak256(bytes(vaultDeployParams.symbol)) == keccak256(bytes("NOMA"))
+            ) || 
             deployedTokenHashes[
                 keccak256(
                     abi.encodePacked(vaultDeployParams.name, vaultDeployParams.symbol)
                 )
             ]
         ) revert TokenAlreadyExistsError();
+
+        if (
+            vaultDeployParams.decimals < getProtocolParameters().decimals.minDecimals ||
+            vaultDeployParams.decimals > getProtocolParameters().decimals.maxDecimals
+        ) {
+            revert InvalidParameters();
+        }
 
         ERC1967Proxy proxy; 
         IUniswapV3Pool pool;
@@ -217,14 +228,15 @@ contract NomaFactory {
         }
 
         if (vaultDeployParams.presale == 1 && msg.sender != authority) {
-            if (msg.value < getProtocolParameters().deployFee) {
+            uint256 deployFee = getProtocolParameters().deployFee;
+            if (msg.value < deployFee) {
                 revert InvalidParameters();
             } else {
-                if (teamMultisigAddress != address(0)) {
-                    payable(teamMultisigAddress).transfer(msg.value);
-                } else {
-                    payable(authority).transfer(msg.value);
-                }
+                address payable recipient = teamMultisigAddress != address(0)
+                    ? payable(teamMultisigAddress)
+                    : payable(authority);
+
+                (bool success, ) = recipient.call{value: msg.value}("");
             }
         }
 
@@ -611,13 +623,21 @@ contract NomaFactory {
         int24 _tickSpacing,
         ProtocolParameters memory _liquidityParams
     ) internal {
-        Deployer(deployerContract).deployFloor(IDOPrice, totalSupply * _liquidityParams.floorPercentage / 100, _tickSpacing);  
-        Deployer(deployerContract).deployAnchor(
-            // _liquidityParams.floorBips[0], 
+        Deployer(deployerContract)
+        .deployFloor(
+            IDOPrice, 
+            totalSupply * _liquidityParams.floorPercentage / 100, 
+            _tickSpacing
+        );  
+        Deployer(deployerContract)
+        .deployAnchor(
             _liquidityParams.floorBips[1], 
             totalSupply * _liquidityParams.anchorPercentage / 100
         );
-        Deployer(deployerContract).deployDiscovery(IDOPrice * _liquidityParams.idoPriceMultiplier);
+        Deployer(deployerContract)
+        .deployDiscovery(
+            IDOPrice * _liquidityParams.idoPriceMultiplier
+        );
     }
 
 
