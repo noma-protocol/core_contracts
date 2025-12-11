@@ -271,4 +271,27 @@ library LiquidityDeployer {
             liquidityType: params.liquidityType
         });          
     }
+
+
+    function computeAmount0ForAmount1(
+        LiquidityPosition memory position,
+        uint256 amount1
+    ) public view returns (uint256 amount0) {
+        
+        // Get Liquidity for amount1 
+        uint128 liquidity = LiquidityAmounts
+        .getLiquidityForAmount1(
+            TickMath.getSqrtRatioAtTick(position.lowerTick),
+            TickMath.getSqrtRatioAtTick(position.upperTick),
+            amount1
+        );
+
+        // Compute token0 for liquidity 
+        amount0 = LiquidityAmounts
+        .getAmount0ForLiquidity(
+            TickMath.getSqrtRatioAtTick(position.lowerTick),
+            TickMath.getSqrtRatioAtTick(position.upperTick),
+            liquidity
+        );
+    }
 }

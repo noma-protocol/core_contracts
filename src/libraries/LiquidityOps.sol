@@ -41,6 +41,8 @@ interface IAdaptiveSupply {
     ) external pure returns (uint256 mintAmount);
 }
 
+error InvalidBalance();
+
 /**
  * @title LiquidityOps
  * @notice Library for managing liquidity positions in a Uniswap V3 pool.
@@ -286,6 +288,10 @@ library LiquidityOps {
             ).balanceOf(address(this));
         }
 
+        if (anchorToken1Balance == 0) {
+            revert InvalidBalance();
+        }
+
         newPositions = _slidePositions(
             addresses,
             positions,
@@ -475,18 +481,16 @@ library LiquidityOps {
 
         if (params.liquidityType == LiquidityType.Discovery) {
 
-            uint256 circulatingSupply = IModelHelper(addresses.modelHelper)
-            .getCirculatingSupply(
-                addresses.pool,
-                addresses.vault,
-                false
-            );        
-
             uint256 totalSupply = IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).totalSupply();        
             
             adjustSupply(
                 balanceToken0,
-                circulatingSupply,
+                IModelHelper(addresses.modelHelper)
+                .getCirculatingSupply(
+                    addresses.pool,
+                    addresses.vault,
+                    false
+                ),
                 totalSupply,
                 isShift,
                 addresses
@@ -498,20 +502,31 @@ library LiquidityOps {
         } else {
             (,, balanceToken0,) = IModelHelper(addresses.modelHelper)
             .getUnderlyingBalances(
-                addresses.pool, 
-                address(this), 
+                addresses.pool,
+                address(this),
                 LiquidityType.Anchor
             );
         }
         if (balanceToken0 == 0) {
             balanceToken0 = refreshBalance0(addresses);
-        } 
+        }
 
+        uint256 amount0ToDeploy;
         if (
-            params.liquidityType == LiquidityType.Anchor || 
-            params.liquidityType == LiquidityType.Discovery    
-        ) {
-            if (balanceToken0 == 0) revert NoLiquidity(); 
+            params.liquidityType == LiquidityType.Anchor
+        ) {        
+            amount0ToDeploy = LiquidityDeployer
+            .computeAmount0ForAmount1(
+                LiquidityPosition({
+                    lowerTick: params.lowerTick,
+                    upperTick: params.upperTick,
+                    liquidity: 0,
+                    price: 0,
+                    tickSpacing: 0,
+                    liquidityType: params.liquidityType
+                }), 
+                params.amount1ToDeploy
+            );
         }
 
         newPosition = LiquidityDeployer
@@ -525,8 +540,8 @@ library LiquidityOps {
                 liquidityType: params.liquidityType, 
                 tickSpacing: 60,
                 amounts: AmountsToMint({
-                    amount0: balanceToken0,
-                    amount1: params.liquidityType == LiquidityType.Anchor ? params.amount1ToDeploy: 1
+                    amount0: params.liquidityType == LiquidityType.Anchor ? amount0ToDeploy : balanceToken0,
+                    amount1: params.amount1ToDeploy
                 })
             })
         );     
