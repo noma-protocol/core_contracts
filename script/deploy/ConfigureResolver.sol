@@ -15,7 +15,7 @@ struct ContractInfo {
 
 interface INomaToken {
     function setDividendsManager(NomaDividends _manager) external;
-    function owner() external returns (address);
+    function owner() external view returns (address);
 }
 
 contract ConfigureResolver is Script {
@@ -30,30 +30,36 @@ contract ConfigureResolver is Script {
     Resolver private resolver;
     NomaDividends private nomaDividends;
 
-    address private resolverAddress = 0x9c7fEaDb1e588b53928B8e1573Aa96bd009B8CCC;
-    address private nomaTokenAddres = 0x3912a474AD7D35D5Cd8D9e0172FF92e971dE3044;
-    address private dividenDistributorAddress = 0x8D3BeA1A26d2359CE273C800c08d6ca5d4b2251e;
+    address private resolverAddress = 0x488eBfab208ADFBf97f98579EC694B82664d6e6B;
+    address private nomaTokenAddress = 0x11d9e5b4Fd7CB81eE9c40AB2561CeD9C58D66146;
+    address private nomaFactoryAddress = 0xA2839bA831284Ea6567B8a6Ab3BA02aaE2b3f147;
 
     function run() public {  
         vm.startBroadcast(privateKey);
 
         resolver = Resolver(resolverAddress);
         
-        nomaDividends = NomaDividends(dividenDistributorAddress);
+        nomaDividends = new NomaDividends(nomaFactoryAddress, resolverAddress);
 
         expectedAddressesInResolver.push(
-            ContractInfo("NomaToken", nomaTokenAddres)
+            ContractInfo("DividendDistributor", address(nomaDividends))
+        );
+        
+        console.log("DividendDistributor deployed to address: ", address(nomaDividends));
+
+        expectedAddressesInResolver.push(
+            ContractInfo("NomaToken", nomaTokenAddress)
         );
 
         // Configure resolver
         configureResolver();
 
-        nomaDividends.setSharesToken();
+        nomaDividends.setSharesToken{gas: 1000000}();
 
-        address contractOwner = INomaToken(nomaTokenAddres).owner();
+        address contractOwner = INomaToken(nomaTokenAddress).owner();
         console.log("Contract owner is ", contractOwner);
 
-        INomaToken(nomaTokenAddres).setDividendsManager(nomaDividends);
+        INomaToken(nomaTokenAddress).setDividendsManager{gas: 3000000}(nomaDividends);
 
         vm.stopBroadcast();
     }

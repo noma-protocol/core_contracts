@@ -5,7 +5,7 @@ import "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
 import { NomaFactory } from  "../../src/factory/NomaFactory.sol";
-import { ProtocolParameters, PresaleProtocolParams } from "../../src/types/Types.sol";
+import { ProtocolParameters, PresaleProtocolParams, Decimals } from "../../src/types/Types.sol";
 import { AuxVault } from "../../src/vault/AuxVault.sol";
 
 struct ContractAddressesJson {
@@ -48,24 +48,27 @@ contract SetProtocolParameters is Script {
 
         ProtocolParameters memory _params =
         ProtocolParameters(
-            10,         // Floor percentage of total supply
-            5,          // Anchor percentage of total supply
-            3,          // IDO price multiplier
-            [200, 500], // Floor bips
-            90e16,      // Shift liquidity ratio
-            115e16,     // Slide liquidity ratio
-            15000,      // Discovery deploy bips
-            10,         // shiftAnchorUpperBips
-            300,        // slideAnchorUpperBips
-            5,          // lowBalanceThresholdFactor
-            2,          // highBalanceThresholdFactor
-            5,          // inflationFee
-            27,         // loan interest fee
-            25,         // maxLoanUtilization
-            0,          // deployFee (ETH)
-            25,         // presalePremium (25%)
-            1_250,      // self repaying loan ltv treshold
-            0.5e18      // Adaptive supply curve half step
+            10,             // Floor percentage of total supply
+            5,              // Anchor percentage of total supply
+            3,              // IDO price multiplier
+            [200, 500],     // Floor bips
+            90e16,          // Shift liquidity ratio
+            115e16,         // Slide liquidity ratio
+            15000,          // Discovery deploy bips
+            10,             // shiftAnchorUpperBips
+            300,            // slideAnchorUpperBips
+            5,              // lowBalanceThresholdFactor
+            2,              // highBalanceThresholdFactor
+            5,              // inflationFee
+            27,             // loan interest fee
+            25,             // maxLoanUtilization
+            0,              // deployFee (ETH)
+            25,             // presalePremium (25%)
+            1_250,          // self repaying loan ltv treshold
+            0.5e18,         // Adaptive supply curve half step
+            2,              // Skim ratio
+            Decimals(6, 18),// Decimals (minDecimals, maxDecimals
+            1e14            // basePriceDecimals
         );
 
         // NomaFactory nomaFactory = NomaFactory(addresses.Factory);

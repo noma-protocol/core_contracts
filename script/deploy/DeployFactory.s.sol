@@ -7,7 +7,7 @@ import { IUniswapV3Pool } from "v3-core/interfaces/IUniswapV3Pool.sol";
 import { IAddressResolver } from "../../src/interfaces/IAddressResolver.sol";
 import { Deployer } from "../../src/Deployer.sol";
 import { NomaFactory } from "../../src/factory/NomaFactory.sol";
-import { VaultDeployParams, VaultDescription, ProtocolParameters, PresaleProtocolParams } from "../../src/types/Types.sol";
+import { VaultDeployParams, VaultDescription, ProtocolParameters, PresaleProtocolParams, Decimals } from "../../src/types/Types.sol";
 import { PresaleFactory } from "../../src/factory/PresaleFactory.sol";
 
 
@@ -107,24 +107,27 @@ contract DeployFactory is Script {
 
         ProtocolParameters memory _params =
         ProtocolParameters(
-            10,         // Floor percentage of total supply
-            5,          // Anchor percentage of total supply
-            3,          // IDO price multiplier
-            [200, 500], // Floor bips
-            90e16,      // Shift liquidity ratio
-            115e16,     // Slide liquidity ratio
-            15000,      // Discovery deploy bips
-            10,         // shiftAnchorUpperBips
-            300,        // slideAnchorUpperBips
-            5,          // lowBalanceThresholdFactor
-            2,          // highBalanceThresholdFactor
-            5,          // inflationFee
-            25,         // maxLoanUtilization
-            27,         // loan interest fee
-            0.1e18,     // deployFee (ETH)
-            25,         // presalePremium (25%)
-            1_250,      // selfRepayLtvTreshold
-            0.5e18      // Adaptive supply curve half step
+            10,             // Floor percentage of total supply
+            5,              // Anchor percentage of total supply
+            3,              // IDO price multiplier
+            [200, 500],     // Floor bips
+            90e16,          // Shift liquidity ratio
+            115e16,         // Slide liquidity ratio
+            15000,          // Discovery deploy bips
+            10,             // shiftAnchorUpperBips
+            300,            // slideAnchorUpperBips
+            5,              // lowBalanceThresholdFactor
+            2,              // highBalanceThresholdFactor
+            5,              // inflationFee
+            25,             // maxLoanUtilization
+            27,             // loan interest fee
+            0.1e18,         // deployFee (ETH)
+            25,             // presalePremium (25%)
+            1_250,          // selfRepayLtvTreshold
+            0.5e18,         // Adaptive supply curve half step
+            2,              // Skim ratio
+            Decimals(6, 18),// min and max decimals
+            1e14            // basePriceDecimals
         );
 
         PresaleProtocolParams memory _presaleParams =
@@ -142,20 +145,11 @@ contract DeployFactory is Script {
         nomaFactory.setProtocolParameters(_params);
         nomaFactory.setPresaleProtocolParams(_presaleParams);
 
-        dividendDistributor = new NomaDividends(address(nomaFactory), address(resolver));
-
-        expectedAddressesInResolver.push(
-            ContractInfo("DividendDistributor", address(dividendDistributor))
-        );
-        
-        console.log("DividendDistributor deployed to address: ", address(dividendDistributor));
-
         resolver.initFactory(address(nomaFactory));
 
         configureResolver();
 
         console.log("Factory deployed to address: ", address(nomaFactory));
-
 
         vm.stopBroadcast();
     }

@@ -35,6 +35,7 @@ contract DeployVault is Script {
     address deployer = vm.envAddress("DEPLOYER");
     bool isMainnet = vm.envBool("DEPLOY_FLAG_MAINNET"); 
     bool isChainFork = vm.envBool("DEPLOY_FLAG_FORK"); 
+    bool deployTests = vm.envBool("DEPLOY_TEST"); 
 
     // Constants
     address WMON_monad_mainnet = 0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A;
@@ -87,15 +88,15 @@ contract DeployVault is Script {
             1,
             WMON,
             useUniswap ? 3000 : 2500,   
-            1,                          // 0 = no presale
+            0,                          // 0 = no presale
             isFreshDeploy,              // isFreshDeploy
             useUniswap                  // useUniswap 
         );
 
         PresaleUserParams memory presaleParams =
         PresaleUserParams(
-            9000000000000000000000,   // softCap
-            86400 * 3//2592000          // duration (seconds)
+            3000000000000000000000,     // softCap
+            86400 * 3                   // duration (seconds)
         );
 
         (address vault, address pool, address proxy) = 
@@ -109,15 +110,16 @@ contract DeployVault is Script {
             })            
         );
 
-        BaseVault vaultContract = BaseVault(vault);
-        ProtocolAddresses memory protocolAddresses = vaultContract.getProtocolAddresses();
+        if (deployTests) {
+            nomaFactory.configureVault(vault, 0);
 
-        idoManager = new IDOHelper(pool, vault, modelHelper, proxy, WMON);
+            idoManager = new IDOHelper(pool, vault, modelHelper, proxy, WMON);
+            console.log("IDOHelper address: ", address(idoManager));
+        }
 
         console.log("Vault address: ", vault);
         console.log("Pool address: ", pool);
         console.log("Proxy address: ", proxy);
-        console.log("IDOHelper address: ", address(idoManager));
     }
 
     
