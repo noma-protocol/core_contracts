@@ -4,8 +4,6 @@ pragma solidity ^0.8.0;
 import { IUniswapV3Pool } from "v3-core/interfaces/IUniswapV3Pool.sol";
 import { VaultStorage } from "../libraries/LibAppStorage.sol";
 import { Utils } from "../libraries/Utils.sol";
-import { IModelHelper } from "../interfaces/IModelHelper.sol";
-import { IDeployer } from "../interfaces/IDeployer.sol";
 import { 
     LiquidityType, 
     LiquidityPosition,
@@ -19,14 +17,12 @@ import {
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Uniswap } from "../libraries/Uniswap.sol";
 import { IVault } from "../interfaces/IVault.sol";
-import { DecimalMath } from "../libraries/DecimalMath.sol";
 import { Conversions } from "../libraries/Conversions.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { TickMath } from "v3-core/libraries/TickMath.sol";
-import { LiquidityDeployer } from "../libraries/LiquidityDeployer.sol";
 import { LiquidityOps } from "../libraries/LiquidityOps.sol";
 import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
+import {Conversions} from "../libraries/Conversions.sol";
 import "../libraries/TickMathExtra.sol";
 
 interface INomaFactory {
@@ -45,10 +41,16 @@ interface ILendingVault {
     function vaultSelfRepayLoans(uint256 fundsToPull,uint256 start,uint256 limit) external returns (uint256 totalLoans, uint256 collateralToReturn);
 }
 
+interface IVaultExt {
+    function mintTokens(address to, uint256 amount) external returns (bool);
+}
+
 error NotAuthorized();
 error OnlyInternalCalls();
 error NotInitialized();
 error NoLiquidity();
+error CallbackCaller();
+error InsufficientBalance();
 
 event LoanRepaidOnBehalf(address indexed who, uint256 amount, uint256 collateralReleased);
 
@@ -62,6 +64,40 @@ contract AuxVault {
 
     VaultStorage internal _v;
 
+    function _handleV3SwapCallback(
+        int256 amount0Delta,
+        int256 amount1Delta
+    ) internal {
+        if (msg.sender != address(_v.pool)) revert CallbackCaller();
+
+        // No tokens owed → nothing to do
+        if (amount0Delta <= 0 && amount1Delta <= 0) {
+            return;
+        }
+
+        if (amount0Delta > 0) {
+            uint256 balance0 = IERC20(_v.tokenInfo.token0).balanceOf(address(this));
+            if (balance0 <  uint256(amount0Delta)) {
+                _mintTokens(address(this),  uint256(amount0Delta));
+            }
+            IERC20(_v.tokenInfo.token0).transfer(msg.sender, uint256(amount0Delta));
+        }
+
+        if (amount1Delta > 0) {
+            uint256 bal1 = IERC20(_v.tokenInfo.token1).balanceOf(address(this));
+            if (bal1 < uint256(amount1Delta)) revert InsufficientBalance();
+            IERC20(_v.tokenInfo.token1).transfer(msg.sender, uint256(amount1Delta));
+        }
+    }
+
+    function uniswapV3SwapCallback(
+        int256 amount0Delta,
+        int256 amount1Delta,
+        bytes calldata data
+    ) external {
+        _handleV3SwapCallback(amount0Delta, amount1Delta);
+    }
+
     /**
      * @notice Mints new tokens and distributes them to the specified address.
      * @param to The address to receive the minted tokens.
@@ -71,6 +107,14 @@ contract AuxVault {
         address to,
         uint256 amount
     ) public onlyInternalCalls returns (bool) {
+        
+        return _mintTokens(to, amount);
+    }
+
+    function _mintTokens(
+        address to,
+        uint256 amount
+    ) internal returns (bool) {
         
         _v.timeLastMinted = block.timestamp;
 
@@ -99,7 +143,25 @@ contract AuxVault {
             amount
         );
     }
-    
+
+    function fixInbalance(
+        address pool,
+        uint160 sqrtPriceX96,
+        uint256 amount
+    ) public onlyInternalCalls {
+        bool isOverLimit = Conversions.isNearMaxSqrtPrice(sqrtPriceX96);
+
+        if (isOverLimit) {
+            IUniswapV3Pool(pool).swap(
+                address(this),
+                true,
+                int256(amount),
+                TickMath.MIN_SQRT_RATIO + 1,
+                ""
+            );
+        }
+    }
+
     function _setFees(
         LiquidityPosition[3] memory positions
     ) internal {
@@ -109,7 +171,7 @@ contract AuxVault {
             uint256 feesPosition0Token1, 
             uint256 feesPosition1Token0, 
             uint256 feesPosition1Token1
-            ) = LiquidityOps._calculateFees(address(this), address(_v.pool), positions);
+        ) = LiquidityOps._calculateFees(address(this), address(_v.pool), positions);
 
         IVault(address(this)).setFees(
             feesPosition0Token0, 
@@ -294,6 +356,8 @@ contract AuxVault {
         return _exchangeHelper;
     }
 
+ 
+
     /**
      * @notice Retrieves the address of the vToken contract.
      * @return The address of the contract.
@@ -364,16 +428,14 @@ contract AuxVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](16);
+        bytes4[] memory selectors = new bytes4[](18);
         selectors[0] = bytes4(keccak256(bytes("teamMultiSig()")));
         selectors[1] = bytes4(keccak256(bytes("getTimeSinceLastMint()")));
         selectors[2] = bytes4(keccak256(bytes("getAccumulatedFees()")));
         selectors[3] = bytes4(keccak256(bytes("pool()")));
         selectors[4] = bytes4(
             keccak256(
-                bytes(
-                    "setProtocolParameters(address,address,address,address,address,(uint8,uint8,uint8,uint16[2],uint256,uint256,int24,int24,int24,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,(uint8,uint8),uint256))"
-                )
+                bytes("setProtocolParameters((uint8,uint8,uint8,uint16[2],uint256,uint256,int24,int24,int24,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,(uint8,uint8),uint256))")
             )
         );      
         selectors[5] = bytes4(keccak256(bytes("setManager(address)")));
@@ -387,7 +449,9 @@ contract AuxVault {
         selectors[13] = bytes4(keccak256(bytes("getTotalCreatorEarnings()")));
         selectors[14] = bytes4(keccak256(bytes("getTotalTeamEarnings()")));
         selectors[15] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));
+        selectors[16] = bytes4(keccak256(bytes("fixInbalance(address,uint160,uint256)")));
+        selectors[17] = bytes4(keccak256(bytes("uniswapV3SwapCallback(int256,int256,bytes)")));
 
-        return selectors;
+        return selectors; 
     }
 }        

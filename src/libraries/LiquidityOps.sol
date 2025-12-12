@@ -97,6 +97,9 @@ library LiquidityOps {
             
             if (circulatingSupply > 0) {
             
+                (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(addresses.pool).slot0();
+                bool isOverLimit = Conversions.isNearMaxSqrtPrice(sqrtRatioX96);
+
                 (,,, uint256 floorToken1Balance) = IModelHelper(addresses.modelHelper)
                 .getUnderlyingBalances(
                     addresses.pool, 
@@ -123,13 +126,23 @@ library LiquidityOps {
                         discoveryToken1Balance: discoveryToken1Balance,
                         discoveryToken0Balance: discoveryToken0Balance
                     }),
-                    positions
+                    positions,
+                    isOverLimit
                 );
                 
-                IVault(addresses.vault)
-                .updatePositions(
-                    newPositions
-                ); 
+                if (!isOverLimit) {
+                    IVault(addresses.vault)
+                    .updatePositions(
+                        newPositions
+                    ); 
+                } else {
+                    IVault(addresses.vault)
+                    .fixInbalance(
+                        addresses.pool, 
+                        sqrtRatioX96, 
+                        10_000_000 ether
+                    );
+                }
 
                 return (currentLiquidityRatio, newPositions);
             }
@@ -143,11 +156,13 @@ library LiquidityOps {
      * @notice Prepares the positions for shifting.
      * @param params Pre-shift parameters.
      * @param positions Current liquidity positions.
+     * @param isOverLimit ""
      * @return newPositions The new liquidity positions after pre-shift.
      */
     function preShiftPositions(
         PreShiftParameters memory params,
-        LiquidityPosition[3] memory positions
+        LiquidityPosition[3] memory positions,
+        bool isOverLimit
     ) internal returns (LiquidityPosition[3] memory newPositions) {
 
         address deployer = params.addresses.deployer;
@@ -174,7 +189,8 @@ library LiquidityOps {
                 discoveryToken1Balance: params.discoveryToken1Balance,
                 discoveryToken0Balance: params.discoveryToken0Balance,
                 positions: positions
-            })
+            }),
+            isOverLimit
         );
     }
 
@@ -182,15 +198,23 @@ library LiquidityOps {
      * @notice Shifts the liquidity positions.
      * @param addresses Protocol addresses.
      * @param params Shift parameters.
+     * @param isOverLimit ""
      * @return newPositions The new liquidity positions after shifting.
      */
     function shiftPositions(
         ProtocolAddresses memory addresses,
-        ShiftParameters memory params
+        ShiftParameters memory params,
+        bool isOverLimit
     ) internal returns (
         LiquidityPosition[3] memory newPositions
     ) {
         if (params.positions[0].liquidity > 0) {
+            
+            if (isOverLimit) {
+                // abort shift
+                newPositions = params.positions;
+                return newPositions;
+            }
 
             (
                 uint256 feesPosition0Token0,
@@ -315,23 +339,23 @@ library LiquidityOps {
         ShiftParameters memory params
     ) internal returns (LiquidityPosition[3] memory newPositions) {
 
-        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(params.pool).slot0();
         uint8 decimals = IERC20Metadata(address(IUniswapV3Pool(params.pool).token0())).decimals();
-
         uint256 skimRatio = IVault(addresses.vault).getProtocolParameters().skimRatio;
 
         newPositions[0] = LiquidityDeployer
         .shiftFloor(
             params.pool, 
-            addresses.vault, 
+            addresses.exchangeHelper, 
             params.newFloorPrice,
             params.floorToken1Balance + (params.anchorToken1Balance / skimRatio) + params.discoveryToken1Balance,
             params.positions[0]
         );
+
+        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(params.pool).slot0();
         
         int24 upperTick = Utils
         .addBipsToTick(
-            TickMath.getTickAtSqrtRatio(sqrtRatioX96), 
+            TickMath.getTickAtSqrtRatio(sqrtRatioX96),
             IVault(addresses.vault).getProtocolParameters().shiftAnchorUpperBips,
             decimals,
             params.positions[0].tickSpacing
@@ -345,7 +369,8 @@ library LiquidityOps {
                 vault: addresses.vault,
                 deployer: addresses.deployer,
                 presaleContract: addresses.presaleContract,
-                adaptiveSupplyController: addresses.adaptiveSupplyController
+                adaptiveSupplyController: addresses.adaptiveSupplyController,
+                exchangeHelper: addresses.exchangeHelper
             }),
             LiquidityInternalPars({
                 lowerTick: newPositions[0].upperTick,
@@ -372,7 +397,8 @@ library LiquidityOps {
                 vault: addresses.vault,
                 deployer: addresses.deployer,
                 presaleContract: addresses.presaleContract,
-                adaptiveSupplyController: addresses.adaptiveSupplyController
+                adaptiveSupplyController: addresses.adaptiveSupplyController,
+                exchangeHelper: addresses.exchangeHelper
             }),
             LiquidityInternalPars({
                 lowerTick: newPositions[1].upperTick + params.positions[0].tickSpacing,
@@ -435,7 +461,8 @@ library LiquidityOps {
                 vault: addresses.vault,
                 deployer: addresses.deployer,
                 presaleContract: addresses.presaleContract,
-                adaptiveSupplyController: addresses.adaptiveSupplyController
+                adaptiveSupplyController: addresses.adaptiveSupplyController,
+                exchangeHelper: addresses.exchangeHelper
             }),
             LiquidityInternalPars({
                 lowerTick: newPositions[1].upperTick + positions[0].tickSpacing,
@@ -515,7 +542,7 @@ library LiquidityOps {
         if (
             params.liquidityType == LiquidityType.Anchor
         ) {        
-            amount0ToDeploy = LiquidityDeployer
+            amount0ToDeploy = Uniswap
             .computeAmount0ForAmount1(
                 LiquidityPosition({
                     lowerTick: params.lowerTick,

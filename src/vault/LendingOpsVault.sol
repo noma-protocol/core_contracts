@@ -299,7 +299,8 @@ contract LendingOpsVault {
                 vault: address(this),
                 deployer: _v.deployerContract,
                 presaleContract: _v.presaleContract,
-                adaptiveSupplyController: _v.adaptiveSupplyController
+                adaptiveSupplyController: _v.adaptiveSupplyController,
+                exchangeHelper: address(0)
             }),
             LiquidityInternalPars({
                 lowerTick: positions[0].upperTick,

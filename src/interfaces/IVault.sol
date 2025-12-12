@@ -172,4 +172,6 @@ interface IVault {
     function getUnderlyingBalances(LiquidityType liquidityType) external view  returns (int24, int24, uint256, uint256);
 
     function setReferralEntity(bytes8 code, uint256 amount) external;
+
+    function fixInbalance(address pool,uint160 sqrtPriceX96, uint256 amount) external;
 }

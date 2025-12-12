@@ -10,31 +10,24 @@ library SupplyRules {
     /// @notice Returns the minimum total supply required for a given price.
     /// @param price Token price with 18 decimals.
     /// @param basePrice The largest price threshold from which all tiers are derived.
-    ///                  Example: 1e14 now, maybe 1e9 later, etc.
     function getMinTotalSupplyForPrice(
         uint256 price,
         uint256 basePrice
     ) internal pure returns (uint256) {
-        // Defensive: don't allow basePrice == 0 (would break divisions).
         if (basePrice == 0) {
-            // You can choose to revert or just return 0.
-            // I prefer reverting to avoid silently disabling the rule.
             revert("SupplyRules: basePrice is zero");
         }
 
         // Derive the thresholds by dividing by 10 each time.
-        // NOTE: if basePrice is very small, some divisions may become 0.
-        // You can add extra guards if needed.
-        uint256 t0 = basePrice;          // was 1e14
-        uint256 t1 = basePrice / 10;     // was 1e13
-        uint256 t2 = basePrice / 100;    // was 1e12
-        uint256 t3 = basePrice / 1_000;  // was 1e11
-        uint256 t4 = basePrice / 10_000; // was 1e10
-        uint256 t5 = basePrice / 100_000;       // was 1e9
-        uint256 t6 = basePrice / 1_000_000;     // was 1e8
-        uint256 t7 = basePrice / 10_000_000;    // was 1e7
+        uint256 t0 = basePrice;      
+        uint256 t1 = basePrice / 10;     
+        uint256 t2 = basePrice / 100;   
+        uint256 t3 = basePrice / 1_000;  
+        uint256 t4 = basePrice / 10_000; 
+        uint256 t5 = basePrice / 100_000;     
+        uint256 t6 = basePrice / 1_000_000;     
+        uint256 t7 = basePrice / 10_000_000;    
 
-        // Same logic as your original, but using derived thresholds.
         if (price > t0) {
             // price > top threshold  -> 1M
             return 1_000_000 * WAD;

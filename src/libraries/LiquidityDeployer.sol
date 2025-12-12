@@ -16,7 +16,8 @@ import {
     LiquidityPosition, 
     LiquidityType,
     AmountsToMint,
-    DeployLiquidityParams
+    DeployLiquidityParams,
+    SwapParams
 } from "../types/Types.sol";
 
 // Custom errors
@@ -25,6 +26,10 @@ error InvalidTicksAnchor();
 error InvalidTicksDiscovery();
 error InvalidFloor();
 error NoLiquidity();
+
+interface IVaultExt {
+    function mintTokens(address to, uint256 amount) external returns (bool);
+}
 
 /**
  * @title LiquidityManager
@@ -177,17 +182,25 @@ library LiquidityDeployer {
         uint256 newFloorPrice,
         uint256 newFloorBalance,
         LiquidityPosition memory floorPosition
-    ) internal returns (LiquidityPosition memory newPosition) {
-        
+    ) internal returns (LiquidityPosition memory newPosition) {       
+        uint8 decimals = IERC20Metadata(IUniswapV3Pool(pool).token0()).decimals();
         (uint160 sqrtRatioX96,,,,,, ) = IUniswapV3Pool(pool).slot0();
-        uint8 decimals = IERC20Metadata(address(IUniswapV3Pool(pool).token0())).decimals();
 
-        (int24 lowerTick, int24 upperTick) = 
-        Conversions.computeSingleTick(
-            newFloorPrice,
-            floorPosition.tickSpacing,
+        uint256 currentFloorPrice = Conversions.sqrtPriceX96ToPrice(
+            TickMath.getSqrtRatioAtTick(floorPosition.lowerTick),
             decimals
         );
+
+        if (newFloorPrice < currentFloorPrice) {
+            newFloorPrice = currentFloorPrice;
+        }
+
+        (int24 lowerTick, int24 upperTick) =
+            Conversions.computeSingleTick(
+                newFloorPrice,
+                floorPosition.tickSpacing,
+                decimals
+            );
 
         if (lowerTick < floorPosition.lowerTick) revert InvalidFloor();
 
@@ -204,7 +217,7 @@ library LiquidityDeployer {
 
             Uniswap.mint(
                 pool,
-                receiver,
+                address(this),
                 lowerTick,
                 upperTick,
                 liquidity,
@@ -219,16 +232,7 @@ library LiquidityDeployer {
             newPosition.liquidityType = LiquidityType.Floor;
             
         } else {
-
-            revert(
-                string(
-                    abi.encodePacked(
-                        "shiftFloor: liquidity is 0 : ", 
-                        Utils._uint2str(uint256(newFloorPrice))
-                    )
-                )
-            );
-
+            revert NoLiquidity();
         }
 
         return newPosition;
@@ -272,26 +276,4 @@ library LiquidityDeployer {
         });          
     }
 
-
-    function computeAmount0ForAmount1(
-        LiquidityPosition memory position,
-        uint256 amount1
-    ) public view returns (uint256 amount0) {
-        
-        // Get Liquidity for amount1 
-        uint128 liquidity = LiquidityAmounts
-        .getLiquidityForAmount1(
-            TickMath.getSqrtRatioAtTick(position.lowerTick),
-            TickMath.getSqrtRatioAtTick(position.upperTick),
-            amount1
-        );
-
-        // Compute token0 for liquidity 
-        amount0 = LiquidityAmounts
-        .getAmount0ForLiquidity(
-            TickMath.getSqrtRatioAtTick(position.lowerTick),
-            TickMath.getSqrtRatioAtTick(position.upperTick),
-            liquidity
-        );
-    }
 }

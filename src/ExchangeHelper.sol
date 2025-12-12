@@ -18,7 +18,7 @@ pragma solidity ^0.8.0;
 // Contract: ExchangeHelper.sol
 // Author: 0xsufi@noma.money
 // Copyright Noma Protocol 2024/2026
-
+import { TickMath } from "v3-core/libraries/TickMath.sol";
 import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {SignedMath} from "@openzeppelin/contracts/utils/math/SignedMath.sol";
 import {IERC20} from "openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -55,6 +55,7 @@ contract ExchangeHelper {
     error NoToken0Received();
     error InvalidAmount();
     error InvalidSwap();
+    error NotAuthorized();
 
     // TokenInfo state variable
     TokenInfo public tokenInfo;
@@ -301,6 +302,7 @@ contract ExchangeHelper {
             token0: IUniswapV3Pool(pool).token0(),
             token1: IUniswapV3Pool(pool).token1()
         });    
+
         IERC20(tokenInfo.token0).transferFrom(msg.sender, address(this), amount);
 
         // Swap Params

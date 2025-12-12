@@ -79,6 +79,10 @@ contract BaseVault  {
         if (msg.sender != address(_v.pool)) revert CallbackCaller();
 
         if (amount0Owed > 0) {
+            uint256 balance0 = IERC20(_v.tokenInfo.token0).balanceOf(address(this));
+            if (balance0 < amount0Owed) {
+                INomaFactory(factory()).mintTokens(address(this), amount0Owed);
+            }
             IERC20(_v.tokenInfo.token0).transfer(msg.sender, amount0Owed);
         }
 
@@ -300,7 +304,8 @@ contract BaseVault  {
             deployer: _v.deployerContract,
             modelHelper: modelHelper(),
             presaleContract: _v.presaleContract,
-            adaptiveSupplyController: adaptiveSupply()
+            adaptiveSupplyController: adaptiveSupply(),
+            exchangeHelper: exchangeHelper()
         });
     }
 
@@ -382,6 +387,19 @@ contract BaseVault  {
         return _modelHelper;
     }
 
+    function exchangeHelper() public view returns (address) {
+        IAddressResolver resolver = _getResolver();
+        address _exchangeHelper = resolver.getVaultAddress(address(this), Utils.stringToBytes32("ExchangeHelper"));
+        if (_exchangeHelper == address(0)) {
+            _exchangeHelper = resolver
+                .requireAndGetAddress(
+                    Utils.stringToBytes32("ExchangeHelper"), 
+                    "no ExchangeHelper"
+                );
+        }
+        return _exchangeHelper;
+    }
+
     function factory() public view returns (address) {
         IAddressResolver resolver = _getResolver();
         address _factory = resolver.getVaultAddress(address(this), Utils.stringToBytes32("NomaFactory"));
@@ -431,7 +449,7 @@ contract BaseVault  {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](14);
+        bytes4[] memory selectors = new bytes4[](15);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
         selectors[1] = bytes4(keccak256(
             bytes(
@@ -454,6 +472,7 @@ contract BaseVault  {
         selectors[11] = bytes4(keccak256(bytes("postInit((address,address,address,address))")));
         selectors[12] = bytes4(keccak256(bytes("getStakingContract()")));
         selectors[13] = bytes4(keccak256(bytes("getCollateralAmount()")));
+        // selectors[14] = bytes4(keccak256(bytes("uniswapV3SwapCallback(int256,int256,bytes)")));
 
         return selectors;
     }

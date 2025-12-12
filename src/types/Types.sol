@@ -65,6 +65,7 @@ struct ProtocolAddresses {
     address modelHelper;
     address presaleContract;
     address adaptiveSupplyController;
+    address exchangeHelper;
 }
 
 /// @notice General information about the vault.

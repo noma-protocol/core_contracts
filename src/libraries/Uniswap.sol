@@ -7,6 +7,7 @@ import {LiquidityType, LiquidityPosition, SwapParams} from "../types/Types.sol";
 import {Conversions} from "./Conversions.sol";
 import {TickMath} from "v3-core/libraries/TickMath.sol";
 import { IVault } from "../interfaces/IVault.sol";
+import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
 
 // Custom errors
 error ZeroLiquidty();
@@ -139,14 +140,15 @@ library Uniswap {
             revert SlippageExceeded();
         }
 
+        uint160 priceLimit = 
+            params.zeroForOne
+            ? (TickMath.MIN_SQRT_RATIO + 1)
+            : (TickMath.MAX_SQRT_RATIO - 1);
+
         // Wide price limit avoids early stop unless this is a true limit order.
         uint160 sqrtPriceLimitX96 = params.isLimitOrder
-            ? params.basePriceX96
-            : (
-                params.zeroForOne
-                    ? (TickMath.MIN_SQRT_RATIO + 1)
-                    : (TickMath.MAX_SQRT_RATIO - 1)
-            );
+            ? (params.basePriceX96 > 0 ? params.basePriceX96 :  priceLimit)
+            : priceLimit;
 
         try IUniswapV3Pool(params.poolAddress)
         .swap(
@@ -176,27 +178,31 @@ library Uniswap {
                 revert SlippageExceeded();
             }
 
-            // if (params.vaultAddress != address(0)) {
-
-            //     int24 tickSpacing = IUniswapV3Pool(params.poolAddress).tickSpacing();
-
-            //     LiquidityPosition[3] memory positions = 
-            //     IVault(params.vaultAddress)
-            //     .getPositions();
-
-            //     int24 MAX_SAFE_TICK = positions[2].upperTick - tickSpacing;
-
-            //     // ---- Price impact guard (upper tick only) ----
-            //     // If the final tick is above MAX_SAFE_TICK, revert the whole swap.
-            //     // Because of revert, pool state and price both roll back.
-            //     (, int24 tickAfter,,,,,) = IUniswapV3Pool(params.poolAddress).slot0();
-            //     if (tickAfter > MAX_SAFE_TICK) {
-            //         revert PriceImpactTooHigh();
-            //     }
-            // }
-
         } catch {
             revert InvalidSwap();
         }
     }
+
+    function computeAmount0ForAmount1(
+        LiquidityPosition memory position,
+        uint256 amount1
+    ) public view returns (uint256 amount0) {
+        
+        // Get Liquidity for amount1 
+        uint128 liquidity = LiquidityAmounts
+        .getLiquidityForAmount1(
+            TickMath.getSqrtRatioAtTick(position.lowerTick),
+            TickMath.getSqrtRatioAtTick(position.upperTick),
+            amount1
+        );
+
+        // Compute token0 for liquidity 
+        amount0 = LiquidityAmounts
+        .getAmount0ForLiquidity(
+            TickMath.getSqrtRatioAtTick(position.lowerTick),
+            TickMath.getSqrtRatioAtTick(position.upperTick),
+            liquidity
+        );
+    }
+
 }
