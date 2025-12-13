@@ -98,6 +98,8 @@ contract MockWMON {
 contract PrivilegedParametersTest is Test {
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address deployer = vm.envAddress("DEPLOYER");
+    bool isMainnet = vm.envOr("DEPLOY_FLAG_MAINNET", false);
+
     address user = address(0xBEEF);
     address multisig;
 
@@ -110,10 +112,16 @@ contract PrivilegedParametersTest is Test {
     TokenFactory tokenFactory;
     MockWMON mockWMON;
 
-    // Constants mainnet (used with fork) or mock (local testing)
-    address WMON;  // Will be set to mock in setUp
-    address private uniswapFactory = 0x204FAca1764B154221e35c0d20aBb3c525710498;
-    address private pancakeSwapFactory = 0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865;
+    // Mainnet addresses
+    address constant UNISWAP_FACTORY_MAINNET = 0x204FAca1764B154221e35c0d20aBb3c525710498;
+    address constant PANCAKESWAP_FACTORY_MAINNET = 0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865;
+    // Testnet addresses
+    address constant UNISWAP_FACTORY_TESTNET = 0x961235a9020B05C44DF1026D956D1F4D78014276;
+    address constant PANCAKESWAP_FACTORY_TESTNET = 0x3b7838D96Fc18AD1972aFa17574686be79C50040;
+    // Select based on environment (WMON will be set to mock in setUp)
+    address WMON;
+    address private uniswapFactory;
+    address private pancakeSwapFactory;
 
     ContractInfo[] private expectedAddressesInResolver;
 
@@ -121,6 +129,10 @@ contract PrivilegedParametersTest is Test {
     ProtocolParameters initialParams;
 
     function setUp() public {
+        // Set factory addresses based on mainnet/testnet flag
+        uniswapFactory = isMainnet ? UNISWAP_FACTORY_MAINNET : UNISWAP_FACTORY_TESTNET;
+        pancakeSwapFactory = isMainnet ? PANCAKESWAP_FACTORY_MAINNET : PANCAKESWAP_FACTORY_TESTNET;
+
         vm.prank(deployer);
 
         // Mock WMON - use mock for local testing

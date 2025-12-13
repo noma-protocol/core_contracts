@@ -101,6 +101,7 @@ contract MockWMON {
 contract NomaFactoryTest is Test {
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address deployer = vm.envAddress("DEPLOYER");
+    bool isMainnet = vm.envOr("DEPLOY_FLAG_MAINNET", false);
     address user = address(2);
 
     NomaFactory nomaFactory;
@@ -113,16 +114,29 @@ contract NomaFactoryTest is Test {
     SupplyRulesHarness supplyRulesHarness;
     MockWMON mockWMON;
 
-    // Constants mainnet
-    address WMON = 0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A;
+    // Mainnet addresses
+    address constant WMON_MAINNET = 0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A;
+    address constant UNISWAP_FACTORY_MAINNET = 0x204FAca1764B154221e35c0d20aBb3c525710498;
+    address constant PANCAKESWAP_FACTORY_MAINNET = 0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865;
+    // Testnet addresses
+    address constant WMON_TESTNET = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
+    address constant UNISWAP_FACTORY_TESTNET = 0x961235a9020B05C44DF1026D956D1F4D78014276;
+    address constant PANCAKESWAP_FACTORY_TESTNET = 0x3b7838D96Fc18AD1972aFa17574686be79C50040;
+    // Select based on environment
+    address WMON;
+    address uniswapFactory;
+    address pancakeSwapFactory;
     // For SupplyRules integration tests, we use a mock
     address testWMON;
-    address private uniswapFactory = 0x204FAca1764B154221e35c0d20aBb3c525710498;
-    address private pancakeSwapFactory = 0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865;
 
     ContractInfo[] private expectedAddressesInResolver;
 
     function setUp() public {
+        // Set addresses based on mainnet/testnet flag
+        WMON = isMainnet ? WMON_MAINNET : WMON_TESTNET;
+        uniswapFactory = isMainnet ? UNISWAP_FACTORY_MAINNET : UNISWAP_FACTORY_TESTNET;
+        pancakeSwapFactory = isMainnet ? PANCAKESWAP_FACTORY_MAINNET : PANCAKESWAP_FACTORY_TESTNET;
+
         vm.prank(deployer);
 
         // SupplyRules Harness for testing reverts

@@ -52,17 +52,26 @@ contract ShiftRewardsStakingTest is Test {
 
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address deployer = vm.envAddress("DEPLOYER");
+    bool isMainnet = vm.envOr("DEPLOY_FLAG_MAINNET", false);
 
     NomaToken private noma;
     ModelHelper private modelHelper;
 
-    address WMON = 0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A;
+    // Mainnet addresses
+    address constant WMON_MAINNET = 0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A;
+    // Testnet addresses
+    address constant WMON_TESTNET = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
+    // Select based on environment
+    address WMON;
     address payable idoManager;
     address nomaToken;
     address modelHelperContract;
     address vaultAddress;
 
     function setUp() public {
+        // Set WMON based on mainnet/testnet flag
+        WMON = isMainnet ? WMON_MAINNET : WMON_TESTNET;
+
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/deploy_helper/out/out.json");
         string memory json = vm.readFile(path);

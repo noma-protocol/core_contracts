@@ -46,9 +46,17 @@ contract Invariants is Test {
     // Get environment variables.
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address deployer = vm.envAddress("DEPLOYER");
+    bool isMainnet = vm.envOr("DEPLOY_FLAG_MAINNET", false);
 
-    address WMON = 0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A;
-    address private uniswapFactory = 0x204FAca1764B154221e35c0d20aBb3c525710498;
+    // Mainnet addresses
+    address constant WMON_MAINNET = 0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A;
+    address constant UNISWAP_FACTORY_MAINNET = 0x204FAca1764B154221e35c0d20aBb3c525710498;
+    // Testnet addresses
+    address constant WMON_TESTNET = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
+    address constant UNISWAP_FACTORY_TESTNET = 0x961235a9020B05C44DF1026D956D1F4D78014276;
+    // Select based on environment
+    address WMON;
+    address private uniswapFactory;
     // address quoterV2 = 0x74b06eFA24F39C60AA7F61BD516a3eaf39613D57; // PancakeSwap QuoterV2
     address quoterV2 = 0x661E93cca42AfacB172121EF892830cA3b70F08d; // Uniswap V3 QuoterV2
 
@@ -64,6 +72,10 @@ contract Invariants is Test {
     Staking staking;
 
     function setUp() public {
+        // Set addresses based on mainnet/testnet flag
+        WMON = isMainnet ? WMON_MAINNET : WMON_TESTNET;
+        uniswapFactory = isMainnet ? UNISWAP_FACTORY_MAINNET : UNISWAP_FACTORY_TESTNET;
+
         // Define the file path
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/deploy_helper/out/out.json");
