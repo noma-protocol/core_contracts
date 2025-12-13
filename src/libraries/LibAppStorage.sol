@@ -25,6 +25,7 @@ struct VaultStorage {
     // Setup state
     bool isLendingSetup;
     bool isStakingSetup;
+    bool isAdvancedConfEnabled;
 
     // Loans
     address[] loanAddresses;

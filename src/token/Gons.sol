@@ -3,14 +3,16 @@ pragma solidity ^0.8.23;
 
 import {SafeMath} from "../libraries/SafeMath.sol";
 import {ERC20, ERC20Permit} from "../abstract/ERC20Permit.sol";
+import {ERC20Recovery} from "../abstract/ERC20Recovery.sol";
 
 error AlreadyInitialized();
 error InvalidAmount();
 error InvalidAddress();
 error Unauthorized();
 error InvalidTransfer();
+error CannotRecoverSelfToken();
 
-contract GonsToken is ERC20Permit {
+contract GonsToken is ERC20Permit, ERC20Recovery {
     // PLEASE READ BEFORE CHANGING ANY ACCOUNTING OR MATH
     // Anytime there is division, there is a risk of numerical instability from rounding errors. In
     // order to minimize this risk, we adhere to the following guidelines:
@@ -162,7 +164,7 @@ contract GonsToken is ERC20Permit {
     function totalSupply()
         public
         view
-        override
+        override(ERC20)
         returns (uint256)
     {
         return _totalSupply;
@@ -175,7 +177,7 @@ contract GonsToken is ERC20Permit {
     function balanceOf(address who)
         public
         view
-        override
+        override(ERC20)
         returns (uint256)
     {
         return _gonBalances[who].div(_gonsPerFragment);
@@ -190,19 +192,19 @@ contract GonsToken is ERC20Permit {
     function allowance(address owner_, address spender)
         public
         view
-        override
+        override(ERC20)
         returns (uint256)
     {
         return _allowedFragments[owner_][spender];
     }
 
-    /** 
+    /**
      * @dev Transfer tokens to a specified address.
      *      ONLY allowed if sending _to_ or _from_ the stakingContract.
      */
     function transfer(address to, uint256 value)
         public
-        override
+        override(ERC20)
         returns (bool)
     {
         // neither side is stakingContract → forbidden
@@ -218,13 +220,13 @@ contract GonsToken is ERC20Permit {
         return true;
     }
 
-    /** 
+    /**
      * @dev Transfer tokens from one address to another.
      *      ONLY allowed if sending _to_ or _from_ the stakingContract.
      */
     function transferFrom(address from, address to, uint256 value)
         public
-        override
+        override(ERC20)
         returns (bool)
     {
         // neither side is stakingContract → forbidden
@@ -257,7 +259,7 @@ contract GonsToken is ERC20Permit {
      */
     function approve(address spender, uint256 value)
         public
-        override
+        override(ERC20)
         returns (bool)
     {
         _allowedFragments[msg.sender][spender] = value;
@@ -302,6 +304,12 @@ contract GonsToken is ERC20Permit {
         }
         emit Approval(msg.sender, spender, _allowedFragments[msg.sender][spender]);
         return true;
+    }
+
+    function recoverERC20(address token, address to) public onlyStakingContract {
+        if (token == address(this)) revert CannotRecoverSelfToken();
+
+        recoverAllERC20(token, to);
     }
 
     /**
@@ -349,4 +357,5 @@ contract GonsToken is ERC20Permit {
         }
         _;
     }
+    
 }

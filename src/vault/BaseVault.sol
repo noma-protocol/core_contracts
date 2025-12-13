@@ -148,7 +148,8 @@ contract BaseVault  {
         _v.tokenInfo.token1 = _v.pool.token1();
         _v.tickSpacing = _v.pool.tickSpacing();
         _v.initialized = false; 
-        _v.stakingEnabled = false; 
+        _v.stakingEnabled = false;
+        _v.isAdvancedConfEnabled = false; 
         _v.timeLastMinted = 0;
         _v.loanFee = uint8(_params.loanFee);
         _v.totalInterest = 0;

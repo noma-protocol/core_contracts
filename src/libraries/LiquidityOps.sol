@@ -165,7 +165,7 @@ library LiquidityOps {
         bool isOverLimit
     ) internal returns (LiquidityPosition[3] memory newPositions) {
 
-        address deployer = params.addresses.deployer;
+        // address deployer = params.addresses.deployer;
         uint256 skimRatio = IVault(params.addresses.vault).getProtocolParameters().skimRatio;
 
         uint256 newFloorPrice = Utils

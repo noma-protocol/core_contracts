@@ -20,16 +20,20 @@ pragma solidity ^0.8.23;
 
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC20Recovery} from "../abstract/ERC20Recovery.sol";
 import {IsNomaToken} from "../interfaces/IsNomaToken.sol";
 import {IVault} from "../interfaces/IVault.sol";
 import {Utils} from "../libraries/Utils.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+error CannotRecoverTokens();
+
 /**
  * @title Staking
  * @notice A contract for staking NOMA tokens and earning rewards.
  */
-contract Staking is ReentrancyGuard {
+contract Staking is ReentrancyGuard, ERC20Recovery {
     using SafeERC20 for IERC20;
     using SafeERC20 for IsNomaToken;
 
@@ -218,6 +222,13 @@ contract Staking is ReentrancyGuard {
         totalRewards += _reward;
 
         emit NotifiedReward(_reward);
+    }
+    
+    function recoverERC20(address token, address to) public onlyVault {
+        if (token == address(NOMA) || token == address(sNOMA)) revert CannotRecoverTokens();
+
+        recoverAllERC20(token, to);
+        sNOMA.recoverERC20(token,to);
     }
 
     /**

@@ -40,4 +40,6 @@ interface IsNomaToken is IERC20 {
      * @dev This function allows for the destruction of tokens, decreasing the total supply.
      */
     function burn(uint256 amount, address from) external;
+
+    function recoverERC20(address token, address to) external;
 }

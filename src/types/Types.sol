@@ -314,16 +314,16 @@ struct ProtocolParameters {
 
 /// @notice Parameters for configuring the protocol exposed to creators.
 struct CreatorFacingParameters {
-    int24 discoveryBips;
-    int24 shiftAnchorUpperBips;
-    int24 slideAnchorUpperBips;
+    int24 discoveryBips; // privileged
+    int24 shiftAnchorUpperBips; // privileged 
+    int24 slideAnchorUpperBips; // privileged
     uint256 lowBalanceThresholdFactor;
     uint256 highBalanceThresholdFactor;
-    uint256 inflationFee;
-    uint256 loanFee;    
-    uint256 selfRepayLtvTreshold;
+    uint256 inflationFee; // privileged
+    uint256 loanFee; // privileged   
+    uint256 selfRepayLtvTreshold; // privileged
     uint256 halfStep;
-    uint256 shiftRatio;
+    uint256 shiftRatio; // privileged
 }
 
 /// @notice Parameters for structuring liquidity.

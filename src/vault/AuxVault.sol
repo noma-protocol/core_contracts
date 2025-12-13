@@ -34,6 +34,7 @@ interface INomaFactory {
 
 interface IStakingRewards {
     function notifyRewardAmount(uint256 reward) external;
+    function recoverERC20(address token, address to) external;
 }
 
 interface ILendingVault {
@@ -213,26 +214,43 @@ contract AuxVault {
     * that are explicitly creator-facing, leaving the rest unchanged.
     */
     function setProtocolParametersCreator(
-        CreatorFacingParameters memory protocolParameters
+        CreatorFacingParameters memory cp
     ) public onlyManager {
         ProtocolParameters storage p = _v.protocolParameters;
 
-        // Copy over only the creator-facing fields
-        p.discoveryBips              = protocolParameters.discoveryBips;
-        p.shiftAnchorUpperBips       = protocolParameters.shiftAnchorUpperBips;
-        p.slideAnchorUpperBips       = protocolParameters.slideAnchorUpperBips;
-        p.lowBalanceThresholdFactor  = protocolParameters.lowBalanceThresholdFactor;
-        p.highBalanceThresholdFactor = protocolParameters.highBalanceThresholdFactor;
-        p.inflationFee               = protocolParameters.inflationFee;
-        p.loanFee                    = protocolParameters.loanFee;
-        p.selfRepayLtvTreshold       = protocolParameters.selfRepayLtvTreshold;
-        p.halfStep                   = protocolParameters.halfStep;
+        // ✅ always allowed
+        p.lowBalanceThresholdFactor  = cp.lowBalanceThresholdFactor;
+        p.highBalanceThresholdFactor = cp.highBalanceThresholdFactor;
+        p.halfStep                   = cp.halfStep;
+
+        // 🔒 privileged: only if advanced config is enabled
+        if (_v.isAdvancedConfEnabled) {
+            p.discoveryBips        = cp.discoveryBips;
+            p.shiftAnchorUpperBips = cp.shiftAnchorUpperBips;
+            p.slideAnchorUpperBips = cp.slideAnchorUpperBips;
+
+            p.inflationFee         = cp.inflationFee;
+            p.loanFee              = cp.loanFee;
+            p.selfRepayLtvTreshold = cp.selfRepayLtvTreshold;
+
+            p.shiftRatio           = cp.shiftRatio;
+        }
     }
+
     
     function setManager(address manager) public onlyManagerOrMultiSig {
         _v.manager = manager;
     }
 
+    function setAdvancedConf(bool flag) public onlyMultiSig {
+        _v.isAdvancedConfEnabled = flag;
+    }
+    
+    function recoverERC20(address token, address to) public onlyMultiSig {
+        if (to != INomaFactory(_v.factory).teamMultiSig()) revert NotAuthorized();
+
+        IStakingRewards(_v.stakingContract).recoverERC20(token, to);
+    }
 
     function getReferralEntity(address who) public view returns (ReferralEntity memory) {
         // Get referral code directly as bytes8
@@ -436,7 +454,7 @@ contract AuxVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](18);
+        bytes4[] memory selectors = new bytes4[](21);
         selectors[0] = bytes4(keccak256(bytes("teamMultiSig()")));
         selectors[1] = bytes4(keccak256(bytes("getTimeSinceLastMint()")));
         selectors[2] = bytes4(keccak256(bytes("getAccumulatedFees()")));
@@ -459,7 +477,9 @@ contract AuxVault {
         selectors[15] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));
         selectors[16] = bytes4(keccak256(bytes("fixInbalance(address,uint160,uint256)")));
         selectors[17] = bytes4(keccak256(bytes("uniswapV3SwapCallback(int256,int256,bytes)")));
-        selectors[17] = bytes4(keccak256(bytes("pancakeV3SwapCallback(int256,int256,bytes)")));
+        selectors[18] = bytes4(keccak256(bytes("pancakeV3SwapCallback(int256,int256,bytes)")));
+        selectors[19] = bytes4(keccak256(bytes("recoverERC20(address,address)")));
+        selectors[20] = bytes4(keccak256(bytes("setAdvancedConf(bool)")));
 
         return selectors; 
     }
