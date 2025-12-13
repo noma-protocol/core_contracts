@@ -98,6 +98,14 @@ contract AuxVault {
         _handleV3SwapCallback(amount0Delta, amount1Delta);
     }
 
+    function pancakeV3SwapCallback(
+        int256 amount0Delta,
+        int256 amount1Delta,
+        bytes calldata data
+    ) external {
+        _handleV3SwapCallback(amount0Delta, amount1Delta);
+    }
+
     /**
      * @notice Mints new tokens and distributes them to the specified address.
      * @param to The address to receive the minted tokens.
@@ -451,6 +459,7 @@ contract AuxVault {
         selectors[15] = bytes4(keccak256(bytes("setFees(uint256,uint256)")));
         selectors[16] = bytes4(keccak256(bytes("fixInbalance(address,uint160,uint256)")));
         selectors[17] = bytes4(keccak256(bytes("uniswapV3SwapCallback(int256,int256,bytes)")));
+        selectors[17] = bytes4(keccak256(bytes("pancakeV3SwapCallback(int256,int256,bytes)")));
 
         return selectors; 
     }
