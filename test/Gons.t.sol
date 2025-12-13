@@ -7,8 +7,7 @@ contract TestGonsToken is Test {
     TestGons gons;
 
     function setUp() public {
-        // gons = new TestGons(address(this));
-        gons = new TestGons();
+        gons = new TestGons(1_000_000e18);
         // gons.setIndex(1);
         gons.initialize(address(this));
 
@@ -18,7 +17,7 @@ contract TestGonsToken is Test {
     }
 
     function testRebase() public {
-        uint256 initialSupply = 3.025 * 10**6 * 10**18;
+        uint256 initialSupply = 10 * 10**18 * 10**18;
         uint256 balance = gons.balanceOf(address(this));    
 
         assertEq(balance, initialSupply);

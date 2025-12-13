@@ -27,7 +27,8 @@ contract TestQuoter is Test {
 
     address payable idoManager;
     address vaultAddress;
-    address quoterV2 = 0x1b4E313fEF15630AF3e6F2dE550Dbf4cC9D3081d;
+    address quoterV2 = 0x661E93cca42AfacB172121EF892830cA3b70F08d; // Uniswap V3 QuoterV2
+    // address quoterV2 = 0xB048Bbc1Ee6b733FFfCFb9e9CeF7375518e25997; // PancakeSwap QuoterV2
     IUniswapV3Pool pool;
 
     function setUp() public {
@@ -37,17 +38,11 @@ contract TestQuoter is Test {
 
         // Read the JSON file
         string memory json = vm.readFile(path);
-
         string memory networkId = "1337";
-        // Parse the data for network ID `1337`
-        bytes memory data = vm.parseJson(json, string.concat(string("."), networkId));
 
-        // Decode the data into the ContractAddresses struct
-        ContractAddressesJson memory addresses = abi.decode(data, (ContractAddressesJson));
-        
-        // Extract addresses from JSON
-        idoManager = payable(addresses.IDOHelper);
-        
+        // Parse individual fields to avoid struct ordering issues
+        idoManager = payable(vm.parseJsonAddress(json, string.concat(".", networkId, ".IDOHelper")));
+
         IDOManager managerContract = IDOManager(idoManager);
         require(address(managerContract) != address(0), "Manager contract address is zero");
         
@@ -104,12 +99,15 @@ contract TestQuoter is Test {
     /**
      * @notice Uniswap v3 callback function, called back on pool.swap
      */
-    function uniswapV3SwapCallback(
-        int256 amount0Delta, 
-        int256 amount1Delta, 
-        bytes calldata data
-    ) external {
-        require(msg.sender == address(pool), "Callback caller not pool");
+    function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data )
+        external
+    {
+        require(msg.sender == address(pool), "callback caller");
 
     }
+
+    receive() external payable {
+
+    }
+
 }

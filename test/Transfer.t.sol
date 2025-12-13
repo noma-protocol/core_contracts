@@ -25,7 +25,7 @@ contract TestRebaseTokenTransfers is Test {
         mockNomaToken = new TestMockNomaToken();
         mockNomaToken.initialize(address(this), 100_000_000e18, 200_000_000e18, "TEST", "TEST", address(0));
 
-        rebaseToken = new TestGons();
+        rebaseToken = new TestGons(100_000_000e18);
         staking = new Staking(address(mockNomaToken), address(rebaseToken), address(this));        
         mockNomaToken.mintTest(address(staking), INITIAL_SUPPLY);
         // staking.setup(address(this), address(mockNomaToken), address(rebaseToken));

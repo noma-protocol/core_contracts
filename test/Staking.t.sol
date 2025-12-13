@@ -27,7 +27,7 @@ contract TestStaking is Test {
         NOMA = new TestMockNomaToken();
         NOMA.initialize(address(this), 1_000_000e18, 200_000_000e18, "TEST", "TEST", address(0)); // Large initial supply
 
-        sNOMA = new GonsToken("Noma Staked Token", "sNOMA");
+        sNOMA = new GonsToken("Noma Staked Token", "sNOMA", 1_000_000e18);
         vm.prank(deployer);
         staking = new Staking(address(NOMA), address(sNOMA), address(this));
 

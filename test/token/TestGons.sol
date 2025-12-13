@@ -7,12 +7,12 @@ contract TestGons is ERC20Permit {
     using SafeMath for uint256;
 
     uint256 private constant MAX_UINT256 = type(uint256).max;
-    uint256 private constant INITIAL_FRAGMENTS_SUPPLY = 3.025 * 10 **6 * 10**18;
-    uint256 private constant TOTAL_GONS = MAX_UINT256 - (MAX_UINT256 % INITIAL_FRAGMENTS_SUPPLY);
+    uint256 private constant GONS_DIVISOR = 10**37;
+    uint256 private constant TOTAL_GONS = MAX_UINT256 - (MAX_UINT256 % GONS_DIVISOR);
     uint256 private constant MAX_SUPPLY = ~uint128(0);
-    
+
     uint256 internal INDEX; // Index Gons - tracks rebase growth
-    
+
     address private someContract;
     uint256 private _gonsPerFragment;
 
@@ -22,10 +22,14 @@ contract TestGons is ERC20Permit {
 
     event LogRebase(uint256 indexed epoch, uint256 rebase, uint256 scalingFactor);
 
-    constructor () ERC20("Staked Gons", "sGons", 18)  ERC20Permit("Gons") {
-        _totalSupply = INITIAL_FRAGMENTS_SUPPLY;
+    constructor (uint256 _initialSupply) ERC20("Staked Gons", "sGons", 18)  ERC20Permit("Gons") {
+        uint256 remainder = _initialSupply % GONS_DIVISOR;
+        uint256 adjustedSupply = remainder == 0 ? _initialSupply : _initialSupply + (GONS_DIVISOR - remainder);
+        if (adjustedSupply < GONS_DIVISOR) {
+            adjustedSupply = GONS_DIVISOR;
+        }
+        _totalSupply = adjustedSupply;
         _gonsPerFragment = TOTAL_GONS.div(_totalSupply);
-
     }
 
     function setIndex(uint256 _index) external {

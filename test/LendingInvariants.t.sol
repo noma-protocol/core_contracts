@@ -25,7 +25,7 @@ interface IWETH {
 
 interface IDOManager {
     function vault() external view returns (BaseVault);
-    function buyTokens(uint256 price, uint256 amount, address receiver) external;
+    function buyTokens(uint256 price, uint256 amount, uint256 min, address receiver) external;
     function sellTokens(uint256 price, uint256 amount, address receiver) external;
     function modelHelper() external view returns (address);
 }
@@ -53,7 +53,7 @@ contract LendingInvariants is Test {
     NomaToken private noma;
     ModelHelper private modelHelper;
 
-    address WMON = 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701;
+    address WMON = 0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A;
     address payable idoManager;
     address nomaToken;
     address modelHelperContract;
@@ -66,22 +66,16 @@ contract LendingInvariants is Test {
 
         // Read the JSON file
         string memory json = vm.readFile(path);
-
         string memory networkId = "1337";
-        // Parse the data for network ID `1337`
-        bytes memory data = vm.parseJson(json, string.concat(string("."), networkId));
 
-        // Decode the data into the ContractAddresses struct
-        ContractAddressesJson memory addresses = abi.decode(data, (ContractAddressesJson));
-        
+        // Parse individual fields to avoid struct ordering issues
+        idoManager = payable(vm.parseJsonAddress(json, string.concat(".", networkId, ".IDOHelper")));
+        nomaToken = vm.parseJsonAddress(json, string.concat(".", networkId, ".Proxy"));
+        modelHelperContract = vm.parseJsonAddress(json, string.concat(".", networkId, ".ModelHelper"));
+
         // Log parsed addresses for verification
-        console2.log("Model Helper Address:", addresses.ModelHelper);
+        console2.log("Model Helper Address:", modelHelperContract);
 
-        // Extract addresses from JSON
-        idoManager = payable(addresses.IDOHelper);
-        nomaToken = addresses.Proxy;
-        modelHelperContract = addresses.ModelHelper;
-        
         IDOManager managerContract = IDOManager(idoManager);
         require(address(managerContract) != address(0), "Manager contract address is zero");
 
@@ -205,7 +199,7 @@ contract LendingInvariants is Test {
         IWETH(WMON).transfer(idoManager, tradeAmount * totalTrades);
 
         uint256 tokenBalanceBefore = noma.balanceOf(address(this));
-        uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault));
+        uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault), false);
         console.log("Circulating supply is: ", circulatingSupplyBefore);
 
         for (uint i = 0; i < totalTrades; i++) {
@@ -215,10 +209,10 @@ contract LendingInvariants is Test {
             if (i >= 4) {
                 spotPrice =  purchasePrice;
             }
-            managerContract.buyTokens(spotPrice, tradeAmount, deployer);
+            managerContract.buyTokens(spotPrice, tradeAmount, 0, deployer);
         }
         
-        uint256 circulatingSupplyAfter = modelHelper.getCirculatingSupply(pool, address(vault));
+        uint256 circulatingSupplyAfter = modelHelper.getCirculatingSupply(pool, address(vault), false);
         console.log("Circulating supply after purchase is: ", circulatingSupplyAfter);
 
         uint256 nextFloorPrice = getNextFloorPrice(pool, address(vault));
@@ -236,29 +230,27 @@ contract LendingInvariants is Test {
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
         uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
-        uint256 purchasePrice = spotPrice + (spotPrice * 1 / 100);
+        uint256 purchasePrice = spotPrice + (spotPrice * 25 / 100);
 
-        uint16 totalTrades = 500;
-        uint256 tradeAmount = 10 ether;
+        uint16 totalTrades = 10;
+        uint256 tradeAmount = 20000 ether;
 
         IWETH(WMON).deposit{ value: (tradeAmount * totalTrades)}();
         IWETH(WMON).transfer(idoManager, tradeAmount * totalTrades);
 
         uint256 tokenBalanceBefore = noma.balanceOf(address(this));
-        uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault));
+        uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault), false);
         console.log("Circulating supply before purchase is: ", circulatingSupplyBefore);
 
         for (uint i = 0; i < totalTrades; i++) {
             (sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
             spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
-            purchasePrice = spotPrice + (spotPrice * i / 100);
-            if (i >= 4) {
-                spotPrice =  purchasePrice;
-            }
-            managerContract.buyTokens(spotPrice, tradeAmount, deployer);
+            purchasePrice = spotPrice + (spotPrice * 25 / 100);
+            spotPrice = purchasePrice;
+            managerContract.buyTokens(spotPrice, tradeAmount, 0, address(this));
         }
         
-        uint256 circulatingSupplyAfter = modelHelper.getCirculatingSupply(pool, address(vault));
+        uint256 circulatingSupplyAfter = modelHelper.getCirculatingSupply(pool, address(vault), false);
         console.log("Circulating supply after purchase is: ", circulatingSupplyAfter);
 
         uint256 nextFloorPrice = getNextFloorPrice(pool, address(vault));
@@ -287,7 +279,7 @@ contract LendingInvariants is Test {
 
     function getNextFloorPrice(address pool, address vault) public view returns (uint256) {
         LiquidityPosition[3] memory positions = IVault(vault).getPositions();
-        uint256 circulatingSupply = modelHelper.getCirculatingSupply(pool, vault);
+        uint256 circulatingSupply = modelHelper.getCirculatingSupply(pool, vault, false);
         uint256 anchorCapacity = modelHelper.getPositionCapacity(pool, vault, positions[1], LiquidityType.Anchor);
         (,,,uint256 floorBalance) = Underlying.getUnderlyingBalances(pool, vault, positions[0]);
 
@@ -305,7 +297,7 @@ contract LendingInvariants is Test {
         IVault vault = IVault(address(managerContract.vault()));
         address pool = address(vault.pool());
 
-        uint256 circulatingSupply = modelHelper.getCirculatingSupply(pool, address(vault));
+        uint256 circulatingSupply = modelHelper.getCirculatingSupply(pool, address(vault), false);
         console.log("Circulating supply is: ", circulatingSupply);
 
         uint256 intrinsicMinimumValue = modelHelper.getIntrinsicMinimumValue(address(vault));

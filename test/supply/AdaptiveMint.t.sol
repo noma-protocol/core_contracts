@@ -37,22 +37,16 @@ contract AdaptiveMintTest is Test {
 
         // Read the JSON file
         string memory json = vm.readFile(path);
-
         string memory networkId = "1337";
-        // Parse the data for network ID `1337`
-        bytes memory data = vm.parseJson(json, string.concat(string("."), networkId));
 
-        // Decode the data into the ContractAddresses struct
-        ContractAddressesJson memory addresses = abi.decode(data, (ContractAddressesJson));
-        
+        // Parse individual fields to avoid struct ordering issues
+        idoManager = payable(vm.parseJsonAddress(json, string.concat(".", networkId, ".IDOHelper")));
+        nomaToken = vm.parseJsonAddress(json, string.concat(".", networkId, ".Proxy"));
+        modelHelperContract = vm.parseJsonAddress(json, string.concat(".", networkId, ".ModelHelper"));
+
         // Log parsed addresses for verification
-        console2.log("Model Helper Address:", addresses.ModelHelper);
+        console2.log("Model Helper Address:", modelHelperContract);
 
-        // Extract addresses from JSON
-        idoManager = payable(addresses.IDOHelper);
-        nomaToken = addresses.Proxy;
-        modelHelperContract = addresses.ModelHelper;
-        
         IDOManager managerContract = IDOManager(idoManager);
         require(address(managerContract) != address(0), "Manager contract address is zero");
         

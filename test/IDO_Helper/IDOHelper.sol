@@ -45,10 +45,11 @@ contract IDOHelper {
     }
 
     // Test function
-    function buyTokens(uint256 price, uint256 amount, address receiver) public {
+    function buyTokens(uint256 price, uint256 amount, uint256 minReceived, address receiver) public {
         uint8 decimals = ERC20(tokenInfo.token0).decimals();
         // Swap Params
         SwapParams memory swapParams = SwapParams({
+            vaultAddress: address(0),
             poolAddress: address(pool),
             receiver: receiver,
             token0: tokenInfo.token0,
@@ -59,10 +60,10 @@ contract IDOHelper {
                 decimals
             ),
             amountToSwap: amount,
-            slippageTolerance: 10,
+            slippageTolerance: 100,
             zeroForOne: false,
-            isLimitOrder: false,
-            minAmountOut: 0
+            isLimitOrder: true,
+            minAmountOut: minReceived
         });
         
         Uniswap.swap(
@@ -73,6 +74,7 @@ contract IDOHelper {
     function sellTokens(uint256 price, uint256 amount, address receiver) public {
         uint8 decimals = ERC20(tokenInfo.token0).decimals();
         SwapParams memory swapParams = SwapParams({
+            vaultAddress: address(0),
             poolAddress: address(pool),
             receiver: receiver,
             token0: tokenInfo.token0,
@@ -83,9 +85,9 @@ contract IDOHelper {
                 decimals
             ),
             amountToSwap: amount,
-            slippageTolerance: 10,
+            slippageTolerance: 100,
             zeroForOne: true,
-            isLimitOrder: false,
+            isLimitOrder: true,
             minAmountOut: 0
         });
 
