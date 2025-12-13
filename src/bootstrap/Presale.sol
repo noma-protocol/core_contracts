@@ -88,8 +88,11 @@
     /// @notice Tracks number of participants per referral code.
     mapping(bytes8 => uint256) public referralParticipants;
 
-    /// @notice Referral percentage 
+    /// @notice Referral percentage
     uint256 public referralPercentage;
+
+    /// @notice Total ETH reserved for referral payouts
+    uint256 public totalReferralReserved;
 
     /// @notice Tracks all contributors.
     address[] public contributors;
@@ -285,6 +288,7 @@
         if (referralCode != bytes8(0)) {
             uint256 referralFee = (msg.value * referralPercentage) / 100;
             referralEarnings[referralCode] += referralFee;
+            totalReferralReserved += referralFee;
             referralParticipants[referralCode] += 1;
         }
 
@@ -402,6 +406,7 @@
         if (amount == 0) revert NothingToClaim();
 
         referralEarnings[code] = 0;
+        totalReferralReserved -= amount;
         payable(msg.sender).transfer(amount);
         emit ReferralPaid(code, amount);
     }
@@ -441,15 +446,19 @@
         if (!finalized) revert NotFinalized();
 
         uint256 balance = address(this).balance;
+        // Reserve ETH for referral payouts
+        if (balance <= totalReferralReserved) return;
+        uint256 withdrawable = balance - totalReferralReserved;
+
         // calculate fee
-        uint256 fee = (balance * teamFeePct) / 100;
+        uint256 fee = (withdrawable * teamFeePct) / 100;
         address teamMultiSig = IFactory(factory).teamMultiSig();
 
         if (teamMultiSig != address(0)) {
             // transfer fee to team multisig
             payable(teamMultiSig).transfer(fee);
         }
-        payable(owner()).transfer(balance - fee);
+        payable(owner()).transfer(withdrawable - fee);
     }
 
     /**
