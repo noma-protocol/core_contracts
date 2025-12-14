@@ -10,6 +10,7 @@ import {ReferralEntity} from "../../types/Types.sol";
 interface IVault {
     function getReferralEntity(address who) external view returns (ReferralEntity memory);
     function setReferralEntity(bytes8 code, uint256 amount) external;
+    function consumeReferral(bytes8 code, uint256 amount) external;
 }
 
 error Unauthorized();
@@ -64,6 +65,8 @@ contract vToken is ERC20 {
     /* ----------------------- Mint from referral balance ---------------------- */
 
     /// @notice Mint vTokens against your referral balance.
+    /// @dev IMPORTANT: Only call consumeReferral, NOT setReferralEntity!
+    ///      setReferralEntity ADDS to balance, which would allow infinite minting.
     /// @param to Recipient (or zero to mint to msg.sender)
     /// @param amount Amount to mint. If zero, mints ALL available.
     function mint(address to, uint256 amount) external {
@@ -81,8 +84,10 @@ contract vToken is ERC20 {
 
         _mint(mintRecipient, toMint);
 
-        uint256 remaining = available - toMint;
-        IVault(vault).setReferralEntity(referralEntity.code, remaining);
+        // [CRITICAL FIX] Only call consumeReferral - do NOT call setReferralEntity
+        // setReferralEntity ADDS to the balance, which would negate the consumption
+        // and allow infinite minting
+        IVault(vault).consumeReferral(referralEntity.code, toMint);
     }
 
     /* ------------------------------ Redemption ------------------------------ */

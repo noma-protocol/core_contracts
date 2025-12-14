@@ -11,6 +11,7 @@ error InvalidAddress();
 error Unauthorized();
 error InvalidTransfer();
 error CannotRecoverSelfToken();
+error MinimumSupplyReached();
 
 contract GonsToken is ERC20Permit, ERC20Recovery {
     // PLEASE READ BEFORE CHANGING ANY ACCOUNTING OR MATH
@@ -50,6 +51,9 @@ contract GonsToken is ERC20Permit, ERC20Recovery {
 
     // MAX_SUPPLY = maximum integer < (sqrt(4*TOTAL_GONS + 1) - 1) / 2
     uint256 private constant MAX_SUPPLY = ~uint128(0);  // (2^128) - 1
+
+    // [M-04 FIX] Minimum supply to prevent division by zero in _gonsPerFragment calculation
+    uint256 private constant MIN_SUPPLY = 1e18; // Minimum 1 token (with 18 decimals)
 
     uint256 private _gonsPerFragment;
     uint256 public immutable initialFragmentsSupply;
@@ -151,9 +155,13 @@ contract GonsToken is ERC20Permit, ERC20Recovery {
     }
 
     function burn(uint256 value, address from) external onlyStakingContract returns (bool) {
+        // [M-04 FIX] Prevent burning below minimum supply to avoid division by zero
+        if (_totalSupply.sub(value) < MIN_SUPPLY) {
+            revert MinimumSupplyReached();
+        }
         _gonBalances[from] = 0;
         _totalSupply = _totalSupply.sub(value);
-        _gonsPerFragment = TOTAL_GONS.div(_totalSupply);        
+        _gonsPerFragment = TOTAL_GONS.div(_totalSupply);
         _burnAll(from);
         return true;
     }

@@ -36,6 +36,7 @@ import {
 
 import {Utils} from "../libraries/Utils.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 interface INomaFactory {
     function deferredDeploy(address deployer) external;
@@ -70,6 +71,8 @@ error NotInitialized();
  * @dev This contract handles initialization, fee management, and interactions with the Uniswap V3 pool.
  */
 contract BaseVault  {
+    using SafeERC20 for IERC20;
+
     VaultStorage internal _v;
     
     function _handleV3MintCallback(
@@ -83,11 +86,13 @@ contract BaseVault  {
             if (balance0 < amount0Owed) {
                 INomaFactory(factory()).mintTokens(address(this), amount0Owed);
             }
-            IERC20(_v.tokenInfo.token0).transfer(msg.sender, amount0Owed);
+            // [C-02 FIX] Use SafeERC20
+            IERC20(_v.tokenInfo.token0).safeTransfer(msg.sender, amount0Owed);
         }
 
         if (amount1Owed > 0) {
-            IERC20(_v.tokenInfo.token1).transfer(msg.sender, amount1Owed);
+            // [C-02 FIX] Use SafeERC20
+            IERC20(_v.tokenInfo.token1).safeTransfer(msg.sender, amount1Owed);
         }
     }
 

@@ -87,6 +87,8 @@ contract NomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSU
      * @param _amount The amount of tokens to mint.
      */
     function mint(address _recipient, uint256 _amount) public onlyFactory {
+        // [M-02 FIX] Enforce max supply cap
+        if (totalSupply() + _amount > maxTotalSupply) revert MaxSupplyReached();
         _mint(_recipient, _amount);
     }
     
@@ -156,7 +158,8 @@ contract NomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSU
      * @notice Renounces ownership of the contract.
      */
     function renounceOwnership() public override onlyOwner {
-        renounceOwnership();
+        // [C-01 FIX] Call parent implementation instead of infinite recursive call
+        super.renounceOwnership();
     }
 
     /**

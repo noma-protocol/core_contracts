@@ -70,9 +70,10 @@ contract LendingVault {
         uint256 borrowAmount,
         uint256 duration
     ) internal view returns (uint256 fees) {
-        uint256 SECONDS_IN_DAY = 86400;
-        uint256 daysElapsed = duration / SECONDS_IN_DAY;
-        fees = (borrowAmount *_v.loanFee * daysElapsed) / 100_000;
+        // [H-05 FIX] Avoid precision loss by multiplying before dividing
+        // Previous code lost precision for loans < 1 day (daysElapsed = 0)
+        uint256 SECONDS_IN_DAY = 86_400;
+        fees = (borrowAmount * _v.loanFee * duration) / (SECONDS_IN_DAY * 100_000);
     }
     /**
      * @notice Allows a user to borrow tokens from the vault's floor liquidity.
@@ -97,7 +98,6 @@ contract LendingVault {
         SafeERC20.safeTransfer(IERC20(address(_v.pool.token0())), _v.tokenRepo, collateralAmount);
         SafeERC20.safeTransfer(IERC20(address(_v.pool.token1())), who, borrowAmount - loanFees);
 
-        uint256 totalLoans = _v.totalLoansPerUser[who];
         LoanPosition memory loanPosition = LoanPosition({
             borrowAmount: borrowAmount,
             collateralAmount: collateralAmount,
@@ -108,7 +108,8 @@ contract LendingVault {
 
         _v.collateralAmount += collateralAmount;
         _v.loanPositions[who] = loanPosition;
-        _v.totalLoansPerUser[who] = totalLoans++;
+        // [H-01 FIX] Use pre-increment to actually store incremented value
+        _v.totalLoansPerUser[who] = ++_v.totalLoansPerUser[who];
         _v.loanAddresses.push(who);
         _v.totalInterest += loanFees;
         

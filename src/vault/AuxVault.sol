@@ -81,13 +81,15 @@ contract AuxVault {
             if (balance0 <  uint256(amount0Delta)) {
                 _mintTokens(address(this),  uint256(amount0Delta));
             }
-            IERC20(_v.tokenInfo.token0).transfer(msg.sender, uint256(amount0Delta));
+            // [C-02 FIX] Use SafeERC20
+            IERC20(_v.tokenInfo.token0).safeTransfer(msg.sender, uint256(amount0Delta));
         }
 
         if (amount1Delta > 0) {
             uint256 bal1 = IERC20(_v.tokenInfo.token1).balanceOf(address(this));
             if (bal1 < uint256(amount1Delta)) revert InsufficientBalance();
-            IERC20(_v.tokenInfo.token1).transfer(msg.sender, uint256(amount1Delta));
+            // [C-02 FIX] Use SafeERC20
+            IERC20(_v.tokenInfo.token1).safeTransfer(msg.sender, uint256(amount1Delta));
         }
     }
 
@@ -360,6 +362,15 @@ contract AuxVault {
         _v.protocolParameters = protocolParameters;
     }
 
+    function consumeReferral(bytes8 code, uint256 amount) external {
+        if (msg.sender != vToken()) revert NotAuthorized();
+
+        uint256 bal = _v.referrals[code].totalReferred;
+        if (amount > bal) amount = bal; // or revert
+        unchecked {
+            _v.referrals[code].totalReferred = bal - amount;
+        }
+    }
 
     /**
      * @notice Retrieves the address of the exchange helper.
@@ -454,7 +465,7 @@ contract AuxVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](21);
+        bytes4[] memory selectors = new bytes4[](22);
         selectors[0] = bytes4(keccak256(bytes("teamMultiSig()")));
         selectors[1] = bytes4(keccak256(bytes("getTimeSinceLastMint()")));
         selectors[2] = bytes4(keccak256(bytes("getAccumulatedFees()")));
@@ -480,6 +491,7 @@ contract AuxVault {
         selectors[18] = bytes4(keccak256(bytes("pancakeV3SwapCallback(int256,int256,bytes)")));
         selectors[19] = bytes4(keccak256(bytes("recoverERC20(address,address)")));
         selectors[20] = bytes4(keccak256(bytes("setAdvancedConf(bool)")));
+        selectors[21] = bytes4(keccak256(bytes("consumeReferral(bytes8,uint256)")));
 
         return selectors; 
     }

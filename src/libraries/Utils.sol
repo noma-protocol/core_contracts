@@ -270,51 +270,35 @@ library Utils {
     // MISC FUNCTIONS
 
     /**
-    * @notice Generates an 8‐character hex referral code from an address
-    * @param user Address to generate a referral code for.
-    * @return A bytes32 where the first 8 bytes are ASCII hex chars (0–9, a–f) and the remaining 24 bytes are zero.
-    */
-    function generateReferralCode(address user) public pure returns (bytes32) {
-        bytes16 _HEX_SYMBOLS = "0123456789abcdef";
-
-        // 1) Hash the user address
-        bytes32 hash = keccak256(abi.encodePacked(user));
-
-        // 2) Allocate an 8‐byte buffer for ASCII hex (8 chars)
-        bytes memory buf = new bytes(8);
-
-        // 3) Convert first 4 bytes of hash into 8 hex digits
-        for (uint256 i = 0; i < 4; i++) {
-            uint8 b = uint8(hash[i]);              // extract one byte
-            buf[2 * i]     = _HEX_SYMBOLS[b >> 4]; // high nibble → ASCII
-            buf[2 * i + 1] = _HEX_SYMBOLS[b & 0x0f]; // low nibble → ASCII
-        }
-
-        // 4) Load those 8 bytes into a bytes32 (left‐aligned in the 32‐byte word)
-        bytes32 code;
-        assembly {
-            code := mload(add(buf, 32))
-        }
-
-        return code;
-    }
-    /**
-     * @notice Generates an 8‐character hex referral code string from an address
+     * @notice Generates a referral code from an address
+     * @dev [MEDIUM FIX] Uses 8 bytes (64 bits) to prevent birthday attacks.
+     *      Previous 4-byte version was vulnerable to collisions with ~65k attempts.
+     *      With 8 bytes, ~2^32 (~4 billion) attempts needed for 50% collision probability.
      * @param user Address to generate a referral code for.
-     * @return The referral code as a string.
+     * @return code The first 8 bytes of the keccak256 hash (64 bits)
+     */
+    function generateReferralCode(address user) public pure returns (bytes8) {
+        return bytes8(keccak256(abi.encodePacked(user)));
+    }
+
+    /**
+     * @notice Generates a 16-character hex referral code string from an address
+     * @param user Address to generate a referral code for.
+     * @return The referral code as a hex string.
      */
     function getCodeString(address user) external pure returns (string memory) {
-        bytes8 code = bytes8(keccak256(abi.encodePacked(user)));
+        bytes8 code = generateReferralCode(user);
         return toHexString(code);
     }
 
     /**
-     * @notice Generates a bytes8 referral code from an address
+     * @notice Generates a bytes8 referral code from an address (64-bit)
+     * @dev Uses 8 bytes for collision resistance
      * @param user Address to generate a referral code for.
      * @return The referral code as bytes8.
      */
     function getReferralCode(address user) external pure returns (bytes8) {
-        return bytes8(keccak256(abi.encodePacked(user)));
+        return generateReferralCode(user);
     }
 
     /**

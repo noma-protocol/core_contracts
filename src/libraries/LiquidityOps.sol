@@ -118,7 +118,7 @@ library LiquidityOps {
                 newPositions = preShiftPositions(
                     PreShiftParameters({
                         addresses: addresses,
-                        toSkim: 0, // toSkim
+                        toSkim: 0, // toSkim TODO clean this up
                         circulatingSupply : circulatingSupply,
                         anchorCapacity: anchorCapacity,
                         floorToken1Balance: floorToken1Balance,
@@ -140,7 +140,7 @@ library LiquidityOps {
                     .fixInbalance(
                         addresses.pool, 
                         sqrtRatioX96, 
-                        10_000_000 ether
+                        10_000_000 ether // TOOD replace with % of circulating or total supply
                     );
                 }
 
@@ -633,7 +633,7 @@ library LiquidityOps {
 
     }
     
-    function refreshBalance0(ProtocolAddresses memory addresses) internal returns (uint256) {
+    function refreshBalance0(ProtocolAddresses memory addresses) internal view returns (uint256) {
         return IERC20Metadata(IUniswapV3Pool(addresses.pool).token0()).balanceOf(addresses.vault);
     }
 
@@ -641,7 +641,7 @@ library LiquidityOps {
         ProtocolAddresses memory addresses,
         uint256 totalSupply,
         uint160 sqrtRatioX96
-    ) internal returns (uint256 mintAmount) {
+    ) internal view returns (uint256 mintAmount) {
         // Mint unbacked supply
         mintAmount = IAdaptiveSupply(
             addresses.adaptiveSupplyController
@@ -654,7 +654,8 @@ library LiquidityOps {
                 sqrtRatioX96,
                 18
             ),
-            IModelHelper(addresses.modelHelper).getIntrinsicMinimumValue(addresses.vault)
+            IModelHelper(addresses.modelHelper)
+            .getIntrinsicMinimumValue(addresses.vault)
         );
     }
 

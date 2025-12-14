@@ -232,7 +232,8 @@ contract StakingVault is BaseVault {
     }
 
     function _notifyStaking(uint256 amount) internal {
-        IERC20(_v.tokenInfo.token0).transfer(
+        // [C-02 FIX] Use SafeERC20
+        IERC20(_v.tokenInfo.token0).safeTransfer(
             _v.stakingContract,
             amount
         );

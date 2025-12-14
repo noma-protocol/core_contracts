@@ -24,19 +24,28 @@ contract LiquidationVault {
 
     /**
      * @notice Defaults all expired loans and seizes the collateral.
+     * @dev [M-01 FIX] Uses while loop to handle swap-and-pop correctly.
+     *      When a loan is removed, the last element is swapped into position i,
+     *      so we must NOT increment i to re-check the swapped element.
      */
     function vaultDefaultLoans() public onlyInternalCalls returns (uint256 totalBurned, uint256 loansDefaulted) {
         totalBurned = 0;
         loansDefaulted = 0;
-        for (uint256 i = 0; i < _v.loanAddresses.length; i++) {
+
+        uint256 i = 0;
+        while (i < _v.loanAddresses.length) {
             address who = _v.loanAddresses[i];
             LoanPosition storage loan = _v.loanPositions[who];
-            if (block.timestamp > loan.expiry) {
+
+            if (block.timestamp > loan.expiry && loan.borrowAmount > 0) {
                 loansDefaulted++;
                 uint256 seized = _seizeCollateral(who);
                 totalBurned += seized;
                 delete _v.loanPositions[who];
                 _removeLoanAddress(who);
+                // Do NOT increment i - re-check the swapped-in entry at position i
+            } else {
+                unchecked { i++; }
             }
         }
     }

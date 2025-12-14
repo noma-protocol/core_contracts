@@ -142,7 +142,8 @@ contract Staking is ReentrancyGuard, ERC20Recovery {
         lastOperationTimestamp[msg.sender] = block.timestamp;
         
         // Transfer NOMA tokens from the user to the staking contract
-        NOMA.transferFrom(msg.sender, address(this), _amount);
+        // [C-02 FIX] Use SafeERC20
+        NOMA.safeTransferFrom(msg.sender, address(this), _amount);
 
         // Mint rebase-adjusted sNOMA to the staker
         sNOMA.mint(msg.sender, _amount);

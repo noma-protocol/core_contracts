@@ -339,6 +339,11 @@
         uint256 spotPriceX96 = Conversions.sqrtPriceX96ToPrice(sqrt0, 18);
         uint256 slippagePriceX96 = spotPriceX96 + (spotPriceX96 * 5) / 1000;
 
+        // [M-06 FIX] Calculate proper minimum amount out with slippage protection
+        // Expected tokens = contribution / price, with 0.5% slippage tolerance
+        uint256 expectedTokens = (contributionAmount * 1e18) / spotPriceX96;
+        uint256 calculatedMinAmountOut = (expectedTokens * 995) / 1000; // 0.5% slippage
+
         // 7) swap with a limit order at slippagePriceX96
         Uniswap.swap(
             SwapParams({
@@ -352,7 +357,7 @@
                 slippageTolerance: 1,
                 zeroForOne:    false,
                 isLimitOrder:  true,
-                minAmountOut:  0
+                minAmountOut:  calculatedMinAmountOut
             })
         );
 
