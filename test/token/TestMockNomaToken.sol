@@ -58,7 +58,7 @@ contract TestMockNomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeabl
     }
 
     function renounceOwnership() public override onlyOwner {
-        renounceOwnership();
+        super.renounceOwnership();
     }
 
     function nomaFactory() public view returns (address) {

@@ -60,6 +60,16 @@ contract MockNomaTokenTest is Test {
         mockNomaToken.mintTest(deployer, 2000000 ether);
         vm.stopPrank();
     }
+
+    // [C-01 TEST] Verify renounceOwnership doesn't cause infinite recursion
+    function testRenounceOwnership() public {
+        vm.startPrank(deployer);
+        // This should work without infinite recursion
+        mockNomaToken.renounceOwnership();
+        // After renouncing, owner should be zero address
+        assertEq(mockNomaToken.owner(), address(0));
+        vm.stopPrank();
+    }
     
     function testInitialSupply() public {
         uint256 deployerBalance = mockNomaToken.balanceOf(deployer);

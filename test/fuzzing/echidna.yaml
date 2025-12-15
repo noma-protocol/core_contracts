@@ -1,0 +1,44 @@
+# Echidna configuration for Noma Protocol fuzzing
+# Runs against forked chain at localhost:8545
+
+# Test configuration
+testMode: assertion
+testLimit: 500000
+seqLen: 100
+shrinkLimit: 5000
+
+# Timeout (24 hours for deep fuzzing)
+timeout: 86400
+
+# RPC configuration for forked chain
+rpcUrl: http://localhost:8545
+rpcBlock: latest
+
+# Coverage settings
+coverage: true
+corpusDir: echidna-corpus
+
+# Code size limit (needed for large diamond contracts)
+codeSize: 0x80000
+
+# Assertion checking
+checkAsserts: true
+
+# Multi-transaction testing
+multi-abi: true
+
+# Workers for parallel execution
+workers: 4
+
+# Solidity compiler settings
+solcArgs: "--optimize --optimize-runs 200"
+
+# Filter out view functions from fuzzing
+filterBlacklist: true
+
+# Addresses
+deployer: "0x30000"
+sender: "0x10000"
+
+# Crytic compile
+cryticArgs: ["--foundry-out-directory", "out"]
