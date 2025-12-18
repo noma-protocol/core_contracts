@@ -14,6 +14,7 @@ import {IVault} from "../interfaces/IVault.sol";
 import {DecimalMath} from "../libraries/DecimalMath.sol";
 import {LiquidityDeployerMin} from "../libraries/LiquidityDeployerMin.sol";
 import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
+import "../errors/Errors.sol";
 
 import {
     LiquidityType,
@@ -37,11 +38,6 @@ interface ILendingVault {
 interface INomaDividends {
     function distribute(address rewardToken, uint256 amount) external;
 }
-
-// Custom errors
-error StakingContractNotSet();
-error Unauthorized();
-error NoStakingRewards();
 
 /**
  * @title StakingVault

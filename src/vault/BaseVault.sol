@@ -37,6 +37,7 @@ import {
 import {Utils} from "../libraries/Utils.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "../errors/Errors.sol";
 
 interface INomaFactory {
     function deferredDeploy(address deployer) external;
@@ -53,17 +54,6 @@ interface IAdaptiveSupplyController {
 interface ILendingVault {
     function setFee(uint256 fee, uint256 feeToTreasury) external;
 }
-
-// Custom errors
-error AlreadyInitialized();
-error InvalidPosition();
-error OnlyFactory();
-error OnlyDeployer();
-error OnlyInternalCalls();
-error CallbackCaller();
-error ResolverNotSet();
-error Locked();
-error NotInitialized();
 
 /**
  * @title BaseVault
@@ -455,7 +445,7 @@ contract BaseVault  {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure virtual returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](15);
+        bytes4[] memory selectors = new bytes4[](14);
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
         selectors[1] = bytes4(keccak256(
             bytes(
@@ -478,7 +468,6 @@ contract BaseVault  {
         selectors[11] = bytes4(keccak256(bytes("postInit((address,address,address,address))")));
         selectors[12] = bytes4(keccak256(bytes("getStakingContract()")));
         selectors[13] = bytes4(keccak256(bytes("getCollateralAmount()")));
-        // selectors[14] = bytes4(keccak256(bytes("uniswapV3SwapCallback(int256,int256,bytes)")));
 
         return selectors;
     }

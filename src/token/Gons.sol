@@ -4,14 +4,7 @@ pragma solidity ^0.8.23;
 import {SafeMath} from "../libraries/SafeMath.sol";
 import {ERC20, ERC20Permit} from "../abstract/ERC20Permit.sol";
 import {ERC20Recovery} from "../abstract/ERC20Recovery.sol";
-
-error AlreadyInitialized();
-error InvalidAmount();
-error InvalidAddress();
-error Unauthorized();
-error InvalidTransfer();
-error CannotRecoverSelfToken();
-error MinimumSupplyReached();
+import "../errors/Errors.sol";
 
 contract GonsToken is ERC20Permit, ERC20Recovery {
     // PLEASE READ BEFORE CHANGING ANY ACCOUNTING OR MATH

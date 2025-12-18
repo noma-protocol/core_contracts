@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
+import "../errors/Errors.sol";
+
 library SupplyRules {
     uint256 internal constant WAD = 1e18; // 18 decimals
 
@@ -15,7 +17,7 @@ library SupplyRules {
         uint256 basePrice
     ) internal pure returns (uint256) {
         if (basePrice == 0) {
-            revert("SupplyRules: basePrice is zero");
+            revert InvalidParams();
         }
 
         // Derive the thresholds by dividing by 10 each time.

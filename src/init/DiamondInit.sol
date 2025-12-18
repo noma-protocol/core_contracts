@@ -16,10 +16,7 @@ import {IERC173} from "../interfaces/IERC173.sol";
 import {IERC165} from "../interfaces/IERC165.sol";
 import { Utils } from "../libraries/Utils.sol";
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
-
-error AlreadyInitialized();
-error InvalidResolver();
-error NotAuthorized();
+import "../errors/Errors.sol";
 
 contract DiamondInit {
 

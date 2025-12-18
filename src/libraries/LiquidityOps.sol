@@ -27,6 +27,7 @@ import {
     LiquidityInternalPars,
     DeployLiquidityParams
 } from "../types/Types.sol";
+import "../errors/Errors.sol";
 
 /**
  * @title IAdaptiveSupply
@@ -41,25 +42,12 @@ interface IAdaptiveSupply {
     ) external pure returns (uint256 mintAmount);
 }
 
-error InvalidBalance();
-
 /**
  * @title LiquidityOps
  * @notice Library for managing liquidity positions in a Uniswap V3 pool.
  */
 library LiquidityOps {
     using SafeERC20 for IERC20;
-
-    error InvalidTick();
-    error AboveThreshold();
-    error BelowThreshold();
-    error PositionsLength();
-    error NoLiquidity();
-    error MintAmount();
-    error BalanceToken0();
-    error OnlyNotEmptyPositions();
-    error ZeroAnchorBalance();
-    error InvalidTresholds();
 
     /**
      * @notice Shifts liquidity positions based on the current liquidity ratio.
@@ -137,9 +125,9 @@ library LiquidityOps {
                 } else {
                     IVault(addresses.vault)
                     .fixInbalance(
-                        addresses.pool, 
-                        sqrtRatioX96, 
-                        10_000_000 ether // TOOD replace with % of circulating or total supply
+                        addresses.pool,
+                        sqrtRatioX96,
+                        (circulatingSupply * 90) / 100
                     );
                 }
 
@@ -247,7 +235,7 @@ library LiquidityOps {
             );
  
         } else {
-            revert("shiftPositions: no liquidity in Floor");
+            revert NoLiquidity();
         }
     }
     
@@ -583,7 +571,7 @@ library LiquidityOps {
         ProtocolParameters memory params = vault.getProtocolParameters();
 
         // Optional safety check
-        if (params.lowBalanceThresholdFactor >= 100 && params.highBalanceThresholdFactor >= 100) revert InvalidTresholds();
+        if (params.lowBalanceThresholdFactor >= 100 && params.highBalanceThresholdFactor >= 100) revert InvalidThresholds();
 
         // Thresholds as percentages of circulating supply
         uint256 lowBalanceThreshold  = (circulatingSupply * params.lowBalanceThresholdFactor)  / 100;

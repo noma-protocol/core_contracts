@@ -6,20 +6,13 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IAddressResolver} from "../../interfaces/IAddressResolver.sol";
 import {ReferralEntity} from "../../types/Types.sol";
+import "../../errors/Errors.sol";
 
 interface IVault {
     function getReferralEntity(address who) external view returns (ReferralEntity memory);
     function setReferralEntity(bytes8 code, uint256 amount) external;
     function consumeReferral(bytes8 code, uint256 amount) external;
 }
-
-error Unauthorized();
-error InvalidAddress();
-error NothingToMint();
-error ZeroAmount();
-error InvalidRate();
-error InsufficientTokenOut();
-error NonTrasferrable();
 
 contract vToken is ERC20 {
     using SafeERC20 for IERC20;
@@ -58,7 +51,7 @@ contract vToken is ERC20 {
     // Non-transferable: only mint/burn are allowed.
     function _update(address from, address to, uint256 value) internal override {
         // allow mint (from=0) and burn (to=0), block transfers
-        if (from != address(0) && to != address(0)) revert NonTrasferrable();
+        if (from != address(0) && to != address(0)) revert NonTransferrable();
         super._update(from, to, value);
     }
 

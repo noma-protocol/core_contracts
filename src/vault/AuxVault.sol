@@ -13,7 +13,6 @@ import {
     ProtocolParameters, 
     CreatorFacingParameters 
 } from "../types/Types.sol";
-// import { DeployHelper } from "../libraries/DeployHelper.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Uniswap } from "../libraries/Uniswap.sol";
 import { IVault } from "../interfaces/IVault.sol";
@@ -24,6 +23,7 @@ import { LiquidityOps } from "../libraries/LiquidityOps.sol";
 import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
 import {Conversions} from "../libraries/Conversions.sol";
 import "../libraries/TickMathExtra.sol";
+import "../errors/Errors.sol";
 
 interface INomaFactory {
     function deferredDeploy(address deployer) external;
@@ -45,13 +45,6 @@ interface ILendingVault {
 interface IVaultExt {
     function mintTokens(address to, uint256 amount) external returns (bool);
 }
-
-error NotAuthorized();
-error OnlyInternalCalls();
-error NotInitialized();
-error NoLiquidity();
-error CallbackCaller();
-error InsufficientBalance();
 
 event LoanRepaidOnBehalf(address indexed who, uint256 amount, uint256 collateralReleased);
 
@@ -341,7 +334,7 @@ contract AuxVault {
      */
     function updatePositions(LiquidityPosition[3] memory positions) public onlyInternalCalls {
         if (!_v.initialized) revert NotInitialized();             
-        if (positions[0].liquidity == 0 /*|| positions[1].liquidity == 0 || positions[2].liquidity == 0*/) revert NoLiquidity();
+        if (positions[0].liquidity == 0 || positions[1].liquidity == 0 || positions[2].liquidity == 0) revert NoLiquidity();
         
         _updatePositions(positions);
     }

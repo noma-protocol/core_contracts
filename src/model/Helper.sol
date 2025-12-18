@@ -32,10 +32,7 @@ import {
     TokenInfo,
     VaultInfo
 } from "../types/Types.sol";
-
-// Custom errors
-error NoLiquidity();
-error InsolvencyInvariant();
+import "../errors/Errors.sol";
 
 /**
  * @title ModelHelper

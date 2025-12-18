@@ -13,19 +13,13 @@ import {IVault} from "../interfaces/IVault.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {
-    LiquidityPosition, 
+    LiquidityPosition,
     LiquidityType,
     AmountsToMint,
     DeployLiquidityParams,
     SwapParams
 } from "../types/Types.sol";
-
-// Custom errors
-error InvalidTicksFloor();
-error InvalidTicksAnchor();
-error InvalidTicksDiscovery();
-error InvalidFloor();
-error NoLiquidity();
+import "../errors/Errors.sol";
 
 interface IVaultExt {
     function mintTokens(address to, uint256 amount) external returns (bool);

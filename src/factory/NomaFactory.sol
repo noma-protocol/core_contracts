@@ -49,6 +49,7 @@ import {
 } from "../types/Types.sol";
 
 import {IVaultUpgrade, IEtchVault, IExtFactory, IDeployerFactory} from "../interfaces/IVaultUpgrades.sol";
+import "../errors/Errors.sol";
 
 /**
  * @title IERC20
@@ -87,18 +88,6 @@ interface IDiamondInterface {
 interface IVault {
     function postInit(PostInitParams memory params) external;
 }
-
-error Unauthorized();
-error OnlyVaultsError();
-error NotAuthorityError();
-error SupplyTransferError();
-error InvalidSymbol();
-error ZeroAddressError();
-error TokenAlreadyExistsError();
-error InvalidParameters();
-error UpgradeFailed();
-error InvalidStep();
-error Unused();
 
 /**
  * @title NomaFactory

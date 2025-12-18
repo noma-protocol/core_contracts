@@ -27,12 +27,7 @@ import { Conversions } from "../libraries/Conversions.sol";
 import { Uniswap } from "../libraries/Uniswap.sol";
 import { LiquidityOps } from "../libraries/LiquidityOps.sol";
 import { IDeployer } from "../interfaces/IDeployer.sol";
-
-error NotAuthorized();
-error OnlyInternalCalls();
-error NotInitialized();
-error LiquidityOpRequired();
-error InvalidTick();
+import "../errors/Errors.sol";
 
 interface ILendingVault {
     function loanLTV(address who) external view returns (uint256 ltv1e18);

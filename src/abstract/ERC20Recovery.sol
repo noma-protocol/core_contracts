@@ -3,8 +3,8 @@
 pragma solidity ^0.8.23;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "../errors/Errors.sol";
 
-error ZeroAddress();
 event RecoveredERC20(address token, address who, uint256 balance);
 
 abstract contract ERC20Recovery {

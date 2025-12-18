@@ -8,13 +8,7 @@ import {Conversions} from "./Conversions.sol";
 import {TickMath} from "v3-core/libraries/TickMath.sol";
 import { IVault } from "../interfaces/IVault.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
-
-// Custom errors
-error ZeroLiquidty();
-error NoTokensExchanged();
-error InvalidSwap();
-error SlippageExceeded();
-error PriceImpactTooHigh();
+import "../errors/Errors.sol";
 
 /**
  * @title Uniswap

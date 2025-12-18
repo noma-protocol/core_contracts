@@ -26,8 +26,7 @@ import {IVault} from "../interfaces/IVault.sol";
 import {Utils} from "../libraries/Utils.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-
-error CannotRecoverTokens();
+import "../errors/Errors.sol";
 
 /**
  * @title Staking

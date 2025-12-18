@@ -12,17 +12,12 @@ import {Conversions} from "./Conversions.sol";
 import {IVault} from "../interfaces/IVault.sol";
 
 import {
-    LiquidityPosition, 
+    LiquidityPosition,
     LiquidityType,
     AmountsToMint,
     DeployLiquidityParams
 } from "../types/Types.sol";
-
-// Custom errors
-error InvalidTicksFloor();
-error InvalidTicksAnchor();
-error InvalidTicksDiscovery();
-error InvalidFloor();
+import "../errors/Errors.sol";
 
 /**
  * @title LiquidityManager

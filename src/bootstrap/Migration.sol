@@ -4,25 +4,11 @@ pragma solidity ^0.8.23;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
+import "../errors/Errors.sol";
 
 interface IModelHelper {
     function getIntrinsicMinimumValue(address vault) external view returns (uint256);
 }
-
-// Custom errors
-error InvalidHelper();
-error InvalidToken();
-error InvalidVault();
-error IMVMustBeGreaterThanZero();
-error DurationMustBeGreaterThanZero();
-error HoldersBalancesMismatchOrEmpty();
-error MigrationEnded();
-error NoBalanceSet();
-error IMVNotGrown();
-error NothingToWithdraw();
-error MismatchOrEmpty();
-error NoTokens();
-error NoExcessTokens();
 
 /// @title Migration Contract
 /// @notice Manages token withdrawals based on intrinsic minimum value (IMV) changes

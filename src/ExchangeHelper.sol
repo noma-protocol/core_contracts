@@ -23,6 +23,7 @@ import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {SignedMath} from "@openzeppelin/contracts/utils/math/SignedMath.sol";
 import {IERC20} from "openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Conversions} from "../src/libraries/Conversions.sol";
 import {Uniswap} from "../src/libraries/Uniswap.sol";
 import {Utils} from "../src/libraries/Utils.sol";
@@ -45,6 +46,7 @@ interface INomaFactory {
 }
 
 contract ExchangeHelper {
+    using SafeERC20 for IERC20;
 
     event BoughtTokensETH(address who, uint256 amount);
     event BoughtTokensWETH(address who, uint256 amount);
@@ -173,8 +175,8 @@ contract ExchangeHelper {
         tokenInfo = TokenInfo({
             token0: IUniswapV3Pool(pool).token0(),
             token1: IUniswapV3Pool(pool).token1()
-        });    
-        IERC20(tokenInfo.token1).transferFrom(msg.sender, address(this), amount);
+        });
+        IERC20(tokenInfo.token1).safeTransferFrom(msg.sender, address(this), amount);
         uint8 decimals = IERC20Metadata(tokenInfo.token1).decimals();
 
         // Swap Params
@@ -236,9 +238,9 @@ contract ExchangeHelper {
         tokenInfo = TokenInfo({
             token0: IUniswapV3Pool(pool).token0(),
             token1: IUniswapV3Pool(pool).token1()
-        });    
+        });
         address token0 = tokenInfo.token0;
-        IERC20(tokenInfo.token0).transferFrom(msg.sender, address(this), amount);
+        IERC20(tokenInfo.token0).safeTransferFrom(msg.sender, address(this), amount);
 
         // Swap Params
         SwapParams memory swapParams = SwapParams({
@@ -272,7 +274,7 @@ contract ExchangeHelper {
             IERC20Metadata(token0).balanceOf(address(this));  
 
         if (refund > 0) {
-            IERC20(token0).transfer(msg.sender, refund);
+            IERC20(token0).safeTransfer(msg.sender, refund);
         }
 
         // track referrals if a code is provided
@@ -301,9 +303,9 @@ contract ExchangeHelper {
         tokenInfo = TokenInfo({
             token0: IUniswapV3Pool(pool).token0(),
             token1: IUniswapV3Pool(pool).token1()
-        });    
+        });
 
-        IERC20(tokenInfo.token0).transferFrom(msg.sender, address(this), amount);
+        IERC20(tokenInfo.token0).safeTransferFrom(msg.sender, address(this), amount);
 
         // Swap Params
         SwapParams memory swapParams = SwapParams({
@@ -363,12 +365,12 @@ contract ExchangeHelper {
         }
 
         if (amount0Delta > 0) {
-            IERC20(tokenInfo.token0).transfer(msg.sender, uint256(amount0Delta));
+            IERC20(tokenInfo.token0).safeTransfer(msg.sender, uint256(amount0Delta));
         } else if (amount1Delta > 0) {
-            IERC20(tokenInfo.token1).transfer(msg.sender, uint256(amount1Delta));
+            IERC20(tokenInfo.token1).safeTransfer(msg.sender, uint256(amount1Delta));
         }
 
-        // Reset token info 
+        // Reset token info
         tokenInfo = TokenInfo({
             token0: address(0),
             token1: address(0)
@@ -389,12 +391,12 @@ contract ExchangeHelper {
         }
 
         if (amount0Delta > 0) {
-            IERC20(tokenInfo.token0).transfer(msg.sender, uint256(amount0Delta));
+            IERC20(tokenInfo.token0).safeTransfer(msg.sender, uint256(amount0Delta));
         } else if (amount1Delta > 0) {
-            IERC20(tokenInfo.token1).transfer(msg.sender, uint256(amount1Delta));
+            IERC20(tokenInfo.token1).safeTransfer(msg.sender, uint256(amount1Delta));
         }
 
-        // Reset token info 
+        // Reset token info
         tokenInfo = TokenInfo({
             token0: address(0),
             token1: address(0)

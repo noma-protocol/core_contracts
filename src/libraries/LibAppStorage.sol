@@ -23,7 +23,7 @@ struct VaultStorage {
     IAddressResolver resolver;
 
     // Setup state
-    bool isLendingSetup;
+    bool isLendingSetup; // @deprecated - unused, kept for storage layout compatibility
     bool isStakingSetup;
     bool isAdvancedConfEnabled;
 
@@ -46,7 +46,7 @@ struct VaultStorage {
     address modelHelper;
     address stakingContract;
     address presaleContract;
-    address proxyAddress;
+    address proxyAddress; // @deprecated - unused, kept for storage layout compatibility
     address adaptiveSupplyController;
     address tokenRepo;
     address vNOMAContract;
@@ -66,7 +66,7 @@ struct VaultStorage {
     TokenInfo tokenInfo;
 
     // Uniswap pool information
-    uint24 feeTier;
+    uint24 feeTier; // @deprecated - unused, kept for storage layout compatibility
     int24 tickSpacing;
     IUniswapV3Pool pool;
 

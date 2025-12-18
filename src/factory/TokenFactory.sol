@@ -23,6 +23,7 @@ import { NomaToken } from "../token/NomaToken.sol";
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
 import { VaultDeployParams } from "../types/Types.sol";
 import "../libraries/Utils.sol";
+import "../errors/Errors.sol";
 
 /**
  * @title IERC20
@@ -33,9 +34,6 @@ interface IERC20 {
     function burn(address from, uint256 amount) external;
     function totalSupply() external view returns (uint256);
 }
-
-error InvalidTokenAddressError();
-error PredictionNotFoundWithinLimit();
 
 contract TokenFactory {
     IAddressResolver public resolver;

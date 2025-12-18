@@ -9,7 +9,8 @@ import {
 import { IVault } from "../interfaces/IVault.sol";
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
 import { VaultStorage } from "../libraries/LibAppStorage.sol";
-import { LiquidityOps } from "../libraries/LiquidityOps.sol"; 
+import { LiquidityOps } from "../libraries/LiquidityOps.sol";
+import "../errors/Errors.sol";
 
 interface IStakingVault {
     function mintAndDistributeRewards(address caller, ProtocolAddresses memory addresses) external;
@@ -36,7 +37,6 @@ event DefaultLoans(uint256 totalBurned, uint256 loansDefaulted);
 
 event Shift();
 event Slide();
-error Locked();
 
 /**
  * @title ExtVault

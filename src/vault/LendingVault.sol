@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-// import {BaseVault} from "./BaseVault.sol";
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
 import {DecimalMath} from "../libraries/DecimalMath.sol";
 import {Uniswap} from "../libraries/Uniswap.sol";
@@ -14,30 +13,14 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import { VaultStorage } from "../libraries/LibAppStorage.sol";
 import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
 import {Utils} from "../libraries/Utils.sol";
+import "../errors/Errors.sol";
 
 import {
-    LiquidityPosition, 
+    LiquidityPosition,
     LiquidityType,
     LoanPosition,
     OutstandingLoan
 } from "../types/Types.sol";
-
-// Custom errors
-error NotInitialized();
-error InsufficientLoanAmount();
-error InvalidDuration();
-error InsufficientFloorBalance();
-error NoActiveLoan();
-error ActiveLoan();
-error LoanExpired();
-error InsufficientCollateral();
-error CantRollLoan();
-error NoLiquidity();
-error OnlyVault();
-error InvalidRepayAmount();
-error InvalidParams();
-error NotPermitted();
-error OnlyInternalCalls();
 
 /**
  * @title LendingVault
@@ -94,8 +77,8 @@ contract LendingVault {
 
         _fetchFromLiquidity(borrowAmount, true);
 
-        IERC20(_v.pool.token0()).transferFrom(who, address(this), collateralAmount);  
-        SafeERC20.safeTransfer(IERC20(address(_v.pool.token0())), _v.tokenRepo, collateralAmount);
+        IERC20(_v.pool.token0()).safeTransferFrom(who, address(this), collateralAmount);
+        IERC20(_v.pool.token0()).safeTransfer(_v.tokenRepo, collateralAmount);
         SafeERC20.safeTransfer(IERC20(address(_v.pool.token1())), who, borrowAmount - loanFees);
 
         LoanPosition memory loanPosition = LoanPosition({
@@ -108,8 +91,7 @@ contract LendingVault {
 
         _v.collateralAmount += collateralAmount;
         _v.loanPositions[who] = loanPosition;
-        // [H-01 FIX] Use pre-increment to actually store incremented value
-        _v.totalLoansPerUser[who] = ++_v.totalLoansPerUser[who];
+        ++_v.totalLoansPerUser[who];
         _v.loanAddresses.push(who);
         _v.totalInterest += loanFees;
         
@@ -144,7 +126,7 @@ contract LendingVault {
 
         // Pull in repayment tokens
         if (!isSelfRepaying) {
-            IERC20(_v.pool.token1()).transferFrom(who, address(this), repayAmount);
+            IERC20(_v.pool.token1()).safeTransferFrom(who, address(this), repayAmount);
         }
 
         // Release proportional collateral
@@ -226,8 +208,8 @@ contract LendingVault {
         if (amount == 0) revert InsufficientCollateral();
         if (_v.loanPositions[who].borrowAmount == 0) revert NoActiveLoan();
 
-        IERC20(_v.pool.token0()).transferFrom(who, address(this), amount);
-        SafeERC20.safeTransfer(IERC20(address(_v.pool.token0())), _v.tokenRepo, amount);
+        IERC20(_v.pool.token0()).safeTransferFrom(who, address(this), amount);
+        IERC20(_v.pool.token0()).safeTransfer(_v.tokenRepo, amount);
 
         _v.collateralAmount += amount;
         _v.loanPositions[who].collateralAmount += amount;
