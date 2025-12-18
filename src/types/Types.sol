@@ -217,8 +217,7 @@ struct DeployLiquidityParams {
 /// @param discoveryToken0Balance Token0 balance for discovery.
 struct PreShiftParameters {
     ProtocolAddresses addresses;
-    uint256 toSkim;
-    uint256 circulatingSupply;
+    uint256 circulatingSupply; 
     uint256 anchorCapacity;
     uint256 floorToken1Balance;
     uint256 anchorToken1Balance;
@@ -241,7 +240,6 @@ struct PreShiftParameters {
 struct ShiftParameters {
     address pool;
     address deployer;
-    uint256 toSkim;
     uint256 newFloorPrice;
     address modelHelper;
     address adaptiveSupplyController;

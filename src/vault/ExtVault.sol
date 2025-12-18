@@ -40,7 +40,7 @@ error Locked();
 
 /**
  * @title ExtVault
- * @notice A contract for vault external functions.
+ * @notice A contract for vault external facing functions. // TODO MAKE public?
  * @dev n/a.
  */
 contract ExtVault {
@@ -54,7 +54,7 @@ contract ExtVault {
     function borrow(
         uint256 borrowAmount,
         uint256 duration
-    ) external {
+    ) public {
 
         ILendingVault(address(this))
         .borrowFromFloor(
@@ -69,7 +69,7 @@ contract ExtVault {
     /**
      * @notice Allows a user to pay back a loan.
      */
-    function payback(uint256 amount) external  {
+    function payback(uint256 amount) public  {
 
         ILendingVault(address(this))
         .paybackLoan(msg.sender, amount, false);
@@ -82,7 +82,7 @@ contract ExtVault {
      */
     function roll(
         uint256 newDuration
-    ) external  {
+    ) public  {
         
         uint256 amount = 
         ILendingVault(address(this))
@@ -100,7 +100,7 @@ contract ExtVault {
      */
     function addCollateral(
         uint256 amount
-    ) external  {
+    ) public  {
 
         ILendingVault(address(this))
         .addCollateral(msg.sender, amount);
@@ -159,7 +159,7 @@ contract ExtVault {
     /**
      * @notice Allows anybody to default expired loans.
      */
-    function defaultLoans(uint256 start, uint256 limit) external {
+    function defaultLoans(uint256 start, uint256 limit) public {
         uint256 totalBurned = 0;
         uint256 loansDefaulted = 0;
 
@@ -180,17 +180,17 @@ contract ExtVault {
      * @notice Retrieves the function selectors for this contract.
      * @return selectors An array of function selectors.
      */
-     // TODO add defaultLoans to selectors
     function getFunctionSelectors() external pure  returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](8);
+        bytes4[] memory selectors = new bytes4[](9);
         selectors[0] = bytes4(keccak256(bytes("shift()")));
         selectors[1] = bytes4(keccak256(bytes("slide()")));  
         selectors[2] = bytes4(keccak256(bytes("borrow(uint256,uint256)")));  
         selectors[3] = bytes4(keccak256(bytes("payback(uint256)")));
         selectors[4] = bytes4(keccak256(bytes("roll(uint256)")));  
-        selectors[5] = bytes4(keccak256(bytes("addCollateral(uint256)")));           
-        selectors[6] = bytes4(keccak256(bytes("defaultLoans(uint256,uint256)"))); 
-        selectors[7] = bytes4(keccak256(bytes("selfRepayLoans(uint256,uint256,uint256)"))); 
+        selectors[5] = bytes4(keccak256(bytes("addCollateral(uint256)")));      
+        selectors[6] = bytes4(keccak256(bytes("defaultLoans()")));      
+        selectors[7] = bytes4(keccak256(bytes("defaultLoans(uint256,uint256)"))); 
+        selectors[8] = bytes4(keccak256(bytes("selfRepayLoans(uint256,uint256,uint256)"))); 
         return selectors;
     }
 }

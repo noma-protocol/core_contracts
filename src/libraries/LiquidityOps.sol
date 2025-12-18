@@ -118,7 +118,6 @@ library LiquidityOps {
                 newPositions = preShiftPositions(
                     PreShiftParameters({
                         addresses: addresses,
-                        toSkim: 0, // toSkim TODO clean this up
                         circulatingSupply : circulatingSupply,
                         anchorCapacity: anchorCapacity,
                         floorToken1Balance: floorToken1Balance,
@@ -180,7 +179,6 @@ library LiquidityOps {
             ShiftParameters({
                 pool: params.addresses.pool,
                 deployer: params.addresses.deployer,
-                toSkim: params.toSkim,
                 newFloorPrice: newFloorPrice,
                 modelHelper: params.addresses.modelHelper,
                 adaptiveSupplyController: params.addresses.adaptiveSupplyController,
