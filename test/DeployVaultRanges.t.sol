@@ -3,6 +3,7 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import {SupplyRules} from "../src/libraries/SupplyRules.sol";
+import {InvalidParams} from "../src/errors/Errors.sol";
 
 /**
  * @title DeployVaultRangesTest
@@ -312,7 +313,7 @@ contract DeployVaultRangesTest is Test {
      * @notice Tests edge case: zero base price should revert
      */
     function test_ZeroBasePrice_Reverts() public {
-        vm.expectRevert("SupplyRules: basePrice is zero");
+        vm.expectRevert(InvalidParams.selector);
         harness.getMinTotalSupplyForPrice(1e18, 0);
     }
 

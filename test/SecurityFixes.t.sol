@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import "../src/TokenRepo.sol";
 import "../src/libraries/Utils.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "../src/errors/Errors.sol";
 
 // Mock ERC20 for testing
 contract MockERC20 is ERC20 {
@@ -59,7 +60,7 @@ contract SecurityFixesTest is Test {
 
     function test_TokenRepo_TransferOwnership_OnlyOwnerCanInitiate() public {
         vm.prank(attacker);
-        vm.expectRevert("Only owner can call this function");
+        vm.expectRevert(OnlyOwner.selector);
         tokenRepo.transferOwnership(attacker);
     }
 
@@ -70,19 +71,19 @@ contract SecurityFixesTest is Test {
 
         // Attacker tries to accept
         vm.prank(attacker);
-        vm.expectRevert("Not pending owner");
+        vm.expectRevert(NotAuthorized.selector);
         tokenRepo.acceptOwnership();
     }
 
     function test_TokenRepo_TransferOwnership_CannotSetToZero() public {
         vm.prank(owner);
-        vm.expectRevert("Invalid new owner");
+        vm.expectRevert(ZeroAddress.selector);
         tokenRepo.transferOwnership(address(0));
     }
 
     function test_TokenRepo_TransferOwnership_CannotSetToSelf() public {
         vm.prank(owner);
-        vm.expectRevert("Already owner");
+        vm.expectRevert(InvalidParams.selector);
         tokenRepo.transferOwnership(owner);
     }
 
@@ -232,7 +233,7 @@ contract SecurityFixesTest is Test {
         token.transfer(address(tokenRepo), 100e18);
 
         vm.prank(attacker);
-        vm.expectRevert("Only owner can call this function");
+        vm.expectRevert(OnlyOwner.selector);
         tokenRepo.transferToRecipient(address(token), attacker, 50e18);
     }
 }

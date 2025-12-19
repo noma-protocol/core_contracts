@@ -44,21 +44,20 @@ contract TestStaking is Test {
     }
 
     function testMultipleStakersStakeAndUnstake() public {
-        // All users stake
+        // All users stake (with time warp between each to bypass cooldown)
         for (uint i = 0; i < NUM_USERS; i++) {
+            vm.warp(block.timestamp + 3 days + 1); // Bypass cooldown
             vm.prank(users[i]);
             staking.stake(STAKE_AMOUNT);
             vm.stopPrank();
-
         }
 
         // Check balances after staking
         for (uint i = 0; i < NUM_USERS; i++) {
             assertEq(NOMA.balanceOf(users[i]), INITIAL_NOMA_BALANCE - STAKE_AMOUNT, "NOMA balance incorrect after stake");
-            // assertEq(sNOMA.balanceOf(users[i]), STAKE_AMOUNT, "sNOMA balance should be slightly higher than stake amount");
         }
 
-        // Simulate some rewards
+        // Simulate some rewards (this advances epoch)
         vm.prank(address(staking));
         staking.notifyRewardAmount(0);
 
@@ -66,6 +65,9 @@ contract TestStaking is Test {
         NOMA.mintTest(address(staking), rewardAmount);
         vm.prank(address(staking));
         staking.notifyRewardAmount(rewardAmount);
+
+        // Warp past lock-in period (1 epoch) and cooldown
+        vm.warp(block.timestamp + 3 days + 1);
 
         // All users unstake
         for (uint i = 0; i < NUM_USERS; i++) {
@@ -105,6 +107,9 @@ contract TestStaking is Test {
     }
     
     function testStakeUnstakeWithRebases() public {
+        // Warp past initial cooldown
+        vm.warp(block.timestamp + 3 days + 1);
+
         // All users stake
         for (uint i = 0; i < NUM_USERS; i++) {
             vm.prank(users[i]);
@@ -121,6 +126,9 @@ contract TestStaking is Test {
             vm.prank(address(staking));
             staking.notifyRewardAmount(rewardAmount);
         }
+
+        // Warp past lock-in period and cooldown
+        vm.warp(block.timestamp + 3 days + 1);
 
         // All users unstake
         for (uint i = 0; i < NUM_USERS; i++) {
@@ -142,6 +150,9 @@ contract TestStaking is Test {
     }
 
     function testNonLinearStakingAndUnstaking() public {
+        // Warp past initial cooldown
+        vm.warp(block.timestamp + 3 days + 1);
+
         // Half of users stake
         for (uint i = 0; i < NUM_USERS / 2; i++) {
             vm.prank(users[i]);
@@ -157,6 +168,9 @@ contract TestStaking is Test {
         vm.prank(address(staking));
         staking.notifyRewardAmount(rewardAmount);
 
+        // Warp for second batch of stakers cooldown
+        vm.warp(block.timestamp + 3 days + 1);
+
         // Other half of users stake
         for (uint i = NUM_USERS / 2; i < NUM_USERS; i++) {
             vm.prank(users[i]);
@@ -167,6 +181,9 @@ contract TestStaking is Test {
         NOMA.mintTest(address(staking), rewardAmount);
         vm.prank(address(staking));
         staking.notifyRewardAmount(rewardAmount);
+
+        // Warp past lock-in period and cooldown
+        vm.warp(block.timestamp + 3 days + 1);
 
         // All users unstake
         for (uint i = 0; i < NUM_USERS; i++) {
@@ -187,6 +204,9 @@ contract TestStaking is Test {
     }
 
     function testRandomStakingAndUnstaking() public {
+        // Warp past initial cooldown
+        vm.warp(block.timestamp + 3 days + 1);
+
         uint256[] memory stakeAmounts = new uint256[](NUM_USERS);
         uint256 totalStaked = 0;
 
@@ -218,6 +238,9 @@ contract TestStaking is Test {
             
             console.log("Reward distributed:", rewardAmount);
         }
+
+        // Warp past lock-in period and cooldown
+        vm.warp(block.timestamp + 3 days + 1);
 
         // Unstake for all users
         for (uint256 i = 0; i < NUM_USERS; i++) {
@@ -251,6 +274,9 @@ contract TestStaking is Test {
     }
 
     function testRandomNonLinearStakingAndUnstaking() public {
+        // Warp past initial cooldown
+        vm.warp(block.timestamp + 3 days + 1);
+
         uint256[] memory stakeAmounts = new uint256[](NUM_USERS);
         uint256 totalStaked = 0;
 
@@ -275,6 +301,9 @@ contract TestStaking is Test {
         staking.notifyRewardAmount(rewardAmount);
         // console.log("First reward distributed:", rewardAmount);
 
+        // Warp for second batch of stakers cooldown
+        vm.warp(block.timestamp + 3 days + 1);
+
         // Other half of users stake random amounts
         for (uint i = NUM_USERS / 2; i < NUM_USERS; i++) {
             uint256 stakeAmount = _randomAmount(1e18, MAX_STAKE_AMOUNT);
@@ -296,6 +325,9 @@ contract TestStaking is Test {
         vm.prank(address(staking));
         staking.notifyRewardAmount(additionalReward);
         // console.log("Second reward distributed:", additionalReward);
+
+        // Warp past lock-in period and cooldown
+        vm.warp(block.timestamp + 3 days + 1);
 
         // All users unstake
         for (uint i = 0; i < NUM_USERS; i++) {

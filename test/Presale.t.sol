@@ -34,6 +34,7 @@ import { ModelHelper } from "../src/model/Helper.sol";
 import { AdaptiveSupply } from "../src/controllers/supply/AdaptiveSupply.sol";
 import { PresaleFactory } from "../src/factory/PresaleFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "../src/errors/Errors.sol";
 
 struct ContractInfo {
     string name;
@@ -484,7 +485,7 @@ contract PresaleTest is Test {
         _deployVaultWithPresale();
 
         vm.prank(user1);
-        vm.expectRevert(Presale.InvalidParameters.selector);
+        vm.expectRevert(InvalidParams.selector);
         presale.deposit{value: 0}(bytes8(0));
     }
 
@@ -495,7 +496,7 @@ contract PresaleTest is Test {
         bytes8 selfReferralCode = _getReferralCode(user1);
 
         vm.prank(user1);
-        vm.expectRevert(Presale.InvalidParameters.selector);
+        vm.expectRevert(InvalidParams.selector);
         presale.deposit{value: minContribution}(selfReferralCode);
     }
 
@@ -506,7 +507,7 @@ contract PresaleTest is Test {
         uint256 belowMin = minContribution - 1;
 
         vm.prank(user1);
-        vm.expectRevert(Presale.InvalidParameters.selector);
+        vm.expectRevert(InvalidParams.selector);
         presale.deposit{value: belowMin}(bytes8(0));
     }
 
@@ -517,7 +518,7 @@ contract PresaleTest is Test {
         uint256 aboveMax = maxContribution + 1;
 
         vm.prank(user1);
-        vm.expectRevert(Presale.InvalidParameters.selector);
+        vm.expectRevert(InvalidParams.selector);
         presale.deposit{value: aboveMax}(bytes8(0));
     }
 
@@ -579,7 +580,7 @@ contract PresaleTest is Test {
 
         // Non-owner cannot finalize before deadline
         vm.prank(user1);
-        vm.expectRevert(Presale.NotAuthorized.selector);
+        vm.expectRevert(NotAuthorized.selector);
         presale.finalize();
     }
 
@@ -869,7 +870,7 @@ contract PresaleTest is Test {
         _deployVaultWithPresale();
 
         vm.prank(user1);
-        vm.expectRevert(Presale.NotAuthorized.selector);
+        vm.expectRevert(NotAuthorized.selector);
         presale.setEmergencyWithdrawalFlag(false);
     }
 

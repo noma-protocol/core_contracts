@@ -8,6 +8,7 @@ import {NomaDividends} from "../src/controllers/NomaDividends.sol";
 import {Resolver} from "../src/Resolver.sol";
 import {Utils} from "../src/libraries/Utils.sol";
 import {VaultDescription} from "../src/types/Types.sol";
+import "../src/errors/Errors.sol";
 
 /// @notice Mock ERC20 token for testing rewards
 contract MockRewardToken is ERC20 {
@@ -233,7 +234,7 @@ contract DividendsTest is Test {
         rewardToken1.mint(user1, amount);
         vm.startPrank(user1);
         rewardToken1.approve(address(dividends), amount);
-        vm.expectRevert(NomaDividends.OnlyVaultsError.selector);
+        vm.expectRevert(OnlyVault.selector);
         dividends.distribute(address(rewardToken1), amount);
         vm.stopPrank();
     }
@@ -241,14 +242,14 @@ contract DividendsTest is Test {
     function testDistribute_RevertOnZeroAmount() public {
         vm.startPrank(vault);
         rewardToken1.approve(address(dividends), 1000 ether);
-        vm.expectRevert(NomaDividends.ZeroAmount.selector);
+        vm.expectRevert(ZeroAmount.selector);
         dividends.distribute(address(rewardToken1), 0);
         vm.stopPrank();
     }
 
     function testDistribute_RevertOnZeroRewardToken() public {
         vm.startPrank(vault);
-        vm.expectRevert(NomaDividends.InvalidRewardToken.selector);
+        vm.expectRevert(InvalidRewardToken.selector);
         dividends.distribute(address(0), 1000 ether);
         vm.stopPrank();
     }
@@ -626,7 +627,7 @@ contract DividendsTest is Test {
 
         vm.startPrank(vault);
         rewardToken1.approve(address(emptyDividends), 1000 ether);
-        vm.expectRevert(NomaDividends.NoShares.selector);
+        vm.expectRevert(NoShares.selector);
         emptyDividends.distribute(address(rewardToken1), 1000 ether);
         vm.stopPrank();
     }
@@ -661,19 +662,19 @@ contract DividendsTest is Test {
 
     function testOnlyOwner_SetAutoClaimOnTransfer() public {
         vm.prank(user1);
-        vm.expectRevert(NomaDividends.NotOwner.selector);
+        vm.expectRevert(OnlyOwner.selector);
         dividends.setAutoClaimOnTransfer(false);
     }
 
     function testOnlyOwner_SetSharesToken() public {
         vm.prank(user1);
-        vm.expectRevert(NomaDividends.NotOwner.selector);
+        vm.expectRevert(OnlyOwner.selector);
         dividends.setSharesToken();
     }
 
     function testOnlySharesToken_TransferHook() public {
         vm.prank(user1);
-        vm.expectRevert(NomaDividends.NotSharesToken.selector);
+        vm.expectRevert(NotSharesToken.selector);
         dividends.onSharesTransferHook(user1, user2);
     }
 

@@ -4,6 +4,7 @@ pragma solidity ^0.8.23;
 import "forge-std/Test.sol";
 import "../src/libraries/Utils.sol";
 import "../src/types/Types.sol";
+import {Utils as UtilsLib} from "../src/libraries/Utils.sol";
 
 /// @notice Helper contract to test internal library functions with expectRevert
 contract StringToBytes8Caller {
@@ -44,9 +45,9 @@ contract ReferralCodeTest is Test {
         console.log("Code string from getCodeString:", codeStr);
         console.log("Code string length:", bytes(codeStr).length);
 
-        // This should fail with "String too long for bytes8"
+        // This should fail with InvalidInputLength
         // Using external call wrapper so vm.expectRevert works
-        vm.expectRevert("String too long for bytes8");
+        vm.expectRevert(UtilsLib.InvalidInputLength.selector);
         caller.callStringToBytes8(codeStr);
     }
     
@@ -100,7 +101,7 @@ contract ReferralCodeTest is Test {
         // This will fail because codeStr is 16 characters (8 bytes as hex)
         // but stringToBytes8 expects at most 8 characters
         // Using external call wrapper so vm.expectRevert works
-        vm.expectRevert("String too long for bytes8");
+        vm.expectRevert(UtilsLib.InvalidInputLength.selector);
         caller.callStringToBytes8(codeStr);
     }
     

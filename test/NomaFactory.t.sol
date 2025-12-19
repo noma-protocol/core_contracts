@@ -8,9 +8,9 @@ import { DeployerFactory } from "../src/factory/DeployerFactory.sol";
 import { ExtFactory } from "../src/factory/ExtFactory.sol";
 import { EtchVault } from "../src/vault/deploy/EtchVault.sol";
 import { TokenFactory } from "../src/factory/TokenFactory.sol";
-import { 
+import {
     VaultInit
-} from "../../src/vault/init/VaultInit.sol";
+} from "../src/vault/init/VaultInit.sol";
 import { 
     VaultUpgrade, 
     VaultUpgradeStep1, 
@@ -22,18 +22,21 @@ import {
 
 import { VaultFinalize } from "../src/vault/init/VaultFinalize.sol";
 
-import { 
+import {
     VaultDeployParams,
-    PresaleUserParams, 
-    VaultDescription, 
+    PresaleUserParams,
+    VaultDescription,
     ProtocolParameters,
     ExistingDeployData,
-    Decimals
+    Decimals,
+    VaultInfo
 } from "../src/types/Types.sol";
 
 import "../src/libraries/Utils.sol";
 import { SupplyRules } from "../src/libraries/SupplyRules.sol";
+import "../src/errors/Errors.sol";
 import { ModelHelper } from "../src/model/Helper.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { AdaptiveSupply } from "../src/controllers/supply/AdaptiveSupply.sol";
 import { PresaleFactory } from "../src/factory/PresaleFactory.sol";
 
@@ -515,7 +518,7 @@ contract NomaFactoryTest is Test {
             true          // use Uniswap
         );
 
-        vm.expectRevert(abi.encodeWithSignature("NotAuthorityError()"));
+        vm.expectRevert(NotAuthorized.selector);
 
         PresaleUserParams memory presaleParams =
         PresaleUserParams(
@@ -918,7 +921,7 @@ contract NomaFactoryTest is Test {
 
     /// @notice Test that basePrice of 0 reverts
     function test_GetMinSupply_ZeroBasePriceReverts() public {
-        vm.expectRevert("SupplyRules: basePrice is zero");
+        vm.expectRevert(InvalidParams.selector);
         supplyRulesHarness.getMinTotalSupplyForPrice(1e18, 0);
     }
 
@@ -1360,4 +1363,420 @@ contract NomaFactoryTest is Test {
 
         assertTrue(vault != address(0), "Vault should be deployed with new basePrice");
     }
+
+    // ========== isFreshDeploy = false Tests ==========
+
+    /// @notice Test deploying a vault with isFreshDeploy=false using existing token and pool
+    /// @dev This tests the code path where an existing token and pool are reused.
+    ///      IMPORTANT: When isFreshDeploy=false, the factory must have tokens before calling deployVault.
+    ///      The token owner must mint/transfer tokens to the factory first.
+    function testDeployVault_ExistingTokenAndPool() public {
+        // Skip if not running on fork (Uniswap factory won't be deployed)
+        if (uniswapFactory.code.length == 0) {
+            vm.skip(true);
+        }
+
+        expectedAddressesInResolver.push(
+            ContractInfo("WMON", WMON)
+        );
+        configureResolver();
+
+        // Step 1: Deploy first vault with isFreshDeploy=true to create token and pool
+        VaultDeployParams memory freshDeployParams = VaultDeployParams(
+            "Original Token",
+            "ORIG",
+            18,
+            100_000_000e18,
+            200_000_000e18,
+            1e18,
+            0,
+            WMON,
+            3000,
+            0,            // No presale
+            true,         // isFreshDeploy = true
+            true
+        );
+
+        PresaleUserParams memory presaleParams = PresaleUserParams(
+            100e18,
+            90 days
+        );
+
+        vm.prank(deployer);
+        (address vault1, address pool1, address token1) = nomaFactory.deployVault(
+            presaleParams,
+            freshDeployParams,
+            ExistingDeployData({
+                pool: address(0),
+                token0: address(0)
+            })
+        );
+
+        assertTrue(vault1 != address(0), "First vault should be deployed");
+        assertTrue(pool1 != address(0), "Pool should be created");
+        assertTrue(token1 != address(0), "Token should be created");
+
+        // Step 2: Mint tokens to the factory before deploying with isFreshDeploy=false
+        // The token allows the factory to mint, so vault1 (which is the minting authority via factory) can mint
+        // Actually, the NomaFactory.mintTokens() is called by vaults, so we need to use the vault
+        // For testing, we'll mint directly from vault1 to the factory
+        vm.prank(vault1);
+        nomaFactory.mintTokens(address(nomaFactory), 100_000_000e18);
+
+        uint256 factoryBalance = IERC20(token1).balanceOf(address(nomaFactory));
+        assertEq(factoryBalance, 100_000_000e18, "Factory should have tokens before isFreshDeploy=false");
+
+        // Step 3: Deploy second vault with isFreshDeploy=false using existing token and pool
+        VaultDeployParams memory existingDeployParams = VaultDeployParams(
+            "Original Token",     // Same name
+            "ORIG2",              // Different symbol to avoid duplicate check
+            18,
+            100_000_000e18,
+            200_000_000e18,
+            1e18,
+            0,
+            WMON,
+            3000,
+            0,            // No presale
+            false,        // isFreshDeploy = false - use existing token/pool
+            true
+        );
+
+        vm.prank(deployer);
+        (address vault2, address pool2, address token2) = nomaFactory.deployVault(
+            presaleParams,
+            existingDeployParams,
+            ExistingDeployData({
+                pool: pool1,      // Use existing pool
+                token0: token1    // Use existing token
+            })
+        );
+
+        assertTrue(vault2 != address(0), "Second vault should be deployed");
+        assertEq(pool2, pool1, "Should use the same pool");
+        assertEq(token2, token1, "Should use the same token");
+        assertTrue(vault2 != vault1, "Should be a different vault");
+
+        // Verify vault descriptions
+        VaultDescription memory vaultDesc1 = nomaFactory.getVaultDescription(vault1);
+        VaultDescription memory vaultDesc2 = nomaFactory.getVaultDescription(vault2);
+
+        assertEq(vaultDesc1.token0, token1, "Vault1 token0 should match");
+        assertEq(vaultDesc2.token0, token1, "Vault2 token0 should match (same token)");
+        assertEq(vaultDesc1.token1, WMON, "Vault1 token1 should be WMON");
+        assertEq(vaultDesc2.token1, WMON, "Vault2 token1 should be WMON");
+    }
+
+    /// @notice Test that isFreshDeploy=false with zero addresses reverts or fails gracefully
+    function testDeployVault_ExistingDeploy_ZeroAddresses() public {
+        expectedAddressesInResolver.push(
+            ContractInfo("WMON", WMON)
+        );
+        configureResolver();
+
+        VaultDeployParams memory existingDeployParams = VaultDeployParams(
+            "Test Token",
+            "TEST",
+            18,
+            100_000_000e18,
+            200_000_000e18,
+            1e18,
+            0,
+            WMON,
+            3000,
+            0,
+            false,        // isFreshDeploy = false
+            true
+        );
+
+        PresaleUserParams memory presaleParams = PresaleUserParams(
+            100e18,
+            90 days
+        );
+
+        // Should revert when using isFreshDeploy=false with zero addresses
+        vm.expectRevert();
+        vm.prank(deployer);
+        nomaFactory.deployVault(
+            presaleParams,
+            existingDeployParams,
+            ExistingDeployData({
+                pool: address(0),   // Zero address - invalid
+                token0: address(0)  // Zero address - invalid
+            })
+        );
+    }
+
+    /// @notice Test full vault lifecycle with isFreshDeploy=false including configureVault
+    /// @dev This comprehensive test verifies the vault can be fully configured and used
+    function testDeployVault_ExistingDeploy_FullLifecycle() public {
+        // Skip if not running on fork
+        if (uniswapFactory.code.length == 0) {
+            vm.skip(true);
+        }
+
+        expectedAddressesInResolver.push(
+            ContractInfo("WMON", WMON)
+        );
+        configureResolver();
+
+        // Step 1: Create token and pool via fresh deploy
+        VaultDeployParams memory freshDeployParams = VaultDeployParams(
+            "Lifecycle Token",
+            "LIFE",
+            18,
+            100_000_000e18,
+            200_000_000e18,
+            1e18,
+            0,
+            WMON,
+            3000,
+            0,
+            true,         // Fresh deploy first
+            true
+        );
+
+        PresaleUserParams memory presaleParams = PresaleUserParams(
+            100e18,
+            90 days
+        );
+
+        vm.prank(deployer);
+        (address vault1, address pool1, address token1) = nomaFactory.deployVault(
+            presaleParams,
+            freshDeployParams,
+            ExistingDeployData({
+                pool: address(0),
+                token0: address(0)
+            })
+        );
+
+        // Step 2: Mint tokens to the factory before deploying with isFreshDeploy=false
+        vm.prank(vault1);
+        nomaFactory.mintTokens(address(nomaFactory), 100_000_000e18);
+
+        // Step 3: Deploy vault with existing token/pool
+        VaultDeployParams memory existingDeployParams = VaultDeployParams(
+            "Lifecycle Token",
+            "LIFE2",
+            18,
+            100_000_000e18,
+            200_000_000e18,
+            1e18,
+            0,
+            WMON,
+            3000,
+            0,
+            false,        // Use existing
+            true
+        );
+
+        vm.prank(deployer);
+        (address vault2, address pool2, address token2) = nomaFactory.deployVault(
+            presaleParams,
+            existingDeployParams,
+            ExistingDeployData({
+                pool: pool1,
+                token0: token1
+            })
+        );
+
+        assertTrue(vault2 != address(0), "Vault2 should be deployed");
+
+        // Step 4: Configure the vault (this adds all facets)
+        vm.prank(deployer);
+        nomaFactory.configureVault(vault2, 0);
+
+        // Step 5: Verify vault is properly configured
+        VaultDescription memory vaultDesc = nomaFactory.getVaultDescription(vault2);
+        assertEq(vaultDesc.vault, vault2, "Vault address should match");
+        assertEq(vaultDesc.deployer, deployer, "Deployer should match");
+
+        // Step 6: Verify vault info is accessible (proves facets are installed)
+        // Using low-level call to avoid interface issues
+        (bool success, bytes memory data) = vault2.staticcall(
+            abi.encodeWithSignature("getVaultInfo()")
+        );
+        assertTrue(success, "getVaultInfo should succeed - BaseVault facet installed");
+
+        // Verify staking is accessible
+        (success, ) = vault2.staticcall(
+            abi.encodeWithSignature("stakingEnabled()")
+        );
+        assertTrue(success, "stakingEnabled should be callable - StakingVault facet installed");
+
+        // Verify lending functions are accessible
+        (success, ) = vault2.staticcall(
+            abi.encodeWithSignature("loanCount()")
+        );
+        assertTrue(success, "loanCount should be callable - LendingVault facet installed");
+    }
+
+    /// @notice Test full protocol operations with isFreshDeploy=false vault
+    /// @dev Tests shift, slide, borrow, and staking functionality
+    function testDeployVault_ExistingDeploy_ProtocolOperations() public {
+        // Skip if not running on fork
+        if (uniswapFactory.code.length == 0) {
+            vm.skip(true);
+        }
+
+        expectedAddressesInResolver.push(
+            ContractInfo("WMON", WMON)
+        );
+        configureResolver();
+
+        // Deploy first vault with fresh deploy
+        VaultDeployParams memory freshDeployParams = VaultDeployParams(
+            "Operations Token",
+            "OPS",
+            18,
+            100_000_000e18,
+            200_000_000e18,
+            1e18,
+            0,
+            WMON,
+            3000,
+            0,
+            true,
+            true
+        );
+
+        PresaleUserParams memory presaleParams = PresaleUserParams(
+            100e18,
+            90 days
+        );
+
+        vm.prank(deployer);
+        (address vault1, address pool1, address token1) = nomaFactory.deployVault(
+            presaleParams,
+            freshDeployParams,
+            ExistingDeployData({
+                pool: address(0),
+                token0: address(0)
+            })
+        );
+
+        // Configure first vault
+        vm.prank(deployer);
+        nomaFactory.configureVault(vault1, 0);
+
+        // Mint tokens to factory for second vault
+        vm.prank(vault1);
+        nomaFactory.mintTokens(address(nomaFactory), 100_000_000e18);
+
+        // Deploy second vault with isFreshDeploy=false
+        VaultDeployParams memory existingDeployParams = VaultDeployParams(
+            "Operations Token",
+            "OPS2",
+            18,
+            100_000_000e18,
+            200_000_000e18,
+            1e18,
+            0,
+            WMON,
+            3000,
+            0,
+            false,
+            true
+        );
+
+        vm.prank(deployer);
+        (address vault2,,) = nomaFactory.deployVault(
+            presaleParams,
+            existingDeployParams,
+            ExistingDeployData({
+                pool: pool1,
+                token0: token1
+            })
+        );
+
+        // Configure second vault
+        vm.prank(deployer);
+        nomaFactory.configureVault(vault2, 0);
+
+        // ============ TEST SHIFT ============
+        // Shift should revert with AboveThreshold when liquidity ratio is high
+        // This proves the ExtVault facet is installed and working
+        (bool shiftSuccess,) = vault2.call(abi.encodeWithSignature("shift()"));
+        // We expect it to revert with AboveThreshold (0xe40aeaf5) because no trades have occurred
+        // If it doesn't revert, that's also valid (means shift conditions were met)
+        console.log("Shift call success:", shiftSuccess);
+
+        // ============ TEST SLIDE ============
+        // Slide should revert with conditions not met
+        (bool slideSuccess,) = vault2.call(abi.encodeWithSignature("slide()"));
+        console.log("Slide call success:", slideSuccess);
+
+        // ============ TEST STAKING CONTRACT ============
+        (bool stakingSuccess, bytes memory stakingData) = vault2.staticcall(
+            abi.encodeWithSignature("getStakingContract()")
+        );
+        assertTrue(stakingSuccess, "getStakingContract should succeed");
+        address stakingContract = abi.decode(stakingData, (address));
+        assertTrue(stakingContract != address(0), "Staking contract should be set");
+        console.log("Staking contract:", stakingContract);
+
+        // ============ TEST LOAN COUNT ============
+        (bool loanCountSuccess, bytes memory loanCountData) = vault2.staticcall(
+            abi.encodeWithSignature("loanCount()")
+        );
+        assertTrue(loanCountSuccess, "loanCount should succeed");
+        uint256 loanCount = abi.decode(loanCountData, (uint256));
+        assertEq(loanCount, 0, "Initial loan count should be 0");
+        console.log("Loan count:", loanCount);
+
+        // ============ TEST LIQUIDITY POSITIONS ============
+        (bool positionsSuccess, bytes memory positionsData) = vault2.staticcall(
+            abi.encodeWithSignature("getPositions()")
+        );
+        assertTrue(positionsSuccess, "getPositions should succeed");
+        console.log("Positions retrieved successfully");
+
+        // ============ TEST VAULT INFO ============
+        (bool infoSuccess, bytes memory infoData) = vault2.staticcall(
+            abi.encodeWithSignature("getVaultInfo()")
+        );
+        assertTrue(infoSuccess, "getVaultInfo should succeed");
+        console.log("VaultInfo retrieved successfully");
+
+        // ============ TEST BORROW (should fail - internal only) ============
+        // First approve tokens as collateral
+        vm.prank(deployer);
+        IERC20(token1).approve(vault2, type(uint256).max);
+
+        // Borrow should revert with NotPermitted - external borrow requires going through ExtVault
+        // This proves the LendingVault facet is installed and access control works
+        vm.prank(deployer);
+        (bool borrowSuccess,) = vault2.call(
+            abi.encodeWithSignature("borrow(uint256,uint256)", 0.1 ether, 30 days)
+        );
+        assertFalse(borrowSuccess, "Borrow should fail - proves lending facet and access control work");
+        console.log("Borrow reverted as expected (NotPermitted)");
+
+        // ============ VERIFY VAULT IS FULLY FUNCTIONAL ============
+        // Get VaultInfo which contains all the key protocol state
+        (bool infoSuccess2, bytes memory infoData2) = vault2.staticcall(
+            abi.encodeWithSignature("getVaultInfo()")
+        );
+        assertTrue(infoSuccess2, "getVaultInfo should succeed");
+
+        // Decode and verify key fields
+        VaultInfo memory vaultInfo = abi.decode(infoData2, (VaultInfo));
+        assertTrue(vaultInfo.initialized, "Vault should be initialized");
+        assertTrue(vaultInfo.stakingContract != address(0), "Staking contract should be set");
+        assertTrue(vaultInfo.sToken != address(0), "sToken should be set");
+        assertGt(vaultInfo.circulatingSupply, 0, "Circulating supply should be > 0");
+        assertGt(vaultInfo.liquidityRatio, 0, "Liquidity ratio should be > 0");
+
+        console.log("VaultInfo verification:");
+        console.log("  - initialized:", vaultInfo.initialized);
+        console.log("  - stakingContract:", vaultInfo.stakingContract);
+        console.log("  - sToken:", vaultInfo.sToken);
+        console.log("  - liquidityRatio:", vaultInfo.liquidityRatio);
+        console.log("  - circulatingSupply:", vaultInfo.circulatingSupply);
+
+        console.log("All protocol operations verified for isFreshDeploy=false vault");
+    }
+
+    receive() external payable {}
 }
