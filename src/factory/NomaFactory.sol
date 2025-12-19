@@ -144,7 +144,7 @@ contract NomaFactory {
             _deployerFactory == address(0)  || 
             _extFactory == address(0)       ||
             _presaleFactory == address(0)
-        ) revert ZeroAddressError();
+        ) revert ZeroAddress();
 
         authority = msg.sender;
         teamMultisigAddress = msg.sender;
@@ -189,7 +189,7 @@ contract NomaFactory {
             vaultDeployParams.decimals < getProtocolParameters().decimals.minDecimals ||
             vaultDeployParams.decimals > getProtocolParameters().decimals.maxDecimals
         ) {
-            revert InvalidParameters();
+            revert InvalidParams();
         }
 
         ERC1967Proxy proxy; 
@@ -219,7 +219,7 @@ contract NomaFactory {
         if (vaultDeployParams.presale == 1 && msg.sender != authority) {
             uint256 deployFee = getProtocolParameters().deployFee;
             if (msg.value < deployFee) {
-                revert InvalidParameters();
+                revert InvalidParams();
             } else {
                 address payable recipient = teamMultisigAddress != address(0)
                     ? payable(teamMultisigAddress)
@@ -708,13 +708,13 @@ contract NomaFactory {
     * It reverts if the provided address is zero.
     */
     function setMultiSigAddress(address _address) public {
-        if (msg.sender != teamMultisigAddress && msg.sender != authority) revert NotAuthorityError();
-        if (_address == address(0)) revert ZeroAddressError();
+        if (msg.sender != teamMultisigAddress && msg.sender != authority) revert NotAuthorized();
+        if (_address == address(0)) revert ZeroAddress();
         teamMultisigAddress = _address;
     }
 
     function setVaultOwnership(address vaultAddress, address newOwner) public {
-        if (msg.sender != teamMultisigAddress && msg.sender != authority) revert NotAuthorityError();
+        if (msg.sender != teamMultisigAddress && msg.sender != authority) revert NotAuthorized();
         IDiamondInterface(vaultAddress).transferOwnership(newOwner);
     }
 
@@ -734,7 +734,7 @@ contract NomaFactory {
 
     function _calculatePresalePremium(uint256 _idoPrice) internal view returns (uint256) {
         uint256 premium = protocolParameters.presalePremium;
-        if (premium == 0) revert InvalidParameters();
+        if (premium == 0) revert InvalidParams();
         uint256 presalePrice = _idoPrice + (_idoPrice * premium / 100);
         return presalePrice;
     }
@@ -919,7 +919,7 @@ contract NomaFactory {
      */
     modifier checkDeployAuthority() {
         if (!permissionlessDeployEnabled) {
-            if (msg.sender != authority) revert NotAuthorityError();
+            if (msg.sender != authority) revert NotAuthorized();
         }
         _;
     }
@@ -929,7 +929,7 @@ contract NomaFactory {
      * @dev Reverts with NotAuthorityError if the caller is not the authority.
      */
     modifier isAuthority() {
-        if (msg.sender != authority) revert NotAuthorityError();
+        if (msg.sender != authority) revert NotAuthorized();
         _;
     }
 
@@ -938,7 +938,7 @@ contract NomaFactory {
      * @dev Reverts with OnlyVaultsError if the caller is not an authorized vault.
      */
     modifier onlyVaults() {
-        if (vaultsRepository[msg.sender].vault != msg.sender) revert OnlyVaultsError();
+        if (vaultsRepository[msg.sender].vault != msg.sender) revert OnlyVault();
         _;
     }
 }

@@ -25,6 +25,7 @@ import {Resolver} from "../Resolver.sol";
 import {MultiTokenDividends} from "../libraries/MultiTokenDividends.sol";
 import {Utils} from "../libraries/Utils.sol";
 import {VaultDescription} from "../types/Types.sol";
+import "../errors/Errors.sol";
 
 interface INomaFactory {
     function getVaultsRepository(address vault) external view returns (VaultDescription memory);
@@ -103,13 +104,7 @@ contract NomaDividends {
     //                         ERRORS
     // ============================================================
 
-    error InvalidRewardToken();
-    error ZeroAmount();
-    error NoShares();
-    error OnlyVaultsError();
-    error NotSharesToken();
-    error NotOwner();
-
+    
     // ============================================================
     //                       CONSTRUCTOR
     // ============================================================
@@ -125,7 +120,7 @@ contract NomaDividends {
     // ============================================================
 
     modifier onlyOwner() {
-        if (msg.sender != owner) revert NotOwner();
+        if (msg.sender != owner) revert OnlyOwner();
         _;
     }
 
@@ -434,7 +429,7 @@ contract NomaDividends {
     /// @dev Only known vaults (from factory registry) can call certain functions (e.g. distribute).
     modifier onlyVaults() {
         VaultDescription memory vaultDesc = factory.getVaultsRepository(msg.sender);
-        if (vaultDesc.vault != msg.sender) revert OnlyVaultsError();
+        if (vaultDesc.vault != msg.sender) revert OnlyVault();
         _;
     }
 }

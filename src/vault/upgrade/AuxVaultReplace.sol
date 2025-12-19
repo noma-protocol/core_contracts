@@ -5,6 +5,7 @@ import { IUniswapV3Pool } from "v3-core/interfaces/IUniswapV3Pool.sol";
 import { VaultStorage } from "../../libraries/LibAppStorage.sol";
 import { ProtocolParameters, LiquidityPosition } from "../../types/Types.sol";
 import { Utils } from "../../libraries/Utils.sol";
+import "../../errors/Errors.sol";
 
 interface INomaFactory {
     function deferredDeploy(address deployer) external;
@@ -13,9 +14,6 @@ interface INomaFactory {
     function teamMultiSig() external view returns (address);
 }
 
-error NotAuthorized();
-error NotInitialized();
-error OnlyInternalCalls();
 /**
  * @title AuxVault
  * @notice A contract for vault auxiliary public functions.
@@ -58,7 +56,8 @@ contract AuxVault {
      */
     function getFunctionSelectors() external pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](1);
-        selectors[0] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256,int24)[3])")));
+        // LiquidityPosition struct: (int24 lowerTick, int24 upperTick, uint128 liquidity, uint256 price, int24 tickSpacing, uint8 liquidityType)
+        selectors[0] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256,int24,uint8)[3])")));
         return selectors;
     }
 }

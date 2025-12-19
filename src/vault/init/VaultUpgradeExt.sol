@@ -11,6 +11,7 @@ import { LendingOpsVault } from "../LendingOpsVault.sol";
 import { IDiamondCut } from "../../interfaces/IDiamondCut.sol";
 import { IFacet } from "../../interfaces/IFacet.sol";
 import { Utils } from "../../libraries/Utils.sol";
+import "../../errors/Errors.sol";
 
 /**
  * @title IVaultUpgrader
@@ -33,12 +34,6 @@ interface IDiamondInterface {
     function initialize() external;
     function transferOwnership(address) external;
 }
-
-error OnlyFactory();
-error OnlyOwner();
-error InvalidAddress();
-error NotAuthorized();
-
 
 /**
  * @title VaultUpgradeStep1

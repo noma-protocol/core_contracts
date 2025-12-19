@@ -34,6 +34,7 @@ import {
     SwapParams,
     LiquidityType
 } from "../src/types/Types.sol";
+import "../src/errors/Errors.sol";
 
 interface IWETH {
     function deposit() external payable;
@@ -55,9 +56,6 @@ contract ExchangeHelper {
 
     error NoETHSent();
     error NoToken0Received();
-    error InvalidAmount();
-    error InvalidSwap();
-    error NotAuthorized();
 
     // TokenInfo state variable
     TokenInfo public tokenInfo;
@@ -296,8 +294,8 @@ contract ExchangeHelper {
         uint256 slippageTolerance,
         bytes8 referralCode
     ) public lock {
-        require(amount > 0, "ExchangeHelper: Amount must be greater than 0");
-        
+        if (amount == 0) revert InvalidAmount();
+
         int24 tickSpacing = IUniswapV3Pool(pool).tickSpacing();
 
         tokenInfo = TokenInfo({
@@ -329,8 +327,8 @@ contract ExchangeHelper {
             
         // Perform the swap
         (int256 amount0, int256 amount1) = Uniswap.swap(swapParams);
-        require(amount1 < 0, "ExchangeHelper: Invalid swap");
-        
+        if (amount1 >= 0) revert InvalidSwap();
+
         uint256 ethReceived = uint256(-amount1);
         IWETH(WMON).withdraw(ethReceived);
         payable(receiver).transfer(ethReceived);
@@ -405,7 +403,7 @@ contract ExchangeHelper {
 
     // Modifier to prevent reentrancy
     modifier lock() {
-        require(!locked, "ExchangeHelper: Reentrant call");
+        if (locked) revert ReentrantCall();
         locked = true;
         _;
         locked = false;

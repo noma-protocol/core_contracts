@@ -7,16 +7,18 @@ library TickMathExtra {
     int24 internal constant MIN_TICK = -887272;
     int24 internal constant MAX_TICK =  887272;
 
+    error InvalidTickSpacing();
+
     /// @notice Floor to multiple of spacing (<= tick)
     function floorToSpacing(int24 tick, int24 tickSpacing) internal pure returns (int24) {
-        require(tickSpacing > 0, "spacing=0");
+        if (tickSpacing <= 0) revert InvalidTickSpacing();
         int24 r = tick % tickSpacing; // remainder keeps sign of tick in Solidity
         return r >= 0 ? tick - r : tick - (r + tickSpacing);
     }
 
     /// @notice Ceil to multiple of spacing (>= tick)
     function ceilToSpacing(int24 tick, int24 tickSpacing) internal pure returns (int24) {
-        require(tickSpacing > 0, "spacing=0");
+        if (tickSpacing <= 0) revert InvalidTickSpacing();
         int24 r = tick % tickSpacing;
         if (r == 0) return tick;
         return r > 0 ? tick + (tickSpacing - r) : (tick - r);
@@ -24,7 +26,7 @@ library TickMathExtra {
 
     /// @notice Bounds for a given spacing (inclusive)
     function boundsForSpacing(int24 tickSpacing) internal pure returns (int24 minTick, int24 maxTick) {
-        require(tickSpacing > 0, "spacing=0");
+        if (tickSpacing <= 0) revert InvalidTickSpacing();
         // For MIN_TICK (negative), do a true floor:
         int24 rMin = MIN_TICK % tickSpacing;
         minTick = rMin == 0 ? MIN_TICK : MIN_TICK - (rMin + tickSpacing);

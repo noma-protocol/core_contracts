@@ -133,8 +133,8 @@ contract TokenFactory {
         proxy = _deployProxy(p, owner, nomaImpl, predictedProxy, proxySalt);
 
         // 3) Sanity checks
-        require(IERC20(address(proxy)).totalSupply() == p.initialSupply, "wrong parameters");
-        require(address(proxy) != address(0), "Token deploy failed");
+        if (IERC20(address(proxy)).totalSupply() != p.initialSupply) revert InvalidParams();
+        if (address(proxy) == address(0)) revert ZeroAddress();
     }
 
     function _deployImpl(
@@ -143,7 +143,7 @@ contract TokenFactory {
     ) internal returns (NomaToken nomaImpl) {
         bytes memory implCode = type(NomaToken).creationCode;
         address implAddr = _doDeploy(implCode, uint256(implSalt));
-        require(implAddr == predictedImpl, "Impl address mismatch");
+        if (implAddr != predictedImpl) revert InvalidAddress();
         nomaImpl = NomaToken(implAddr);
     }
 
@@ -178,8 +178,8 @@ contract TokenFactory {
         );
 
         address proxyAddr = _doDeploy(proxyBytecode, uint256(proxySalt));
-        require(proxyAddr == predictedProxy, "Proxy address mismatch");
-        require(proxyAddr < p.token1, "Proxy address fails token1 constraint");
+        if (proxyAddr != predictedProxy) revert InvalidAddress();
+        if (proxyAddr >= p.token1) revert InvalidParams();
 
         proxy = ERC1967Proxy(payable(proxyAddr));
     }
@@ -206,7 +206,7 @@ contract TokenFactory {
     }
 
     modifier onlyFactory() {
-        require(msg.sender == factory(), "Only factory allowed");
+        if (msg.sender != factory()) revert OnlyFactory();
         _;
     }
 }

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { ExtVault } from "../ExtVault.sol"; 
+import { ExtVault } from "../ExtVault.sol";
 import { IDiamondCut } from "../../interfaces/IDiamondCut.sol";
 import { IFacet } from "../../interfaces/IFacet.sol";
+import "../../errors/Errors.sol";
 
 interface IDiamondInterface {
     function initialize() external;
@@ -35,7 +36,7 @@ contract VaultFinalize  {
      * @param _upgradePreviousStep The address of the previous upgrade step contract.
      */
     function init(address _someContract, address _upgradePreviousStep) onlyOwner public {
-        require(_upgradePreviousStep != address(0), "Invalid address");
+        if (_upgradePreviousStep == address(0)) revert InvalidAddress();
         finalAuthority = _someContract;
         upgradePreviousStep = _upgradePreviousStep;
     }
@@ -72,7 +73,7 @@ contract VaultFinalize  {
      * @notice Modifier to restrict access to the contract owner.
      */
     modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner");
+        if (msg.sender != owner) revert OnlyOwner();
         _;
     }
 
@@ -80,7 +81,7 @@ contract VaultFinalize  {
      * @notice Modifier to restrict access to the previous upgrade step contract.
      */
     modifier authorized() {
-        require(msg.sender == upgradePreviousStep, "Only UpgradePreviousStep");
+        if (msg.sender != upgradePreviousStep) revert NotAuthorized();
         _;
     }
 }

@@ -25,6 +25,7 @@ library Utils {
     error InvalidChars();
     error InvalidTickSpacing();
     error InvalidFeeTier();
+    error InvalidInputLength();
 
     /**
      * @notice Adds or subtracts basis points (bips) from a given price.
@@ -223,8 +224,8 @@ library Utils {
      * @return The nearest usable tick.
      */
     function nearestUsableTick(int24 tick, int24 tickSpacing) internal pure returns (int24) {
-        require(tickSpacing > 0, "Invalid tick spacing");
-        require(tick >= MIN_TICK && tick <= MAX_TICK, "Out of range");
+        if (tickSpacing <= 0) revert InvalidTickSpacing();
+        if (tick < MIN_TICK || tick > MAX_TICK) revert OutOfRange();
 
         int24 remainder = tick % tickSpacing;
         int24 rounded = _roundTick(tick, remainder, tickSpacing);
@@ -323,7 +324,7 @@ library Utils {
      */
     function stringToBytes8(string memory source) internal pure returns (bytes8 result) {
         bytes memory temp = bytes(source);
-        require(temp.length <= 8, "String too long for bytes8");
+        if (temp.length > 8) revert InvalidInputLength();
         assembly {
             // load first 32 bytes of `temp` data, starting after length slot
             result := mload(add(temp, 32))

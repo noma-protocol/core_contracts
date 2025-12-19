@@ -10,6 +10,7 @@ import { IFacet } from "../../interfaces/IFacet.sol";
 import { IDiamond } from "../../interfaces/IDiamond.sol";
 import { Utils } from "../../libraries/Utils.sol";
 import { IAddressResolver } from "../../interfaces/IAddressResolver.sol";
+import "../../errors/Errors.sol";
 
 /**
  * @title EtchVault
@@ -109,7 +110,7 @@ contract EtchVault {
      * @notice Modifier to restrict access to the factory contract.
      */
     modifier onlyFactory() {
-        require(msg.sender == factory, "Only factory");
+        if (msg.sender != factory) revert OnlyFactory();
         _;
     }
 }

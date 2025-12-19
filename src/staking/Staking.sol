@@ -75,16 +75,6 @@ contract Staking is ReentrancyGuard, ERC20Recovery {
     // Lock-in period in epochs (e.g., 1 for one epoch)
     uint256 public lockInEpochs = 1;
 
-    // Custom errors
-    error StakingNotEnabled();
-    error InvalidParameters();
-    error NotEnoughBalance(uint256 currentBalance);
-    error InvalidReward();
-    error OnlyVault();
-    error CustomError();
-    error CooldownNotElapsed();
-    error LockInPeriodNotElapsed();
-
     // Events
     event Staked(address indexed user, uint256 amount);
     event Unstaked(address indexed user, uint256 amount);
@@ -125,7 +115,7 @@ contract Staking is ReentrancyGuard, ERC20Recovery {
     */
     function stake(uint256 _amount) external nonReentrant {
         if (_amount == 0) {
-            revert InvalidParameters();
+            revert InvalidParams();
         }
 
         if (IVault(vault).stakingEnabled() == false || epoch.number == 0) {

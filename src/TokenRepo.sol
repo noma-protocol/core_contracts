@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "./errors/Errors.sol";
 
 /// @title ITokenRepo Interface
 /// @notice Interface for a token repository contract that can transfer tokens
@@ -34,7 +35,7 @@ contract TokenRepo {
     /// @notice Constructor that sets the contract owner.
     /// @param _owner The address that will be set as the owner.
     constructor(address _owner) {
-        require(_owner != address(0), "Invalid owner address");
+        if (_owner == address(0)) revert ZeroAddress();
         owner = _owner;
     }
 
@@ -52,15 +53,15 @@ contract TokenRepo {
     /// @notice Initiates ownership transfer to a new address (two-step process)
     /// @param newOwner The address of the proposed new owner
     function transferOwnership(address newOwner) external onlyOwner {
-        require(newOwner != address(0), "Invalid new owner");
-        require(newOwner != owner, "Already owner");
+        if (newOwner == address(0)) revert ZeroAddress();
+        if (newOwner == owner) revert InvalidParams();
         pendingOwner = newOwner;
         emit OwnershipTransferInitiated(owner, newOwner);
     }
 
     /// @notice Accepts pending ownership transfer
     function acceptOwnership() external {
-        require(msg.sender == pendingOwner, "Not pending owner");
+        if (msg.sender != pendingOwner) revert NotAuthorized();
         emit OwnershipTransferred(owner, pendingOwner);
         owner = pendingOwner;
         pendingOwner = address(0);
@@ -69,7 +70,7 @@ contract TokenRepo {
     /// @notice Modifier that restricts function access to only the owner.
     /// @dev Reverts if msg.sender is not the owner.
     modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner can call this function");
+        if (msg.sender != owner) revert OnlyOwner();
         _;
     }
 }

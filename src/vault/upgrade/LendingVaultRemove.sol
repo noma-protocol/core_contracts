@@ -12,10 +12,11 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {
-    LiquidityPosition, 
+    LiquidityPosition,
     LiquidityType,
     LoanPosition
 } from "../../types/Types.sol";
+import "../../errors/Errors.sol";
 
 interface INomaFactory {
     function deferredDeploy(address deployer) external;
@@ -23,22 +24,6 @@ interface INomaFactory {
     function burnFor(address from, uint256 amount) external;
     function teamMultiSig() external view returns (address);
 }
-
-// Custom errors
-error NotInitialized();
-error InsufficientLoanAmount();
-error InvalidDuration();
-error InsufficientFloorBalance();
-error NoActiveLoan();
-error ActiveLoan();
-error LoanExpired();
-error InsufficientCollateral();
-error CantRollLoan();
-error NoLiquidity();
-error OnlyVault();
-error InvalidRepayAmount();
-error InvalidParams();
-error NotPermitted();
 
 /**
  * @title LendingVault
@@ -52,7 +37,7 @@ contract LendingVaultRemove is BaseVault {
      * @notice Updates the liquidity positions in the vault.
      * @param _positions The new liquidity positions.
      */
-    function updatePositions(LiquidityPosition[3] memory _positions) public onlyInternalCalls {
+    function updatePositions(LiquidityPosition[3] memory _positions) public  onlyInternalCalls {
         if (!_v.initialized) revert NotInitialized();             
         // if (_positions[0].liquidity == 0 || _positions[1].liquidity == 0 || _positions[2].liquidity == 0) revert NoLiquidity();
         
@@ -63,7 +48,7 @@ contract LendingVaultRemove is BaseVault {
      * @notice Internal function to update the liquidity positions.
      * @param _positions The new liquidity positions.
      */
-    function _updatePositions(LiquidityPosition[3] memory _positions) internal {   
+    function _updatePositions(LiquidityPosition[3] memory _positions) internal  {   
         // if (_positions[0].liquidity == 0 || _positions[1].liquidity == 0 || _positions[2].liquidity == 0) revert NoLiquidity();
 
         _v.floorPosition = _positions[0];
@@ -78,7 +63,8 @@ contract LendingVaultRemove is BaseVault {
      */
     function getFunctionSelectors() external pure override returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](1);
-        selectors[0] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256,int24)[3])")));
+        // LiquidityPosition struct: (int24 lowerTick, int24 upperTick, uint128 liquidity, uint256 price, int24 tickSpacing, uint8 liquidityType)
+        selectors[0] = bytes4(keccak256(bytes("updatePositions((int24,int24,uint128,uint256,int24,uint8)[3])")));
 
         return selectors;
     }

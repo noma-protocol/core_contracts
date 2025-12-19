@@ -14,6 +14,7 @@ import {IUniswapV3Pool} from "v3-core/interfaces/IUniswapV3Pool.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {LiquidityType, SwapParams} from "../../types/Types.sol";
 import {Conversions} from "../../libraries/Conversions.sol";
+import "../../errors/Errors.sol";
 
 interface IStakingVault {
     function mintAndDistributeRewards(address caller, ProtocolAddresses memory addresses) external;
@@ -35,14 +36,6 @@ event DefaultLoans(uint256 totalBurned, uint256 totalLoans);
 
 event Shift();
 event Slide();
-error Locked();
-
-
-
-// Custom errors
-error ZeroLiquidty();
-error NoTokensExchanged();
-error InvalidSwap();
 
 /**
  * @title ExtVault
@@ -59,7 +52,7 @@ contract ExtVaultReplace {
 
     /// @dev Reentrancy lock modifier.
     modifier lock() {
-        if (_v.isLocked[address(this)]) revert Locked();
+        if (_v.isLocked[address(this)]) revert ReentrantCall();
         _v.isLocked[address(this)] = true;
         _;
         _v.isLocked[address(this)] = false;

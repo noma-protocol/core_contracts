@@ -31,6 +31,7 @@
   import {Utils} from "../libraries/Utils.sol";
   import {DecimalMath} from "../libraries/DecimalMath.sol";
   import {PresaleDeployParams, PresaleProtocolParams, LivePresaleParams, SwapParams} from "../types/Types.sol";
+import "../errors/Errors.sol";
 
   interface IVault {
       function afterPresale() external;
@@ -150,15 +151,12 @@
     error SoftCapNotMet();
     error HardCapExceeded();
     error NoContributionsToWithdraw();
-    error CallbackCaller();
     error InvalidParametersDuration();
     error InvalidParametersSoftcap();
     error InvalidParametersPct();
-    error InvalidParameters();
     error InvalidHardCap();
     error EmergencyWithdrawalNotEnabled();
     error NoReentrantCalls();
-    error NotAuthorized();
     error OnlyFactoryOwner();
 
     constructor(
@@ -255,15 +253,15 @@
     function deposit(bytes8 referralCode) external payable lock {
         if (hasExpired()) revert PresaleEnded();
         if (finalized) revert AlreadyFinalized();
-        if (msg.value == 0) revert InvalidParameters();
+        if (msg.value == 0) revert InvalidParams();
         if (isContributor[msg.sender]) revert AlreadyContributed();
 
         if (referralCode != bytes8(0) && referralCode == Utils.getReferralCode(msg.sender)) {
-            revert InvalidParameters();
+            revert InvalidParams();
         }
 
         if (migrationContract == address(0)) {
-            if (msg.value < MIN_CONTRIBUTION || msg.value > MAX_CONTRIBUTION) revert InvalidParameters();
+            if (msg.value < MIN_CONTRIBUTION || msg.value > MAX_CONTRIBUTION) revert InvalidParams();
         }
 
         if (totalDeposited + msg.value > hardCap) revert HardCapExceeded();

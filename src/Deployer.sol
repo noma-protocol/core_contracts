@@ -32,6 +32,7 @@ import {
 } from "./types/Types.sol";
 import {IAddressResolver} from "./interfaces/IAddressResolver.sol";
 import {Utils} from "./libraries/Utils.sol";
+import "./errors/Errors.sol";
 
 /// @title IVault Interface
 /// @notice Interface defining the functionality of the Vault contract.
@@ -97,20 +98,8 @@ contract Deployer is Ownable {
     /// @dev Event emitted when a discovery position is deployed.
     event DiscoveryDeployed(LiquidityPosition position);
 
-    /// @dev Error thrown when a function is called by an unauthorized address.
-    error OnlyFactoryAllowed();
-
     /// @dev Error thrown when the deployment is incomplete.
     error NotDeployed();
-
-    /// @dev Error thrown when a function is called while locked.
-    error Locked();
-
-    /// @dev Error thrown when a callback is made by an unauthorized address.
-    error CallBackCaller();
-
-    /// @dev Error thrown when the contract is already initialized.
-    error AlreadyInitialized();
 
     /// @dev Error thrown when the contract is not deployed.
     event Initialized();
@@ -165,7 +154,7 @@ contract Deployer is Ownable {
         uint256 amount1Owed, 
         bytes calldata data
     ) external {
-        if (msg.sender != address(pool)) revert CallBackCaller();
+        if (msg.sender != address(pool)) revert CallbackCaller();
 
         uint256 token0Balance = IERC20(token0).balanceOf(address(this));
         uint256 token1Balance = IERC20(token1).balanceOf(address(this));
@@ -195,7 +184,7 @@ contract Deployer is Ownable {
         uint256 amount1Owed, 
         bytes calldata data
     ) external {
-        if (msg.sender != address(pool)) revert CallBackCaller();
+        if (msg.sender != address(pool)) revert CallbackCaller();
 
         uint256 token0Balance = IERC20(token0).balanceOf(address(this));
         uint256 token1Balance = IERC20(token1).balanceOf(address(this));
@@ -391,7 +380,7 @@ contract Deployer is Ownable {
 
     /// @dev Reentrancy lock modifier.
     modifier lock() {
-        if (locked) revert Locked();
+        if (locked) revert ReentrantCall();
         locked = true;
         _;
         locked = false;
@@ -405,7 +394,7 @@ contract Deployer is Ownable {
 
     /// @dev Modifier to ensure only the factory can call certain functions.
     modifier onlyFactory() {
-        if (msg.sender != factory) revert OnlyFactoryAllowed();
+        if (msg.sender != factory) revert OnlyFactory();
         _;
     }
 

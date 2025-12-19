@@ -3,6 +3,7 @@ pragma solidity ^0.8.23;
 
 import {RewardParams} from "../../types/Types.sol";
 import {Math} from "openzeppelin/contracts/utils/math/Math.sol";
+import "../../errors/Errors.sol";
 
 /// @title RewardsCalculator
 /// @notice A contract to calculate rewards based on the ratio of total staked to circulating supply.
@@ -17,7 +18,7 @@ contract RewardsCalculator {
     function calculateRewards(
         RewardParams memory params
     ) public pure returns (uint256) {
-        require(params.circulating > 0, "Circulating supply cannot be zero");
+        if (params.circulating == 0) revert InvalidParams();
 
         // stakedRatio = (totalStaked / circulatingSupply), scaled by 1e18
         uint256 stakedRatio = (params.totalStaked * 1e18) / params.circulating;
