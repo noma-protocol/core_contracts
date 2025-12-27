@@ -142,11 +142,12 @@ library Conversions {
     */
     function sqrtPriceX96ToPrice(
         uint160 sqrtPriceX96,
-        uint8 decimals
+        uint8 decimals,
+        address vault
     ) public view returns (uint256) {
         // Handle the “upper bound” / exhausted liquidity case explicitly
         if (sqrtPriceX96 >= TickMath.MAX_SQRT_RATIO - 1) {
-            LiquidityPosition[3] memory positions = IVault(msg.sender).getPositions();
+            LiquidityPosition[3] memory positions = IVault(vault).getPositions();
 
             int24 discoveryUpperTick = positions[2].upperTick;
             uint256 upperTickToPrice = tickToSqrtPriceX96(int24(discoveryUpperTick));

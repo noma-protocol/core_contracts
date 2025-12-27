@@ -275,6 +275,8 @@ contract Deployer is Ownable {
 
         liquidityType = LiquidityType.Discovery;
         discoveryPosition = newPosition;
+        
+
         emit DiscoveryDeployed(newPosition);
     }
 

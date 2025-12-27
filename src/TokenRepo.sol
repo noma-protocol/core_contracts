@@ -44,7 +44,7 @@ contract TokenRepo {
     /// @param token The address of the ERC20 token.
     /// @param to The address of the recipient.
     /// @param amount The amount of tokens to transfer.
-    function transferToRecipient(address token, address to, uint256 amount) external onlyOwner {
+    function transferToRecipient(address token, address to, uint256 amount) public onlyOwner {
         // [C-02 FIX] Use SafeERC20
         IERC20(token).safeTransfer(to, amount);
     }
@@ -52,7 +52,7 @@ contract TokenRepo {
     // [H-04 FIX] Add two-step ownership transfer
     /// @notice Initiates ownership transfer to a new address (two-step process)
     /// @param newOwner The address of the proposed new owner
-    function transferOwnership(address newOwner) external onlyOwner {
+    function transferOwnership(address newOwner) public onlyOwner {
         if (newOwner == address(0)) revert ZeroAddress();
         if (newOwner == owner) revert InvalidParams();
         pendingOwner = newOwner;
@@ -60,7 +60,7 @@ contract TokenRepo {
     }
 
     /// @notice Accepts pending ownership transfer
-    function acceptOwnership() external {
+    function acceptOwnership() public {
         if (msg.sender != pendingOwner) revert NotAuthorized();
         emit OwnershipTransferred(owner, pendingOwner);
         owner = pendingOwner;

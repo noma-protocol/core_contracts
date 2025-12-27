@@ -377,7 +377,6 @@ contract NomaFactory {
         VaultDescription memory vaultDesc = vaultsRepository[vaultAddress];
         uint256 totalSupply = IERC20(vaultDesc.token0).totalSupply();
 
-        // Original Step 1 logic
         (
             data.sNOMA, 
             data.stakingContract, 
@@ -417,7 +416,6 @@ contract NomaFactory {
             data.vToken
         );
 
-        // This ideally should be executed after step 2, 3 and 4 
         IVault(vaultAddress)
         .postInit(
             PostInitParams({
@@ -428,7 +426,6 @@ contract NomaFactory {
             })
         );
 
-        // `data` is populated only for step 1; for others it stays default
         return data;
     }
 
@@ -531,13 +528,14 @@ contract NomaFactory {
                 vaultDeployParams.IDOPrice, 
                 vaultDeployParams.initialSupply, 
                 tickSpacing, 
-                getProtocolParameters()
+                getProtocolParameters(),
+                tokenRepo
             );
             Deployer(deployerContract).finalize();
         }    
     }
 
-    function deferredDeploy(address _deployerContract) public onlyVaults {
+    function deferredDeploy(address _deployerContract, address _tokenRepo) public onlyVaults {
         VaultDeployParams memory _params = deferredDeployParams[msg.sender];   
         int24 tickSpacing = Utils._validateFeeTier(_params.feeTier); 
 
@@ -546,7 +544,8 @@ contract NomaFactory {
             _params.IDOPrice, 
             _params.initialSupply, 
             tickSpacing, 
-            getProtocolParameters()
+            getProtocolParameters(),
+            _tokenRepo
         );
 
         Deployer(_deployerContract).finalize();
@@ -610,7 +609,8 @@ contract NomaFactory {
         uint256 IDOPrice,
         uint256 totalSupply,
         int24 _tickSpacing,
-        ProtocolParameters memory _liquidityParams
+        ProtocolParameters memory _liquidityParams,
+        address tokenRepo
     ) internal {
         Deployer(deployerContract)
         .deployFloor(
@@ -628,7 +628,6 @@ contract NomaFactory {
             IDOPrice * _liquidityParams.idoPriceMultiplier
         );
     }
-
 
     /**
     * @notice Initializes the vault with the provided parameters.

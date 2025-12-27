@@ -25,6 +25,7 @@ import {DecimalMath} from "../libraries/DecimalMath.sol";
 import {Underlying} from "../libraries/Underlying.sol";
 import {IVault} from "../interfaces/IVault.sol";
 import {Utils} from "../libraries/Utils.sol";
+import {FullMath} from 'v3-core/libraries/FullMath.sol';
 
 import {
     LiquidityPosition,
@@ -33,6 +34,14 @@ import {
     VaultInfo
 } from "../types/Types.sol";
 import "../errors/Errors.sol";
+
+/**
+ * @title IStaking
+ * @notice Minimal interface for staking contract to get sNOMA address.
+ */
+interface IStaking {
+    function sNOMA() external view returns (address);
+}
 
 /**
  * @title ModelHelper
@@ -57,9 +66,16 @@ contract ModelHelper {
 
         uint256 anchorUpperPrice = Conversions.sqrtPriceX96ToPrice(
                 Conversions.tickToSqrtPriceX96(positions[1].upperTick),
-            decimals);
-            
-        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, decimals);
+            decimals,
+            address(0));
+
+        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtRatioX96, decimals, vault);
+
+        // Prevent division by zero when price is at extreme minimum
+        if (spotPrice == 0) {
+            return type(uint256).max;
+        }
+
         liquidityRatio = DecimalMath.divideDecimal(anchorUpperPrice, spotPrice);
     }
 
@@ -176,8 +192,8 @@ contract ModelHelper {
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
         
         vaultInfo.liquidityRatio = getLiquidityRatio(pool, vault);
-        vaultInfo.circulatingSupply = getCirculatingSupply(pool, vault, false);
-        vaultInfo.spotPriceX96 = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+        vaultInfo.circulatingSupply = getCirculatingSupply(pool, vault, true);
+        vaultInfo.spotPriceX96 = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18, vault);
         vaultInfo.anchorCapacity = getPositionCapacity(pool, vault, positions[1], LiquidityType.Anchor);
         vaultInfo.floorCapacity = getPositionCapacity(pool, vault, positions[0], LiquidityType.Floor);
         vaultInfo.token0 = tokenInfo.token0;
@@ -197,45 +213,80 @@ contract ModelHelper {
         address vault,
         bool includeStaked
     ) public view returns (uint256) {
-        LiquidityPosition[3] memory positions = IVault(vault).getPositions();
         uint256 totalSupply = ERC20(address(IUniswapV3Pool(pool).token0())).totalSupply();
+        uint256 excluded = _circulatingExcluded(pool, vault, includeStaked);
 
-        (,, uint256 amount0CurrentFloor, ) = Underlying.getUnderlyingBalances(pool, vault, positions[0]);
-        (,, uint256 amount0CurrentAnchor, ) = Underlying.getUnderlyingBalances(pool, vault, positions[1]);
-        (,, uint256 amount0CurrentDiscovery, ) = Underlying.getUnderlyingBalances(pool, vault, positions[2]);
+        // Guard against underflow if something unexpected happens
+        if (excluded >= totalSupply) return 0;
+        return totalSupply - excluded;
+    }
 
-        uint256 protocolUnusedBalanceToken0 = ERC20(address(IUniswapV3Pool(pool).token0())).balanceOf(vault);
-        
-        address stakingContract = IVault(vault).getStakingContract();
+    function _circulatingExcluded(
+        address pool,
+        address vault,
+        bool includeStaked
+    ) internal view returns (uint256 excluded) {
+        IVault v = IVault(vault);
+        IUniswapV3Pool p = IUniswapV3Pool(pool);
+        address token0 = p.token0();
 
-        (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(pool).slot0();
+        LiquidityPosition[3] memory positions = v.getPositions();
 
-        uint256 feesPosition0Token0 = Underlying
-        .computeFeesEarned(
-            positions[0], 
-            vault, 
-            pool, 
-            true, 
-            TickMath.getTickAtSqrtRatio(sqrtRatioX96)
-        );
+        (,, uint256 floor0,)     = Underlying.getUnderlyingBalances(pool, vault, positions[0]);
+        (,, uint256 anchor0,)    = Underlying.getUnderlyingBalances(pool, vault, positions[1]);
+        (,, uint256 discovery0,) = Underlying.getUnderlyingBalances(pool, vault, positions[2]);
 
-        uint256 circulatingSupply = (
-            totalSupply - 
-            (
-                amount0CurrentFloor + 
-                amount0CurrentAnchor + 
-                amount0CurrentDiscovery + 
-                protocolUnusedBalanceToken0 + 
-                (includeStaked ? 
-                stakingContract != address(0) ? 
-                ERC20(address(IUniswapV3Pool(pool).token0())).balanceOf(stakingContract) : 0 : 0) + 
-                IVault(vault).getCollateralAmount() +
-                feesPosition0Token0
-            )
-        );
+        uint256 vaultBalance = ERC20(token0).balanceOf(vault);
 
-        return circulatingSupply;
-    } 
+        (uint160 sqrtRatioX96,,,,,,) = p.slot0();
+        uint256 fees = getTotalFees(vault, pool, sqrtRatioX96, positions);
+
+        excluded =
+            floor0 +
+            anchor0 +
+            discovery0 +
+            vaultBalance +
+            v.getCollateralAmount() +
+            fees;
+
+        if (includeStaked) {
+            excluded += _excludedStakedToken0(vault, token0);
+        }
+    }
+
+    function _excludedStakedToken0(
+        address vault,
+        address token0
+    ) internal view returns (uint256) {
+        IVault v = IVault(vault);
+        address stakingContract = v.getStakingContract();
+        if (stakingContract == address(0)) return 0;
+
+        address sToken = IStaking(stakingContract).sNOMA();     
+
+        uint256 totalStaked = ERC20(token0).balanceOf(stakingContract);
+        uint256 sTot = ERC20(sToken).totalSupply();
+        if (totalStaked == 0 || sTot == 0) return 0;
+
+        uint256 sBal = ERC20(sToken).balanceOf(sToken);
+        if (sBal == 0) return 0;
+
+        return FullMath.mulDiv(totalStaked, sBal, sTot);
+    }
+
+    function getTotalFees(
+        address vault,
+        address pool,
+        uint160 sqrtRatioX96,
+        LiquidityPosition[3] memory positions
+    ) internal view returns (uint256 totalFees) {
+        int24 tick = TickMath.getTickAtSqrtRatio(sqrtRatioX96);
+
+        totalFees =
+            Underlying.computeFeesEarned(positions[0], vault, pool, true, tick) +
+            Underlying.computeFeesEarned(positions[1], vault, pool, true, tick) +
+            Underlying.computeFeesEarned(positions[2], vault, pool, true, tick);
+    }
 
     /**
      * @notice Retrieves the total supply of a token in the pool.
@@ -281,7 +332,6 @@ contract ModelHelper {
         VaultInfo memory vaultInfo = IVault(vault).getVaultInfo();
         (uint256 fees0, uint256 fees1) = IVault(vault).getAccumulatedFees();
         uint256 fees = isToken0 ? fees0 : fees1;
-
         uint256 reserved = fees + vaultInfo.totalInterest;
 
         return protocolUnusedBalance > reserved
@@ -303,7 +353,7 @@ contract ModelHelper {
         int24 lowerTick = positions[0].lowerTick;
         uint160 sqrtPriceX96 = Conversions.tickToSqrtPriceX96(lowerTick);
 
-        return Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+        return Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18, address(0));
     }
 
     /**

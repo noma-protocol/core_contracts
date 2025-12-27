@@ -174,4 +174,6 @@ interface IVault {
     function setReferralEntity(bytes8 code, uint256 amount) external;
 
     function fixInbalance(address pool,uint160 sqrtPriceX96, uint256 amount) external;
+
+    function getVaultData(ProtocolAddresses memory addresses) external view returns (uint256, uint256, uint256, uint256);
 }

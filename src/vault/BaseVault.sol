@@ -40,7 +40,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import "../errors/Errors.sol";
 
 interface INomaFactory {
-    function deferredDeploy(address deployer) external;
+    function deferredDeploy(address deployer, address tokenRepo) external;
     function mintTokens(address to, uint256 amount) external;
     function burnFor(address from, uint256 amount) external;
     function teamMultiSig() external view returns (address);
@@ -205,7 +205,8 @@ contract BaseVault  {
             _v.factory
         ).deferredDeploy(
             INomaFactory(_v.factory)
-            .getVaultsRepository(address(this)).deployerContract
+            .getVaultsRepository(address(this)).deployerContract,
+            _v.tokenRepo
         );
     }
 

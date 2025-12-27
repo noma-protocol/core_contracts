@@ -172,7 +172,7 @@ contract LendingVault {
         if (block.timestamp > loan.expiry) revert LoanExpired();
 
         // Ensure the new duration is valid
-        if (newDuration == 0 || newDuration > 30 days) revert InvalidDuration();
+        if (newDuration == 0 || newDuration > 365 days) revert InvalidDuration();
 
         // Recalculate the collateral value
         uint256 newCollateralValue = DecimalMath.multiplyDecimal(

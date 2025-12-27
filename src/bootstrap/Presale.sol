@@ -334,7 +334,7 @@ import "../errors/Errors.sol";
 
         // 6) compute slippage-adjusted price
         (uint160 sqrt0,,,,,,) = pool.slot0();
-        uint256 spotPriceX96 = Conversions.sqrtPriceX96ToPrice(sqrt0, 18);
+        uint256 spotPriceX96 = Conversions.sqrtPriceX96ToPrice(sqrt0, 18, address(0));
         uint256 slippagePriceX96 = spotPriceX96 + (spotPriceX96 * 5) / 1000;
 
         // [M-06 FIX] Calculate proper minimum amount out with slippage protection

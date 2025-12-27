@@ -4,8 +4,22 @@ pragma solidity ^0.8.0;
 import {Conversions} from "./Conversions.sol";
 import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
 import {DecimalMath} from "./DecimalMath.sol";
+import {IModelHelper} from "../interfaces/IModelHelper.sol";
+import {IVault} from "../interfaces/IVault.sol";
+import {LiquidityPosition, ProtocolAddresses} from "../types/Types.sol";
 
-import {LiquidityPosition} from "../types/Types.sol";
+/**
+ * @title IAdaptiveSupply
+ * @notice Interface for the AdaptiveSupply contract.
+ */
+interface IAdaptiveSupply {
+    function computeMintAmount(
+        uint256 deltaSupply,
+        uint256 timeElapsed,
+        uint256 spotPrice,
+        uint256 imv
+    ) external pure returns (uint256 mintAmount, uint256 sigmoid);
+}
 
 /**
  * @title Utils
@@ -59,8 +73,9 @@ library Utils {
 
         uint256 tickToPrice = Conversions
         .sqrtPriceX96ToPrice(
-            Conversions.tickToSqrtPriceX96(currentTick), 
-            decimals
+            Conversions.tickToSqrtPriceX96(currentTick),
+            decimals,
+            address(0)
         );
 
         uint256 newPrice = addBips(tickToPrice, bips);
@@ -372,4 +387,28 @@ library Utils {
 
         return newFloorPrice;  
     }    
+
+    function computeMintAmount(
+        ProtocolAddresses memory addresses,
+        uint256 totalSupply,
+        uint160 sqrtRatioX96
+    ) internal view returns (uint256 mintAmount, uint256 sigmoid) {
+        // Mint unbacked supply
+        (mintAmount, sigmoid) = IAdaptiveSupply(
+            addresses.adaptiveSupplyController
+        ).computeMintAmount(
+            totalSupply,
+            IVault(addresses.vault).getTimeSinceLastMint() > 0 ? 
+            IVault(addresses.vault).getTimeSinceLastMint() : 
+            1,
+            Conversions.sqrtPriceX96ToPrice(
+                sqrtRatioX96,
+                18,
+                addresses.vault
+            ),
+            IModelHelper(addresses.modelHelper)
+            .getIntrinsicMinimumValue(addresses.vault)
+        );
+    }
+
 }

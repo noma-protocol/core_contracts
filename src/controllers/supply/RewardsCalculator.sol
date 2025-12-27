@@ -5,6 +5,23 @@ import {RewardParams} from "../../types/Types.sol";
 import {Math} from "openzeppelin/contracts/utils/math/Math.sol";
 import "../../errors/Errors.sol";
 
+// ███╗   ██╗ ██████╗ ███╗   ███╗ █████╗                               
+// ████╗  ██║██╔═══██╗████╗ ████║██╔══██╗                              
+// ██╔██╗ ██║██║   ██║██╔████╔██║███████║                              
+// ██║╚██╗██║██║   ██║██║╚██╔╝██║██╔══██║                              
+// ██║ ╚████║╚██████╔╝██║ ╚═╝ ██║██║  ██║                              
+// ╚═╝  ╚═══╝ ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═╝                              
+                                                                    
+// ██████╗ ██████╗  ██████╗ ████████╗ ██████╗  ██████╗ ██████╗ ██╗     
+// ██╔══██╗██╔══██╗██╔═══██╗╚══██╔══╝██╔═══██╗██╔════╝██╔═══██╗██║     
+// ██████╔╝██████╔╝██║   ██║   ██║   ██║   ██║██║     ██║   ██║██║     
+// ██╔═══╝ ██╔══██╗██║   ██║   ██║   ██║   ██║██║     ██║   ██║██║     
+// ██║     ██║  ██║╚██████╔╝   ██║   ╚██████╔╝╚██████╗╚██████╔╝███████╗
+// ╚═╝     ╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝  ╚═════╝ ╚═════╝ ╚══════╝
+//
+// Author: 0xsufi@noma.money
+// Copyright Noma Protocol 2025/2026
+
 /// @title RewardsCalculator
 /// @notice A contract to calculate rewards based on the ratio of total staked to circulating supply.
 contract RewardsCalculator {

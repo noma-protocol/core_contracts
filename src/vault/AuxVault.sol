@@ -24,6 +24,7 @@ import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
 import {Conversions} from "../libraries/Conversions.sol";
 import "../libraries/TickMathExtra.sol";
 import "../errors/Errors.sol";
+import {IModelHelper} from "../interfaces/IModelHelper.sol";
 
 interface INomaFactory {
     function deferredDeploy(address deployer) external;
@@ -270,6 +271,44 @@ contract AuxVault {
     }
 
     /**
+     * @notice Retrieves vault data including circulating supply and token balances.
+     * @param addresses Protocol addresses.
+     * @return circulatingSupply The circulating supply of the vault.
+     * @return anchorToken1Balance The balance of token1 in the anchor position.
+     * @return discoveryToken1Balance The balance of token1 in the discovery position.
+     * @return discoveryToken0Balance The balance of token0 in the discovery position.
+     */
+    function getVaultData(ProtocolAddresses memory addresses) public view returns (uint256, uint256, uint256, uint256) {
+        (,,, uint256 anchorToken1Balance) = IModelHelper(addresses.modelHelper)
+        .getUnderlyingBalances(
+            addresses.pool, 
+            addresses.vault, 
+            LiquidityType.Anchor
+        );
+
+        (,, uint256 discoveryToken0Balance, uint256 discoveryToken1Balance) = IModelHelper(addresses.modelHelper)
+        .getUnderlyingBalances(
+            addresses.pool, 
+            addresses.vault, 
+            LiquidityType.Discovery
+        );
+
+        uint256 circulatingSupply = IModelHelper(addresses.modelHelper)
+        .getCirculatingSupply(
+            addresses.pool,
+            addresses.vault,
+            true
+        );
+        
+        return (
+            circulatingSupply, 
+            anchorToken1Balance, 
+            discoveryToken1Balance, 
+            discoveryToken0Balance
+        );
+    }
+
+    /**
      * @notice Retrieves the address of the team multisig.
      * @return The address of the team multisig.
      */
@@ -458,7 +497,7 @@ contract AuxVault {
      * @return selectors An array of function selectors.
      */
     function getFunctionSelectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](22);
+        bytes4[] memory selectors = new bytes4[](23);
         selectors[0] = bytes4(keccak256(bytes("teamMultiSig()")));
         selectors[1] = bytes4(keccak256(bytes("getTimeSinceLastMint()")));
         selectors[2] = bytes4(keccak256(bytes("getAccumulatedFees()")));
@@ -485,7 +524,8 @@ contract AuxVault {
         selectors[19] = bytes4(keccak256(bytes("recoverERC20(address,address)")));
         selectors[20] = bytes4(keccak256(bytes("setAdvancedConf(bool)")));
         selectors[21] = bytes4(keccak256(bytes("consumeReferral(bytes8,uint256)")));
-
+        selectors[22] = bytes4(keccak256(bytes("getVaultData((address,address,address,address,address,address,address))")));
+        
         return selectors; 
     }
 }        

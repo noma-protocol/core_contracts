@@ -61,13 +61,13 @@ contract AdaptiveSupply {
         uint256 timeElapsed,
         uint256 spotPrice,
         uint256 imv
-    ) public view returns (uint256 mintAmount) {
+    ) public view returns (uint256 mintAmount, uint256 sigmoid) {
         if (timeElapsed == 0) revert TimeElapsedZero();
         if (deltaSupply == 0) revert DeltaSupplyZero();
         if (imv == 0) revert IMVZero();
 
         uint256 scaleFactor = computeScaleFactor();
-        uint256 sigmoid = computeSigmoid(deltaSupply, timeElapsed);
+        sigmoid = computeSigmoid(deltaSupply, timeElapsed);
 
         // compute ratio = spotPrice / imv
         uint256 ratio = spotPrice.divWadDown(imv);

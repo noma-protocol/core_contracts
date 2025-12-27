@@ -82,7 +82,8 @@ library LiquidityDeployer {
 
         uint256 floorUpperPrice = Conversions.sqrtPriceX96ToPrice(
             Conversions.tickToSqrtPriceX96(floorPosition.upperTick),
-            decimals
+            decimals,
+            address(0)
         );
 
         (int24 lowerTick, int24 upperTick) = Conversions.computeRangeTicks(
@@ -130,10 +131,15 @@ library LiquidityDeployer {
 
         uint256 lowerDiscoveryPrice = Conversions.sqrtPriceX96ToPrice(
             Conversions.tickToSqrtPriceX96(anchorPosition.upperTick),
-            decimals
+            decimals,
+            address(0)
         );
 
-        lowerDiscoveryPrice = Utils.addBips(lowerDiscoveryPrice, 50);
+        // Buffer must be at least 2x tick spacing to ensure different tick after rounding
+        // This makes discovery compatible with all fee tiers (including 1% with tickSpacing=200)
+        int256 minBuffer = int256(uint256(int256(anchorPosition.tickSpacing))) * 2;
+        if (minBuffer < 50) minBuffer = 50; // Minimum 0.5% buffer
+        lowerDiscoveryPrice = Utils.addBips(lowerDiscoveryPrice, minBuffer);
 
         (int24 lowerTick, int24 upperTick) = Conversions
         .computeRangeTicks(
@@ -159,7 +165,7 @@ library LiquidityDeployer {
                 tickSpacing: deployParams.tickSpacing,
                 liquidityType: LiquidityType.Discovery,
                 amounts: AmountsToMint({
-                    amount0: balanceToken0,
+                    amount0: (balanceToken0 * 10) / 100, 
                     amount1: 0
                 })
             })            
@@ -182,7 +188,8 @@ library LiquidityDeployer {
 
         uint256 currentFloorPrice = Conversions.sqrtPriceX96ToPrice(
             TickMath.getSqrtRatioAtTick(floorPosition.lowerTick),
-            decimals
+            decimals,
+            address(0)
         );
 
         if (newFloorPrice < currentFloorPrice) {
