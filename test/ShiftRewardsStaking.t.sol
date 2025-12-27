@@ -287,8 +287,8 @@ contract ShiftRewardsStakingTest is Test {
         address poolAddr = address(vault.pool());
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(poolAddr).slot0();
-        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
-        uint256 purchasePrice = spotPrice + (spotPrice * 25 / 100);
+        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18, address(0));
+        uint256 purchasePrice = spotPrice + (spotPrice * 5 / 100);
 
         uint16 totalTrades = 10;
         uint256 tradeAmount = 20000 ether;
@@ -298,8 +298,8 @@ contract ShiftRewardsStakingTest is Test {
 
         for (uint i = 0; i < totalTrades; i++) {
             (sqrtPriceX96,,,,,,) = IUniswapV3Pool(poolAddr).slot0();
-            spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
-            purchasePrice = spotPrice + (spotPrice * 25 / 100);
+            spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18, address(0));
+            purchasePrice = spotPrice + (spotPrice * 5 / 100);
             managerContract.buyTokens(purchasePrice, tradeAmount, 0, address(this));
         }
 

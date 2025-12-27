@@ -157,19 +157,19 @@ contract AMMEffectivenessTest is Test {
 
         // Low volatility: spotPrice just above IMV (1.5x)
         vm.prank(address(mockVault));
-        uint256 lowVolMint = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, 1.5e18, imv);
+        (uint256 lowVolMint, ) = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, 1.5e18, imv);
 
         // Medium volatility: spotPrice 3x IMV
         vm.prank(address(mockVault));
-        uint256 medVolMint = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, 3e18, imv);
+        (uint256 medVolMint, ) = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, 3e18, imv);
 
         // High volatility: spotPrice 5x IMV
         vm.prank(address(mockVault));
-        uint256 highVolMint = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, 5e18, imv);
+        (uint256 highVolMint, ) = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, 5e18, imv);
 
         // Extreme volatility: spotPrice 10x IMV
         vm.prank(address(mockVault));
-        uint256 extremeVolMint = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, 10e18, imv);
+        (uint256 extremeVolMint, ) = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, 10e18, imv);
 
         // Assert monotonic increase with volatility
         assertLt(lowVolMint, medVolMint, "Medium volatility should produce more minting than low");
@@ -194,19 +194,19 @@ contract AMMEffectivenessTest is Test {
 
         // Short time: 1 hour
         vm.prank(address(mockVault));
-        uint256 shortTimeMint = adaptiveSupply.computeMintAmount(deltaSupply, 1 hours, spotPrice, imv);
+        (uint256 shortTimeMint, ) = adaptiveSupply.computeMintAmount(deltaSupply, 1 hours, spotPrice, imv);
 
         // Medium time: 1 day
         vm.prank(address(mockVault));
-        uint256 medTimeMint = adaptiveSupply.computeMintAmount(deltaSupply, 1 days, spotPrice, imv);
+        (uint256 medTimeMint, ) = adaptiveSupply.computeMintAmount(deltaSupply, 1 days, spotPrice, imv);
 
         // Long time: 1 week
         vm.prank(address(mockVault));
-        uint256 longTimeMint = adaptiveSupply.computeMintAmount(deltaSupply, 7 days, spotPrice, imv);
+        (uint256 longTimeMint, ) = adaptiveSupply.computeMintAmount(deltaSupply, 7 days, spotPrice, imv);
 
         // Very long time: 30 days
         vm.prank(address(mockVault));
-        uint256 veryLongTimeMint = adaptiveSupply.computeMintAmount(deltaSupply, 30 days, spotPrice, imv);
+        (uint256 veryLongTimeMint, ) = adaptiveSupply.computeMintAmount(deltaSupply, 30 days, spotPrice, imv);
 
         // Assert all produce non-zero mint amounts
         assertGt(shortTimeMint, 0, "Short time should produce non-zero mint");
@@ -233,17 +233,17 @@ contract AMMEffectivenessTest is Test {
         // Low halfStep (faster transition)
         mockVault.setHalfStep(0.3e18);
         vm.prank(address(mockVault));
-        uint256 lowHalfStepMint = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, spotPrice, imv);
+        (uint256 lowHalfStepMint, ) = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, spotPrice, imv);
 
         // Default halfStep
         mockVault.setHalfStep(0.5e18);
         vm.prank(address(mockVault));
-        uint256 midHalfStepMint = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, spotPrice, imv);
+        (uint256 midHalfStepMint, ) = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, spotPrice, imv);
 
         // High halfStep (slower transition)
         mockVault.setHalfStep(0.7e18);
         vm.prank(address(mockVault));
-        uint256 highHalfStepMint = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, spotPrice, imv);
+        (uint256 highHalfStepMint, ) = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, spotPrice, imv);
 
         // All should produce valid mint amounts
         assertGt(lowHalfStepMint, 0, "Low halfStep should produce mint");
@@ -275,7 +275,7 @@ contract AMMEffectivenessTest is Test {
 
         // Under extreme conditions (100x price ratio)
         vm.prank(address(mockVault));
-        uint256 mintAmount = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, 100e18, 1e18);
+        (uint256 mintAmount, ) = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, 100e18, 1e18);
 
         // Document actual behavior: raw computation can exceed supply under extreme conditions
         // This is expected - the balance threshold checks in adjustSupply handle this
@@ -298,19 +298,19 @@ contract AMMEffectivenessTest is Test {
 
         // Small supply
         vm.prank(address(mockVault));
-        uint256 smallMint = adaptiveSupply.computeMintAmount(1_000 ether, timeElapsed, spotPrice, imv);
+        (uint256 smallMint, ) = adaptiveSupply.computeMintAmount(1_000 ether, timeElapsed, spotPrice, imv);
 
         // 10x supply
         vm.prank(address(mockVault));
-        uint256 medMint = adaptiveSupply.computeMintAmount(10_000 ether, timeElapsed, spotPrice, imv);
+        (uint256 medMint, ) = adaptiveSupply.computeMintAmount(10_000 ether, timeElapsed, spotPrice, imv);
 
         // 100x supply
         vm.prank(address(mockVault));
-        uint256 largeMint = adaptiveSupply.computeMintAmount(100_000 ether, timeElapsed, spotPrice, imv);
+        (uint256 largeMint, ) = adaptiveSupply.computeMintAmount(100_000 ether, timeElapsed, spotPrice, imv);
 
         // 1000x supply
         vm.prank(address(mockVault));
-        uint256 hugeMint = adaptiveSupply.computeMintAmount(1_000_000 ether, timeElapsed, spotPrice, imv);
+        (uint256 hugeMint, ) = adaptiveSupply.computeMintAmount(1_000_000 ether, timeElapsed, spotPrice, imv);
 
         // Should scale roughly linearly (within tolerance due to sqrt scaling)
         // 10x supply should produce approximately 10x mint (adjusted for sqrt(deltaSupply))
@@ -345,7 +345,7 @@ contract AMMEffectivenessTest is Test {
         for (uint i = 0; i < 10; i++) {
             uint256 timeElapsed = (i + 1) * 1 minutes;
             vm.prank(address(mockVault));
-            mintAmounts[i] = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, spotPrice, imv);
+            (mintAmounts[i], ) = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, spotPrice, imv);
         }
 
         // Verify all produce non-zero values
@@ -379,15 +379,15 @@ contract AMMEffectivenessTest is Test {
 
         // Normal price (1.5x IMV)
         vm.prank(address(mockVault));
-        uint256 normalMint = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, 1.5e18, imv);
+        (uint256 normalMint, ) = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, 1.5e18, imv);
 
         // 10x price spike (15x IMV)
         vm.prank(address(mockVault));
-        uint256 spikeMint = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, 15e18, imv);
+        (uint256 spikeMint, ) = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, 15e18, imv);
 
         // 100x price spike (150x IMV)
         vm.prank(address(mockVault));
-        uint256 extremeSpikeMint = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, 150e18, imv);
+        (uint256 extremeSpikeMint, ) = adaptiveSupply.computeMintAmount(deltaSupply, timeElapsed, 150e18, imv);
 
         // Verify mint scales with price (expected behavior for demand-responsive supply)
         assertGt(spikeMint, normalMint, "Higher price should produce more minting");
@@ -424,7 +424,7 @@ contract AMMEffectivenessTest is Test {
 
         // With extremely high price manipulation (1000x)
         vm.prank(address(mockVault));
-        uint256 flashMint = adaptiveSupply.computeMintAmount(deltaSupply, flashTime, 1000e18, imv);
+        (uint256 flashMint, ) = adaptiveSupply.computeMintAmount(deltaSupply, flashTime, 1000e18, imv);
 
         // Document the raw computation result
         // In production, getTimeSinceLastMint() returns real elapsed time, not 1 second
@@ -456,13 +456,13 @@ contract AMMEffectivenessTest is Test {
         uint256 totalMinted = 0;
         for (uint i = 0; i < operationCount; i++) {
             vm.prank(address(mockVault));
-            uint256 mint = adaptiveSupply.computeMintAmount(deltaSupply, timePerOp, spotPrice, imv);
+            (uint256 mint, ) = adaptiveSupply.computeMintAmount(deltaSupply, timePerOp, spotPrice, imv);
             totalMinted += mint;
         }
 
         // Single operation over full 24h
         vm.prank(address(mockVault));
-        uint256 singleOpMint = adaptiveSupply.computeMintAmount(deltaSupply, 24 hours, spotPrice, imv);
+        (uint256 singleOpMint, ) = adaptiveSupply.computeMintAmount(deltaSupply, 24 hours, spotPrice, imv);
 
         // Document the relationship
         emit log_named_uint("100 Small Ops Total Mint", totalMinted);
@@ -485,17 +485,17 @@ contract AMMEffectivenessTest is Test {
     function test_EdgeCase_MinimumInputs() public {
         // Minimum time (1 second)
         vm.prank(address(mockVault));
-        uint256 minTimeMint = adaptiveSupply.computeMintAmount(1_000 ether, 1, 2e18, 1e18);
+        (uint256 minTimeMint, ) = adaptiveSupply.computeMintAmount(1_000 ether, 1, 2e18, 1e18);
         assertGt(minTimeMint, 0, "Minimum time should still produce mint");
 
         // Minimum supply
         vm.prank(address(mockVault));
-        uint256 minSupplyMint = adaptiveSupply.computeMintAmount(1 ether, 1 days, 2e18, 1e18);
+        (uint256 minSupplyMint, ) = adaptiveSupply.computeMintAmount(1 ether, 1 days, 2e18, 1e18);
         assertGt(minSupplyMint, 0, "Minimum supply should still produce mint");
 
         // Minimum price ratio (just above 1)
         vm.prank(address(mockVault));
-        uint256 minRatioMint = adaptiveSupply.computeMintAmount(1_000 ether, 1 days, 1.001e18, 1e18);
+        (uint256 minRatioMint, ) = adaptiveSupply.computeMintAmount(1_000 ether, 1 days, 1.001e18, 1e18);
         assertGt(minRatioMint, 0, "Minimum ratio should still produce mint");
 
         emit log_named_uint("Min Time Mint", minTimeMint);
@@ -563,12 +563,12 @@ contract AMMEffectivenessTest is Test {
 
         for (uint i = 0; i < 6; i++) {
             vm.prank(address(mockVault));
-            bullMints[i] = adaptiveSupply.computeMintAmount(deltaSupply, 5 days, bullPrices[i], imv);
+            (bullMints[i], ) = adaptiveSupply.computeMintAmount(deltaSupply, 5 days, bullPrices[i], imv);
         }
 
         // Phase 2: Peak (high volatility)
         vm.prank(address(mockVault));
-        uint256 peakMint = adaptiveSupply.computeMintAmount(deltaSupply, 1 days, 6e18, imv);
+        (uint256 peakMint, ) = adaptiveSupply.computeMintAmount(deltaSupply, 1 days, 6e18, imv);
 
         // Phase 3: Bear market decline
         uint256[] memory bearMints = new uint256[](4);
@@ -580,7 +580,7 @@ contract AMMEffectivenessTest is Test {
 
         for (uint i = 0; i < 4; i++) {
             vm.prank(address(mockVault));
-            bearMints[i] = adaptiveSupply.computeMintAmount(deltaSupply, 7 days, bearPrices[i], imv);
+            (bearMints[i], ) = adaptiveSupply.computeMintAmount(deltaSupply, 7 days, bearPrices[i], imv);
         }
 
         // Verify expected behavior:
@@ -630,7 +630,7 @@ contract AMMEffectivenessTest is Test {
 
         for (uint i = 0; i < 5; i++) {
             vm.prank(address(mockVault));
-            uint256 mint = adaptiveSupply.computeMintAmount(currentSupply, timeElapsed, spotPrice, imv);
+            (uint256 mint, ) = adaptiveSupply.computeMintAmount(currentSupply, timeElapsed, spotPrice, imv);
 
             mintRatios[i] = mint * 10000 / currentSupply; // Basis points
             currentSupply += mint;
@@ -673,7 +673,7 @@ contract AMMEffectivenessTest is Test {
         for (uint t = 0; t < 4; t++) {
             for (uint p = 0; p < 4; p++) {
                 vm.prank(address(mockVault));
-                uint256 mint = adaptiveSupply.computeMintAmount(deltaSupply, times[t], prices[p], imv);
+                (uint256 mint, ) = adaptiveSupply.computeMintAmount(deltaSupply, times[t], prices[p], imv);
 
                 // Verify all cells produce reasonable values
                 assertGt(mint, 0, "All scenarios should produce mint");
@@ -684,9 +684,9 @@ contract AMMEffectivenessTest is Test {
 
         // Log specific key scenarios for documentation
         vm.prank(address(mockVault));
-        uint256 lowLow = adaptiveSupply.computeMintAmount(deltaSupply, 1 hours, 1.5e18, imv);
+        (uint256 lowLow, ) = adaptiveSupply.computeMintAmount(deltaSupply, 1 hours, 1.5e18, imv);
         vm.prank(address(mockVault));
-        uint256 highHigh = adaptiveSupply.computeMintAmount(deltaSupply, 30 days, 10e18, imv);
+        (uint256 highHigh, ) = adaptiveSupply.computeMintAmount(deltaSupply, 30 days, 10e18, imv);
 
         emit log_named_uint("Low time + Low price (1h, 1.5x) %", lowLow * 100 / deltaSupply);
         emit log_named_uint("High time + High price (30d, 10x) %", highHigh * 100 / deltaSupply);

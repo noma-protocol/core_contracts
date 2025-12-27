@@ -100,7 +100,7 @@ contract AdversarialTests is Test {
 
         // Record initial state
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
-        initialPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+        initialPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18, address(0));
         initialLiquidityRatio = modelHelper.getLiquidityRatio(pool, vaultAddress);
 
         console.log("Initial price:", initialPrice);
@@ -111,7 +111,7 @@ contract AdversarialTests is Test {
 
     function getCurrentPrice() internal view returns (uint256) {
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
-        return Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+        return Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18, address(0));
     }
 
     function getCurrentSqrtPrice() internal view returns (uint160) {
@@ -132,7 +132,7 @@ contract AdversarialTests is Test {
         uint256 balanceBefore = noma.balanceOf(address(this));
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
-        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18, address(0));
         uint256 purchasePrice = spotPrice + (spotPrice * 25 / 100); // 25% slippage
 
         IWETH(WMON).deposit{value: amount}();
@@ -145,7 +145,7 @@ contract AdversarialTests is Test {
 
     function sellTokens(uint256 tokenAmount) internal {
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
-        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18, address(0));
         uint256 sellPrice = spotPrice - (spotPrice * 25 / 100); // 25% slippage
 
         noma.transfer(idoManager, tokenAmount);

@@ -173,7 +173,7 @@ contract AdversarialLiquidityTest is Test {
         console.log("Anchor capacity after trades:", anchorCapacityAfter);
 
         // Verify solvency invariant still holds
-        uint256 circulatingSupply = modelHelper.getCirculatingSupply(address(pool), vaultAddress, false);
+        uint256 circulatingSupply = modelHelper.getCirculatingSupply(address(pool), vaultAddress, true);
         console.log("Circulating supply:", circulatingSupply);
     }
 
@@ -264,7 +264,7 @@ contract AdversarialLiquidityTest is Test {
 
             // Record state before shift
             (uint160 sqrtPriceX96Before,,,,,,) = pool.slot0();
-            uint256 priceBefore = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96Before, 18);
+            uint256 priceBefore = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96Before, 18, address(0));
             console.log("Price before shift:", priceBefore);
 
             // Perform shift
@@ -272,7 +272,7 @@ contract AdversarialLiquidityTest is Test {
 
             // Record state after shift
             (uint160 sqrtPriceX96After,,,,,,) = pool.slot0();
-            uint256 priceAfter = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96After, 18);
+            uint256 priceAfter = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96After, 18, address(0));
             console.log("Price after shift:", priceAfter);
 
             // Verify solvency after shift
@@ -338,7 +338,7 @@ contract AdversarialLiquidityTest is Test {
     function testAdversarial_PriceGapCreation() public {
         // Get current price
         (uint160 sqrtPriceX96,,,,,,) = pool.slot0();
-        uint256 currentPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+        uint256 currentPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18, address(0));
         console.log("Current price:", currentPrice);
 
         // Large purchase to move price significantly
@@ -346,7 +346,7 @@ contract AdversarialLiquidityTest is Test {
 
         // Check new price
         (sqrtPriceX96,,,,,,) = pool.slot0();
-        uint256 newPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+        uint256 newPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18, address(0));
         console.log("Price after large purchase:", newPrice);
 
         // Protocol should handle the price movement
@@ -397,14 +397,14 @@ contract AdversarialLiquidityTest is Test {
         IDOManager managerContract = IDOManager(idoManager);
 
         (uint160 sqrtPriceX96,,,,,,) = pool.slot0();
-        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18, address(0));
 
         IWETH(WMON).deposit{value: tradeAmount * totalTrades}();
         IWETH(WMON).transfer(idoManager, tradeAmount * totalTrades);
 
         for (uint i = 0; i < totalTrades; i++) {
             (sqrtPriceX96,,,,,,) = pool.slot0();
-            spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+            spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18, address(0));
             uint256 purchasePrice = spotPrice + (spotPrice * 5 / 100);
             managerContract.buyTokens(purchasePrice, tradeAmount, 0, address(this));
         }
@@ -414,15 +414,15 @@ contract AdversarialLiquidityTest is Test {
         IDOManager managerContract = IDOManager(idoManager);
 
         (uint160 sqrtPriceX96,,,,,,) = pool.slot0();
-        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18, address(0));
 
         IWETH(WMON).deposit{value: tradeAmount * totalTrades}();
         IWETH(WMON).transfer(idoManager, tradeAmount * totalTrades);
 
         for (uint i = 0; i < totalTrades; i++) {
             (sqrtPriceX96,,,,,,) = pool.slot0();
-            spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
-            uint256 purchasePrice = spotPrice + (spotPrice * 25 / 100);
+            spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18, address(0));
+            uint256 purchasePrice = spotPrice + (spotPrice * 5 / 100);
             managerContract.buyTokens(purchasePrice, tradeAmount, 0, address(this));
         }
     }
@@ -431,7 +431,7 @@ contract AdversarialLiquidityTest is Test {
         IDOManager managerContract = IDOManager(idoManager);
 
         (uint160 sqrtPriceX96,,,,,,) = pool.slot0();
-        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18, address(0));
 
         uint16 totalTrades = 10;
         uint256 tradeAmount = 20000 ether;
@@ -441,14 +441,14 @@ contract AdversarialLiquidityTest is Test {
 
         for (uint i = 0; i < totalTrades; i++) {
             (sqrtPriceX96,,,,,,) = pool.slot0();
-            spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
-            uint256 purchasePrice = spotPrice + (spotPrice * 25 / 100);
+            spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18, address(0));
+            uint256 purchasePrice = spotPrice + (spotPrice * 5 / 100);
             managerContract.buyTokens(purchasePrice, tradeAmount, 0, address(this));
         }
     }
 
     function _verifySolvency() internal view {
-        uint256 circulatingSupply = modelHelper.getCirculatingSupply(address(pool), vaultAddress, false);
+        uint256 circulatingSupply = modelHelper.getCirculatingSupply(address(pool), vaultAddress, true);
 
         LiquidityPosition[3] memory positions = vault.getPositions();
 

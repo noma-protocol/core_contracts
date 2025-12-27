@@ -489,7 +489,7 @@ contract ERC20RecoveryTest is Test {
         address poolAddr = address(vault.pool());
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(poolAddr).slot0();
-        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18, address(0));
         uint256 purchasePrice = spotPrice + (spotPrice * 25 / 100);
 
         IWETH(WMON).deposit{value: wethAmount}();

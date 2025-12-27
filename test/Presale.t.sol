@@ -972,5 +972,102 @@ contract PresaleTest is Test {
         assertTrue(presale.isContributor(user1));
     }
 
+    // ============ P-ASSET NON-TRANSFERABILITY TESTS ============
+
+    /// @notice Test that p-asset transfer() reverts with NonTransferrable
+    function testPAsset_TransferReverts() public {
+        _deployVaultWithPresale();
+
+        // User1 deposits and receives p-assets
+        _deposit(user1, minContribution);
+        uint256 pAssetBalance = presale.balanceOf(user1);
+        assertTrue(pAssetBalance > 0, "User should have p-assets after deposit");
+
+        // Attempt to transfer p-assets to another user - should revert
+        vm.prank(user1);
+        vm.expectRevert(NonTransferrable.selector);
+        presale.transfer(user2, pAssetBalance);
+    }
+
+    /// @notice Test that p-asset transferFrom() reverts with NonTransferrable
+    function testPAsset_TransferFromReverts() public {
+        _deployVaultWithPresale();
+
+        // User1 deposits and receives p-assets
+        _deposit(user1, minContribution);
+        uint256 pAssetBalance = presale.balanceOf(user1);
+        assertTrue(pAssetBalance > 0, "User should have p-assets after deposit");
+
+        // User1 approves user2 to spend their p-assets
+        vm.prank(user1);
+        presale.approve(user2, pAssetBalance);
+
+        // User2 attempts to transferFrom - should revert
+        vm.prank(user2);
+        vm.expectRevert(NonTransferrable.selector);
+        presale.transferFrom(user1, user2, pAssetBalance);
+    }
+
+    /// @notice Test that p-asset minting still works (via deposit)
+    function testPAsset_MintingWorks() public {
+        _deployVaultWithPresale();
+
+        uint256 balanceBefore = presale.balanceOf(user1);
+        assertEq(balanceBefore, 0, "User should have no p-assets before deposit");
+
+        _deposit(user1, minContribution);
+
+        uint256 balanceAfter = presale.balanceOf(user1);
+        assertTrue(balanceAfter > 0, "User should have p-assets after deposit");
+    }
+
+    /// @notice Test that p-asset burning still works (via withdraw)
+    function testPAsset_BurningWorks() public {
+        _deployVaultWithPresale();
+
+        // User1 deposits
+        _deposit(user1, minContribution);
+        _fillToSoftCap();
+
+        // Finalize presale
+        vm.warp(block.timestamp + PRESALE_DURATION + 1);
+        presale.finalize();
+
+        uint256 pAssetBalance = presale.balanceOf(user1);
+        assertTrue(pAssetBalance > 0, "User should have p-assets before withdraw");
+
+        // Withdraw burns p-assets
+        vm.prank(user1);
+        presale.withdraw();
+
+        assertEq(presale.balanceOf(user1), 0, "User should have no p-assets after withdraw");
+    }
+
+    /// @notice Test partial transfer amounts also revert
+    function testPAsset_PartialTransferReverts() public {
+        _deployVaultWithPresale();
+
+        _deposit(user1, minContribution);
+        uint256 pAssetBalance = presale.balanceOf(user1);
+
+        // Attempt to transfer just 1 wei of p-assets - should still revert
+        vm.prank(user1);
+        vm.expectRevert(NonTransferrable.selector);
+        presale.transfer(user2, 1);
+    }
+
+    /// @notice Test transfer to self also reverts (not a burn)
+    function testPAsset_TransferToSelfReverts() public {
+        _deployVaultWithPresale();
+
+        _deposit(user1, minContribution);
+        uint256 pAssetBalance = presale.balanceOf(user1);
+
+        // Transfer to self should also revert (from != 0 && to != 0)
+        vm.prank(user1);
+        vm.expectRevert(NonTransferrable.selector);
+        presale.transfer(user1, pAssetBalance);
+    }
+
     receive() external payable {}
 }

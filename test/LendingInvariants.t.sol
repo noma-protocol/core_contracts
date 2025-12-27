@@ -201,19 +201,19 @@ contract LendingInvariants is Test {
         address pool = address(vault.pool());
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
-        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18, address(0));
         uint256 purchasePrice = spotPrice + (spotPrice * 5 / 100);
 
         IWETH(WMON).deposit{ value: (tradeAmount * totalTrades)}();
         IWETH(WMON).transfer(idoManager, tradeAmount * totalTrades);
 
         uint256 tokenBalanceBefore = noma.balanceOf(address(this));
-        uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault), false);
+        uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault), true);
         console.log("Circulating supply is: ", circulatingSupplyBefore);
 
         for (uint i = 0; i < totalTrades; i++) {
             (sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
-            spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
+            spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18, address(0));
             purchasePrice = spotPrice + (spotPrice * i / 100);
             if (i >= 4) {
                 spotPrice =  purchasePrice;
@@ -221,7 +221,7 @@ contract LendingInvariants is Test {
             managerContract.buyTokens(spotPrice, tradeAmount, 0, deployer);
         }
         
-        uint256 circulatingSupplyAfter = modelHelper.getCirculatingSupply(pool, address(vault), false);
+        uint256 circulatingSupplyAfter = modelHelper.getCirculatingSupply(pool, address(vault), true);
         console.log("Circulating supply after purchase is: ", circulatingSupplyAfter);
 
         uint256 nextFloorPrice = getNextFloorPrice(pool, address(vault));
@@ -238,8 +238,8 @@ contract LendingInvariants is Test {
         address pool = address(vault.pool());
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
-        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
-        uint256 purchasePrice = spotPrice + (spotPrice * 25 / 100);
+        uint256 spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18, address(0));
+        uint256 purchasePrice = spotPrice + (spotPrice * 5 / 100);
 
         uint16 totalTrades = 10;
         uint256 tradeAmount = 20000 ether;
@@ -248,18 +248,18 @@ contract LendingInvariants is Test {
         IWETH(WMON).transfer(idoManager, tradeAmount * totalTrades);
 
         uint256 tokenBalanceBefore = noma.balanceOf(address(this));
-        uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault), false);
+        uint256 circulatingSupplyBefore = modelHelper.getCirculatingSupply(pool, address(vault), true);
         console.log("Circulating supply before purchase is: ", circulatingSupplyBefore);
 
         for (uint i = 0; i < totalTrades; i++) {
             (sqrtPriceX96,,,,,,) = IUniswapV3Pool(pool).slot0();
-            spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18);
-            purchasePrice = spotPrice + (spotPrice * 25 / 100);
+            spotPrice = Conversions.sqrtPriceX96ToPrice(sqrtPriceX96, 18, address(0));
+            purchasePrice = spotPrice + (spotPrice * 5 / 100);
             spotPrice = purchasePrice;
             managerContract.buyTokens(spotPrice, tradeAmount, 0, address(this));
         }
         
-        uint256 circulatingSupplyAfter = modelHelper.getCirculatingSupply(pool, address(vault), false);
+        uint256 circulatingSupplyAfter = modelHelper.getCirculatingSupply(pool, address(vault), true);
         console.log("Circulating supply after purchase is: ", circulatingSupplyAfter);
 
         uint256 nextFloorPrice = getNextFloorPrice(pool, address(vault));
@@ -288,7 +288,7 @@ contract LendingInvariants is Test {
 
     function getNextFloorPrice(address pool, address vault) public view returns (uint256) {
         LiquidityPosition[3] memory positions = IVault(vault).getPositions();
-        uint256 circulatingSupply = modelHelper.getCirculatingSupply(pool, vault, false);
+        uint256 circulatingSupply = modelHelper.getCirculatingSupply(pool, vault, true);
         uint256 anchorCapacity = modelHelper.getPositionCapacity(pool, vault, positions[1], LiquidityType.Anchor);
         (,,,uint256 floorBalance) = Underlying.getUnderlyingBalances(pool, vault, positions[0]);
 
@@ -306,7 +306,7 @@ contract LendingInvariants is Test {
         IVault vault = IVault(address(managerContract.vault()));
         address pool = address(vault.pool());
 
-        uint256 circulatingSupply = modelHelper.getCirculatingSupply(pool, address(vault), false);
+        uint256 circulatingSupply = modelHelper.getCirculatingSupply(pool, address(vault), true);
         console.log("Circulating supply is: ", circulatingSupply);
 
         uint256 intrinsicMinimumValue = modelHelper.getIntrinsicMinimumValue(address(vault));

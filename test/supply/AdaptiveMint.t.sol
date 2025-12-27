@@ -61,7 +61,7 @@ contract AdaptiveMintTest is Test {
         uint256 timeElapsed = 7 days;      // Example time elapsed
 
         vm.prank(vaultAddress);
-        uint256 mintAmount = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 2e18, 1e18);
+        (uint256 mintAmount, ) = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 2e18, 1e18);
 
         emit log_named_uint("Mint Amount (Low Volatility)", mintAmount);
         assertGt(mintAmount, 0, "Mint amount should be greater than 0 for low volatility");
@@ -74,7 +74,7 @@ contract AdaptiveMintTest is Test {
         uint256 timeElapsed = 7 days;      // Example time elapsed
 
         vm.prank(vaultAddress);
-        uint256 mintAmount = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 4e18, 1e18);
+        (uint256 mintAmount, ) = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 4e18, 1e18);
 
         uint256 toMintLowVolatility = testLowVolatility();
 
@@ -91,7 +91,7 @@ contract AdaptiveMintTest is Test {
         uint256 timeElapsed = 1 days;      // Example time elapsed
 
         vm.prank(vaultAddress);
-        uint256 mintAmount = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 6e18, 1e18);
+        (uint256 mintAmount, ) = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 6e18, 1e18);
 
         uint256 toMintNormalVolatility = testNormalVolatility();
 
@@ -108,7 +108,7 @@ contract AdaptiveMintTest is Test {
         uint256 timeElapsed = 12 hours;    // Example time elapsed
 
         vm.prank(vaultAddress);
-        uint256 mintAmount = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 10e18, 1e18);
+        (uint256 mintAmount, ) = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 10e18, 1e18);
 
         uint256 toMintMediumVolatility = testMediumVolatility();
 
@@ -123,13 +123,13 @@ contract AdaptiveMintTest is Test {
         uint256 timeElapsed = 14 days;     // Example time elapsed
 
         vm.prank(vaultAddress);
-        uint256 lowMint = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 2e18, 1e18);
+        (uint256 lowMint, ) = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 2e18, 1e18);
         vm.prank(vaultAddress);
-        uint256 normalMint = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed - 2 days, 4e18, 1e18);
+        (uint256 normalMint, ) = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed - 2 days, 4e18, 1e18);
         vm.prank(vaultAddress);
-        uint256 mediumMint = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed - 3 days, 6e18, 1e18);
+        (uint256 mediumMint, ) = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed - 3 days, 6e18, 1e18);
         vm.prank(vaultAddress);
-        uint256 highMint = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed - 1 weeks, 10e18, 1e18);
+        (uint256 highMint, ) = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed - 1 weeks, 10e18, 1e18);
         
         emit log_named_uint("Mint Amount (Low Volatility)", lowMint);
         emit log_named_uint("Mint Amount (Normal Volatility)", normalMint);
@@ -149,7 +149,7 @@ contract AdaptiveMintTest is Test {
         uint256 timeElapsed = 14 days;     // Example time elapsed
 
         vm.prank(vaultAddress);
-        uint256 firstMintAmount = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 2e18, 1e18);
+        (uint256 firstMintAmount, ) = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 2e18, 1e18);
 
         console.log("First Mint Amount: ", firstMintAmount);
 
@@ -161,7 +161,7 @@ contract AdaptiveMintTest is Test {
         assertLt(firstMintAmount, deltaSupply / 10, "First mint amount should be less than 10% of delta supply");
 
         vm.prank(vaultAddress);
-        uint256 secondMintAmount = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 2e18, 1e18);
+        (uint256 secondMintAmount, ) = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 2e18, 1e18);
     
         console.log("Second Mint Amount: ", secondMintAmount);
 
@@ -179,7 +179,7 @@ contract AdaptiveMintTest is Test {
 
         timeElapsed = 30 days; // Example time elapsed
         vm.prank(vaultAddress);
-        uint256 thirdMintAmount = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 2e18, 1e18);
+        (uint256 thirdMintAmount, ) = adaptiveMint.computeMintAmount(deltaSupply, timeElapsed, 2e18, 1e18);
         console.log("Third Mint Amount: ", thirdMintAmount);
 
         emit log_named_uint("Mint Amount (Low Volatility)", thirdMintAmount);
