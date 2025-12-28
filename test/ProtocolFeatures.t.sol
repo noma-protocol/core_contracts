@@ -103,6 +103,10 @@ contract ProtocolFeaturesTest is Test {
         // Set WMON based on mainnet/testnet flag
         WMON = isMainnet ? WMON_MAINNET : WMON_TESTNET;
 
+        // Fund deployer with ETH and WETH (use mainnet WMON for fork)
+        vm.deal(deployer, 1000 ether);
+        deal(WMON_MAINNET, deployer, 500 ether);
+
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/deploy_helper/out/out.json");
         string memory json = vm.readFile(path);
@@ -115,6 +119,10 @@ contract ProtocolFeaturesTest is Test {
 
         IDOManager managerContract = IDOManager(idoManager);
         noma = NomaToken(nomaToken);
+
+        // Fund deployer with NomaToken for collateral in lending tests
+        deal(nomaToken, deployer, 500 ether);
+
         modelHelper = ModelHelper(modelHelperContract);
         vaultAddress = address(managerContract.vault());
 

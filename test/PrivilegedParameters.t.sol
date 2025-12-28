@@ -275,7 +275,8 @@ contract PrivilegedParametersTest is Test {
             0.5e18,     // Adaptive supply curve half step (halfStep)
             2,          // Skim ratio
             Decimals(6, 18), // Decimals (minDecimals, maxDecimals)
-            1e14        // basePriceDecimals
+            1e14,       // basePriceDecimals
+            0           // reservedBalanceThreshold
         );
 
         vm.prank(deployer);

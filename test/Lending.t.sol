@@ -73,6 +73,10 @@ contract LendingVaultTest is Test {
         // Set WMON based on mainnet/testnet flag
         WMON = isMainnet ? WMON_MAINNET : WMON_TESTNET;
 
+        // Fund deployer with ETH and WETH (use mainnet WMON for fork)
+        vm.deal(deployer, 1000 ether);
+        deal(WMON_MAINNET, deployer, 500 ether);
+
         // Define the file path
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/deploy_helper/out/out.json");
@@ -94,7 +98,10 @@ contract LendingVaultTest is Test {
 
         noma = NomaToken(nomaToken);
         require(address(noma) != address(0), "Noma token address is zero");
-        
+
+        // Fund deployer with NomaToken for collateral in lending tests
+        deal(nomaToken, deployer, 500 ether);
+
         modelHelper = ModelHelper(modelHelperContract);
         vaultAddress = address(managerContract.vault());
 
@@ -404,7 +411,7 @@ contract LendingVaultTest is Test {
         console.log("Anchor capacity is: ", anchorCapacity);
         console.log("Floor balance is: ", floorBalance);
         console.log("Floor capacity is: ", floorCapacity);
-        console.log("Anchor capacity + floor balance is: ", anchorCapacity + floorBalance);
+        console.log("Anchor capacity + floor capacity is: ", anchorCapacity + floorCapacity);
         console.log("Circulating supply is: ", circulatingSupply);
 
         // To guarantee solvency, Noma ensures that capacity > circulating supply each liquidity is deployed.

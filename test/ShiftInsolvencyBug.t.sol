@@ -280,9 +280,11 @@ contract ShiftInsolvencyBugTest is Test {
             console.log("\nActual tokens minted during shift:", actualMint);
             console.log("Expected (based on circulating):  ", lowBalanceThreshold);
 
-            if (actualMint > lowBalanceThreshold * 10) {
+            if (lowBalanceThreshold > 0 && actualMint > lowBalanceThreshold * 10) {
                 console.log("*** BUG: Minted way more than expected! ***");
                 console.log("Mint was", actualMint / lowBalanceThreshold, "x the expected amount");
+            } else if (lowBalanceThreshold == 0 && actualMint > 0) {
+                console.log("*** BUG: Minted tokens when threshold was 0! ***");
             }
         }
     }

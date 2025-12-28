@@ -62,7 +62,7 @@ contract ShiftDivisionByZeroTest is Test {
         WMON = isMainnet ? WMON_MAINNET : WMON_TESTNET;
 
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/deploy_helper/out/out.json");
+        string memory path = string.concat(root, "/deploy_helper/out/deployment.json");
         string memory json = vm.readFile(path);
         string memory networkId = "1337";
 
@@ -415,9 +415,32 @@ contract ShiftDivisionByZeroTest is Test {
 
             if (ratio <= 0.90e18) {
                 console.log("  Attempting shift...");
-                // This might fail with division by zero
-                vault.shift();
-                console.log("  Shift succeeded");
+                // This might fail with division by zero or overflow in RewardsCalculator
+                try vault.shift() {
+                    console.log("  Shift succeeded");
+                } catch Error(string memory reason) {
+                    console.log("  Shift failed:", reason);
+                } catch (bytes memory lowLevelData) {
+                    // Catch panic codes
+                    if (lowLevelData.length >= 36) {
+                        bytes4 selector = bytes4(lowLevelData);
+                        if (selector == bytes4(0x4e487b71)) {
+                            uint256 panicCode;
+                            assembly {
+                                panicCode := mload(add(lowLevelData, 36))
+                            }
+                            if (panicCode == 0x11) {
+                                console.log("  *** BUG: Arithmetic overflow in shift (likely in RewardsCalculator) ***");
+                            } else if (panicCode == 0x12) {
+                                console.log("  *** BUG: Division by zero in shift ***");
+                            } else {
+                                console.log("  Shift panic code:", panicCode);
+                            }
+                        }
+                    } else {
+                        console.log("  Shift failed with low-level error");
+                    }
+                }
             }
         }
 

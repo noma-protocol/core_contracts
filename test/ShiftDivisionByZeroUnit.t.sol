@@ -319,7 +319,8 @@ contract MockVault {
             halfStep: 0.5e18,
             skimRatio: 5,
             decimals: Decimals({minDecimals: 18, maxDecimals: 18}),
-            basePriceDecimals: 18
+            basePriceDecimals: 18,
+            reservedBalanceThreshold: 0
         });
     }
 

@@ -240,7 +240,8 @@ contract PresaleTest is Test {
             0.5e18,     // Adaptive supply curve half step
             2,          // Skim ratio
             Decimals(6, 18), // Decimals (minDecimals, maxDecimals
-            1e14        // basePriceDecimals
+            1e14,       // basePriceDecimals
+            0           // reservedBalanceThreshold
         );
 
         vm.prank(deployer);

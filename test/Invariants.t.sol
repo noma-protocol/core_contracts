@@ -553,7 +553,7 @@ contract Invariants is Test {
         console.log("Anchor capacity is: ", anchorCapacity);
         console.log("Floor balance is: ", floorBalance);
         console.log("Floor capacity is: ", floorCapacity);
-        console.log("Anchor capacity + floor balance is: ", anchorCapacity + floorBalance);
+        console.log("Anchor capacity + floor capacity is: ", anchorCapacity + floorCapacity);
         console.log("Circulating supply is: ", circulatingSupply);
 
         // To guarantee solvency, Noma ensures that capacity > circulating supply each liquidity is deployed.
