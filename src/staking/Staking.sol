@@ -75,6 +75,9 @@ contract Staking is ReentrancyGuard, ERC20Recovery {
     // Lock-in period in epochs (e.g., 1 for one epoch)
     uint256 public lockInEpochs = 1;
 
+    // Minimum stake duration as time-based fallback (when no shifts happen)
+    uint256 public constant MINIMUM_STAKE_DURATION = 3 days;
+
     // Events
     event Staked(address indexed user, uint256 amount);
     event Unstaked(address indexed user, uint256 amount);
@@ -154,7 +157,18 @@ contract Staking is ReentrancyGuard, ERC20Recovery {
         }
 
         // Check if the user's tokens are locked in the lock-in period
-        if (epoch.number < stakedEpochs[msg.sender] + lockInEpochs) {
+        // MUST wait minimum time (prevents instant unstake after shift)
+        // AND (epoch passed OR extended time passed as fallback for no shifts)
+        bool minTimePassed = block.timestamp >= lastOperationTimestamp[msg.sender] + MINIMUM_STAKE_DURATION;
+        if (!minTimePassed) {
+            revert LockInPeriodNotElapsed();
+        }
+
+        // After minimum time, check epoch OR extended fallback (2x minimum time)
+        bool epochLockPassed = epoch.number >= stakedEpochs[msg.sender] + lockInEpochs;
+        bool extendedTimePassed = block.timestamp >= lastOperationTimestamp[msg.sender] + (MINIMUM_STAKE_DURATION * 2);
+
+        if (!epochLockPassed && !extendedTimePassed) {
             revert LockInPeriodNotElapsed();
         }
 
