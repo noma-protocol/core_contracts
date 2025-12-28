@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import "../errors/Errors.sol";
+import "../types/Errors.sol";
 
 library SupplyRules {
     uint256 internal constant WAD = 1e18; // 18 decimals

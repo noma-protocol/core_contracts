@@ -11,7 +11,7 @@ import { LendingOpsVault } from "../LendingOpsVault.sol";
 import { IDiamondCut } from "../../interfaces/IDiamondCut.sol";
 import { IFacet } from "../../interfaces/IFacet.sol";
 import { Utils } from "../../libraries/Utils.sol";
-import "../../errors/Errors.sol";
+import "../../types/Errors.sol";
 
 /**
  * @title IVaultUpgrader
@@ -103,7 +103,7 @@ contract VaultUpgrade {
      */
     modifier onlyOwner() {
         if (msg.sender != owner) {
-            revert OnlyOwner();
+            revert AccessDenied(4); // owner
         }
         _;
     }
@@ -113,7 +113,7 @@ contract VaultUpgrade {
      */
     modifier onlyFactory() {
         if (msg.sender != factory) {
-            revert OnlyFactory();
+            revert AccessDenied(1); // factory
         }
         _;
     }
@@ -171,7 +171,7 @@ contract VaultUpgradeStep1  {
      */
     modifier onlyFactory() {
         if (msg.sender != factory) {
-            revert OnlyFactory();
+            revert AccessDenied(1); // factory
         }
         _;
     }
@@ -229,7 +229,7 @@ contract VaultUpgradeStep2  {
      */
     modifier onlyFactory() {
         if (msg.sender != factory) {
-            revert OnlyFactory();
+            revert AccessDenied(1); // factory
         }
         _;
     }
@@ -239,7 +239,7 @@ contract VaultUpgradeStep2  {
      */
     modifier onlyOwner() {
         if (msg.sender != owner) {
-            revert OnlyOwner();
+            revert AccessDenied(4); // owner
         }
         _;
     }
@@ -249,7 +249,7 @@ contract VaultUpgradeStep2  {
      */
     modifier authorized() {
         if (msg.sender != upgradePreviousStep) {
-            revert NotAuthorized();
+            revert AccessDenied(0); // generic
         }
         _;
     }
@@ -309,7 +309,7 @@ contract VaultUpgradeStep3  {
      */
     modifier onlyFactory() {
         if (msg.sender != factory) {
-            revert OnlyFactory();
+            revert AccessDenied(1); // factory
         }
         _;
     }
@@ -319,7 +319,7 @@ contract VaultUpgradeStep3  {
      */
     modifier onlyOwner() {
         if (msg.sender != owner) {
-            revert OnlyOwner();
+            revert AccessDenied(4); // owner
         }
         _;
     }
@@ -329,7 +329,7 @@ contract VaultUpgradeStep3  {
      */
     modifier authorized() {
         if (msg.sender != upgradePreviousStep) {
-            revert NotAuthorized();
+            revert AccessDenied(0); // generic
         }
         _;
     }
@@ -385,7 +385,7 @@ contract VaultUpgradeStep4  {
 
     modifier onlyFactory() {
         if (msg.sender != factory) {
-            revert OnlyFactory();
+            revert AccessDenied(1); // factory
         }
         _;
     }
@@ -395,7 +395,7 @@ contract VaultUpgradeStep4  {
      */
     modifier onlyOwner() {
         if (msg.sender != owner) {
-            revert OnlyOwner();
+            revert AccessDenied(4); // owner
         }
         _;
     }
@@ -405,7 +405,7 @@ contract VaultUpgradeStep4  {
      */
     modifier authorized() {
         if (msg.sender != upgradePreviousStep) {
-            revert NotAuthorized();
+            revert AccessDenied(0); // generic
         }
         _;
     }
@@ -458,7 +458,7 @@ contract VaultUpgradeStep5  {
 
     modifier onlyFactory() {
         if (msg.sender != factory) {
-            revert OnlyFactory();
+            revert AccessDenied(1); // factory
         }
         _;
     }

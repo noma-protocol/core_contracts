@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import {SafeMath} from "../libraries/SafeMath.sol";
 import {ERC20, ERC20Permit} from "../abstract/ERC20Permit.sol";
 import {ERC20Recovery} from "../abstract/ERC20Recovery.sol";
-import "../errors/Errors.sol";
+import "../types/Errors.sol";
 
 contract GonsToken is ERC20Permit, ERC20Recovery {
     // PLEASE READ BEFORE CHANGING ANY ACCOUNTING OR MATH
@@ -83,7 +83,7 @@ contract GonsToken is ERC20Permit, ERC20Recovery {
      */
     function initialize(address _stakingContract) external notInitialized {
         if (stakingContract != address(0)) {
-            revert AlreadyInitialized();
+            revert InitError(0); // already initialized
         }
         stakingContract = _stakingContract;
         initialized = true;
@@ -344,7 +344,7 @@ contract GonsToken is ERC20Permit, ERC20Recovery {
     */
     modifier onlyStakingContract() {
         if (msg.sender != stakingContract) {
-            revert Unauthorized();
+            revert AccessDenied(0); // generic
         }
         _;
     }    
@@ -354,7 +354,7 @@ contract GonsToken is ERC20Permit, ERC20Recovery {
     */
     modifier notInitialized() {
         if (initialized) {
-            revert AlreadyInitialized();
+            revert InitError(0); // already initialized
         }
         _;
     }

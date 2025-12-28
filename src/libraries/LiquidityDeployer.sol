@@ -19,7 +19,7 @@ import {
     DeployLiquidityParams,
     SwapParams
 } from "../types/Types.sol";
-import "../errors/Errors.sol";
+import "../types/Errors.sol";
 
 interface IVaultExt {
     function mintTokens(address to, uint256 amount) external returns (bool);
@@ -46,7 +46,7 @@ library LiquidityDeployer {
 
         // Ensuring valid tick range
         if (upperTick <= lowerTick) {
-            revert InvalidTicksFloor();
+            revert InvalidTick(1); // floor
         }
 
         // Deploying the new liquidity position
@@ -94,7 +94,7 @@ library LiquidityDeployer {
         );
 
         if (upperTick <= lowerTick) {
-            revert InvalidTicksAnchor();
+            revert InvalidTick(2); // anchor
         }
 
         (newPosition) = deployPosition(
@@ -150,7 +150,7 @@ library LiquidityDeployer {
         );
 
         if (lowerTick <= anchorPosition.upperTick) {
-            revert InvalidTicksDiscovery();
+            revert InvalidTick(3); // discovery
         }
 
         uint256 balanceToken0 = IERC20Metadata(IUniswapV3Pool(deployParams.pool).token0()).balanceOf(address(this));
@@ -203,7 +203,7 @@ library LiquidityDeployer {
                 decimals
             );
 
-        if (lowerTick < floorPosition.lowerTick) revert InvalidFloor();
+        if (lowerTick < floorPosition.lowerTick) revert InvalidTick(1); // floor
 
         uint128 liquidity = LiquidityAmounts
         .getLiquidityForAmounts(

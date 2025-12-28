@@ -167,6 +167,7 @@ library Conversions {
     function isNearMaxSqrtPrice(uint160 sqrtRatioX96) public pure returns (bool) {
         uint256 threshold = (uint256(TickMath.MAX_SQRT_RATIO) * 9) / 10;
         return uint256(sqrtRatioX96) > threshold;
-    }
+    }                                                                                                                                                                                                                                
+
 }
 

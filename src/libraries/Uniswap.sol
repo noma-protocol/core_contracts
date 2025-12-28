@@ -8,7 +8,7 @@ import {Conversions} from "./Conversions.sol";
 import {TickMath} from "v3-core/libraries/TickMath.sol";
 import { IVault } from "../interfaces/IVault.sol";
 import {LiquidityAmounts} from "v3-periphery/libraries/LiquidityAmounts.sol";
-import "../errors/Errors.sol";
+import "../types/Errors.sol";
 
 /**
  * @title Uniswap

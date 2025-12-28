@@ -34,7 +34,7 @@ import {
     SwapParams,
     LiquidityType
 } from "../src/types/Types.sol";
-import "../src/errors/Errors.sol";
+import "../src/types/Errors.sol";
 
 interface IWETH {
     function deposit() external payable;

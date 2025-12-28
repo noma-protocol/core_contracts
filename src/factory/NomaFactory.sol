@@ -49,7 +49,7 @@ import {
 } from "../types/Types.sol";
 
 import {IVaultUpgrade, IEtchVault, IExtFactory, IDeployerFactory} from "../interfaces/IVaultUpgrades.sol";
-import "../errors/Errors.sol";
+import "../types/Errors.sol";
 
 /**
  * @title IERC20
@@ -144,7 +144,7 @@ contract NomaFactory {
             _deployerFactory == address(0)  || 
             _extFactory == address(0)       ||
             _presaleFactory == address(0)
-        ) revert ZeroAddress();
+        ) revert ZeroValue(0); // address
 
         authority = msg.sender;
         teamMultisigAddress = msg.sender;
@@ -348,7 +348,7 @@ contract NomaFactory {
         VaultDescription memory vaultDesc = vaultsRepository[vaultAddress];
 
         if (msg.sender != vaultDesc.deployer) {
-            revert Unauthorized();
+            revert AccessDenied(0); // generic
         }
 
         data = executeStep1(vaultAddress);
@@ -707,13 +707,13 @@ contract NomaFactory {
     * It reverts if the provided address is zero.
     */
     function setMultiSigAddress(address _address) public {
-        if (msg.sender != teamMultisigAddress && msg.sender != authority) revert NotAuthorized();
-        if (_address == address(0)) revert ZeroAddress();
+        if (msg.sender != teamMultisigAddress && msg.sender != authority) revert AccessDenied(0); // generic
+        if (_address == address(0)) revert ZeroValue(0); // address
         teamMultisigAddress = _address;
     }
 
     function setVaultOwnership(address vaultAddress, address newOwner) public {
-        if (msg.sender != teamMultisigAddress && msg.sender != authority) revert NotAuthorized();
+        if (msg.sender != teamMultisigAddress && msg.sender != authority) revert AccessDenied(0); // generic
         IDiamondInterface(vaultAddress).transferOwnership(newOwner);
     }
 
@@ -918,7 +918,7 @@ contract NomaFactory {
      */
     modifier checkDeployAuthority() {
         if (!permissionlessDeployEnabled) {
-            if (msg.sender != authority) revert NotAuthorized();
+            if (msg.sender != authority) revert AccessDenied(0); // generic
         }
         _;
     }
@@ -928,7 +928,7 @@ contract NomaFactory {
      * @dev Reverts with NotAuthorityError if the caller is not the authority.
      */
     modifier isAuthority() {
-        if (msg.sender != authority) revert NotAuthorized();
+        if (msg.sender != authority) revert AccessDenied(0); // generic
         _;
     }
 
@@ -937,7 +937,7 @@ contract NomaFactory {
      * @dev Reverts with OnlyVaultsError if the caller is not an authorized vault.
      */
     modifier onlyVaults() {
-        if (vaultsRepository[msg.sender].vault != msg.sender) revert OnlyVault();
+        if (vaultsRepository[msg.sender].vault != msg.sender) revert AccessDenied(3); // vault
         _;
     }
 }

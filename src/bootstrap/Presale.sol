@@ -31,7 +31,7 @@
   import {Utils} from "../libraries/Utils.sol";
   import {DecimalMath} from "../libraries/DecimalMath.sol";
   import {PresaleDeployParams, PresaleProtocolParams, LivePresaleParams, SwapParams} from "../types/Types.sol";
-import "../errors/Errors.sol";
+import "../types/Errors.sol";
 
   interface IVault {
       function afterPresale() external;
@@ -305,7 +305,7 @@ import "../errors/Errors.sol";
         if (!expired) {
             // before deadline: only allow if soft cap reached AND caller is owner
             if (!reachedSoftCap) revert PresaleOngoing();
-            if (msg.sender != owner()) revert NotAuthorized();
+            if (msg.sender != owner()) revert AccessDenied(0); // generic
         }
         // if expired: permissionless (no caller restriction)
 
@@ -631,7 +631,7 @@ import "../errors/Errors.sol";
     }
 
     modifier authorized() {
-        if (msg.sender != owner() && msg.sender != IFactory(factory).owner()) revert NotAuthorized();
+        if (msg.sender != owner() && msg.sender != IFactory(factory).owner()) revert AccessDenied(0); // generic
         _;
     }
 

@@ -27,7 +27,7 @@ import { Conversions } from "../libraries/Conversions.sol";
 import { Uniswap } from "../libraries/Uniswap.sol";
 import { LiquidityOps } from "../libraries/LiquidityOps.sol";
 import { IDeployer } from "../interfaces/IDeployer.sol";
-import "../errors/Errors.sol";
+import "../types/Errors.sol";
 
 interface ILendingVault {
     function loanLTV(address who) external view returns (uint256 ltv1e18);
@@ -105,7 +105,7 @@ contract LendingOpsVault {
         uint256 limit
     )
         public
-        onlyInternalCalls
+        onlyInternalCalls(this.vaultSelfRepayLoans.selector)
         returns (uint256 eligibleCount, uint256 totalRepaid, uint256 nextIndex)
     {
         address token1 = _v.pool.token1();
@@ -157,6 +157,21 @@ contract LendingOpsVault {
             }
         }
 
+        totalRepaid = proRataAllocate(
+            fundsToPull,
+            totalOutstanding,
+            pool
+        );
+
+        nextIndex = end;
+        return (count, totalRepaid, nextIndex);
+    }
+
+    function proRataAllocate(
+        uint256 fundsToPull,
+        uint256 totalOutstanding,
+        OutstandingLoan[] memory pool
+    ) internal returns (uint256 totalRepaid) {
         // PRO-RATA via helper (reduces locals here)
         (uint256[] memory toRepay, /*spent*/) =
             _proRataAllocate(fundsToPull, pool, totalOutstanding);
@@ -168,9 +183,6 @@ contract LendingOpsVault {
             ILendingVault(address(this)).paybackLoan(pool[i].who, amt, true);
             totalRepaid += amt;
         }
-
-        nextIndex = end;
-        return (count, totalRepaid, nextIndex);
     }
 
     function _redeployAnchor(
@@ -276,15 +288,15 @@ contract LendingOpsVault {
     /**
      * @notice Modifier to restrict access to internal calls.
      */
-    modifier onlyInternalCalls() {
-        if (msg.sender != _v.factory && msg.sender != address(this)) revert OnlyInternalCalls();
-        _;        
+    modifier onlyInternalCalls(bytes4 selector) {
+        if (msg.sender != _v.factory && msg.sender != address(this)) revert OnlyInternalCalls(address(this), selector);
+        _;
     }
 
     modifier onlyManagerOrMultiSig() {
         address multiSig = INomaFactory(_v.factory).teamMultiSig();
         if (msg.sender != _v.manager && msg.sender != multiSig) {
-            revert NotAuthorized();
+            revert AccessDenied(0); // generic
         }
         _;
     }

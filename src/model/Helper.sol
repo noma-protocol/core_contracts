@@ -33,7 +33,7 @@ import {
     TokenInfo,
     VaultInfo
 } from "../types/Types.sol";
-import "../errors/Errors.sol";
+import "../types/Errors.sol";
 
 /**
  * @title IStaking
@@ -369,7 +369,7 @@ contract ModelHelper {
         uint256 floorCapacity = vaultInfo.floorCapacity;
         
         // To guarantee solvency, Noma ensures that capacity > circulating supply each liquidity is deployed.
-        if (anchorCapacity + floorCapacity <= circulatingSupply) {
+        if (anchorCapacity + floorCapacity < circulatingSupply) {
             revert InsolvencyInvariant();
         }
     }

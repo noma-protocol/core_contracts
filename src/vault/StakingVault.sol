@@ -14,7 +14,7 @@ import {IVault} from "../interfaces/IVault.sol";
 import {DecimalMath} from "../libraries/DecimalMath.sol";
 import {LiquidityDeployerMin} from "../libraries/LiquidityDeployerMin.sol";
 import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
-import "../errors/Errors.sol";
+import "../types/Errors.sol";
 
 import {
     LiquidityType,
@@ -55,9 +55,9 @@ contract StakingVault is BaseVault {
     function mintAndDistributeRewards(
         address caller,
         ProtocolAddresses memory addresses
-    ) public onlyInternalCalls {
+    ) public onlyInternalCalls(this.mintAndDistributeRewards.selector) {
         if (msg.sender != address(this)) {
-            revert Unauthorized();
+            revert AccessDenied(0); // generic
         }
         if (_v.stakingContract == address(0)) revert StakingContractNotSet();
         if (!_v.stakingEnabled) return;
@@ -363,7 +363,7 @@ contract StakingVault is BaseVault {
      */
     modifier onlyManager() {
         if (msg.sender != _v.manager) {
-            revert Unauthorized();
+            revert AccessDenied(0); // generic
         }
         _;
     }

@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
-import "../errors/Errors.sol";
+import "../types/Errors.sol";
 
 interface IModelHelper {
     function getIntrinsicMinimumValue(address vault) external view returns (uint256);

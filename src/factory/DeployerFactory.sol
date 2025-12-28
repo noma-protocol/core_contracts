@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import {Deployer} from "../Deployer.sol";
 import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
 import {Utils} from "../libraries/Utils.sol";
+import "../types/Errors.sol";
 
 /**
  * @title DeployerFactory
@@ -12,17 +13,11 @@ import {Utils} from "../libraries/Utils.sol";
  *      can call the deployment function.
  */
 contract DeployerFactory {
-    
+
     /// @notice Emitted when a new `Deployer` contract is created.
     /// @param deployerAddress The address of the newly deployed Deployer contract.
     event DeployerCreated(address deployerAddress);
 
-    /// @notice Error thrown when the caller is not the contract owner.
-    error OnlyOwner();
-
-    /// @notice Error thrown when the caller is not the authorized factory.
-    error OnlyFactory();
-    
     /// @notice Holds the latest deployed Deployer contract instance.
     Deployer public deployer;
 
@@ -64,7 +59,7 @@ contract DeployerFactory {
             "no factory"
         );        
         if (msg.sender != factory) {
-            revert OnlyFactory();
+            revert AccessDenied(1); // factory
         }
         _;
     }

@@ -23,7 +23,7 @@ import { LiquidityOps } from "../libraries/LiquidityOps.sol";
 import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
 import {Conversions} from "../libraries/Conversions.sol";
 import "../libraries/TickMathExtra.sol";
-import "../errors/Errors.sol";
+import "../types/Errors.sol";
 import {IModelHelper} from "../interfaces/IModelHelper.sol";
 
 interface INomaFactory {
@@ -81,7 +81,7 @@ contract AuxVault {
 
         if (amount1Delta > 0) {
             uint256 bal1 = IERC20(_v.tokenInfo.token1).balanceOf(address(this));
-            if (bal1 < uint256(amount1Delta)) revert InsufficientBalance();
+            if (bal1 < uint256(amount1Delta)) revert InsufficientBalance(0); // generic
             // [C-02 FIX] Use SafeERC20
             IERC20(_v.tokenInfo.token1).safeTransfer(msg.sender, uint256(amount1Delta));
         }
@@ -111,7 +111,9 @@ contract AuxVault {
     function mintTokens(
         address to,
         uint256 amount
-    ) public onlyInternalCalls returns (bool) {
+    ) public 
+    onlyInternalCalls(this.mintTokens.selector) 
+    returns (bool) {
         
         return _mintTokens(to, amount);
     }
@@ -138,7 +140,7 @@ contract AuxVault {
      */
     function burnTokens(
         uint256 amount
-    ) public onlyInternalCalls {
+    ) public onlyInternalCalls(this.burnTokens.selector) {
 
         IERC20(_v.pool.token0()).approve(address(_v.factory), amount);
 
@@ -153,7 +155,7 @@ contract AuxVault {
         address pool,
         uint160 sqrtPriceX96,
         uint256 amount
-    ) public onlyInternalCalls {
+    ) public onlyInternalCalls(this.fixInbalance.selector) {
         bool isOverLimit = Conversions.isNearMaxSqrtPrice(sqrtPriceX96);
 
         if (isOverLimit) {
@@ -243,7 +245,7 @@ contract AuxVault {
     }
     
     function recoverERC20(address token, address to) public onlyMultiSig {
-        if (to != INomaFactory(_v.factory).teamMultiSig()) revert NotAuthorized();
+        if (to != INomaFactory(_v.factory).teamMultiSig()) revert AccessDenied(0); // generic
 
         IStakingRewards(_v.stakingContract).recoverERC20(token, to);
     }
@@ -360,9 +362,9 @@ contract AuxVault {
      * @param _feesAccumulatedToken1 The accumulated fees for token1.
      */
     function setFees(
-        uint256 _feesAccumulatedToken0, 
+        uint256 _feesAccumulatedToken0,
         uint256 _feesAccumulatedToken1
-    ) public onlyInternalCalls {
+    ) public onlyInternalCalls(this.setFees.selector) {
         _v.feesAccumulatorToken0 += _feesAccumulatedToken0;
         _v.feesAccumulatorToken1 += _feesAccumulatedToken1;
     }
@@ -371,8 +373,8 @@ contract AuxVault {
      * @notice Updates the liquidity positions in the vault.
      * @param positions The new liquidity positions.
      */
-    function updatePositions(LiquidityPosition[3] memory positions) public onlyInternalCalls {
-        if (!_v.initialized) revert NotInitialized();             
+    function updatePositions(LiquidityPosition[3] memory positions) public onlyInternalCalls(this.updatePositions.selector) {
+        if (!_v.initialized) revert InitError(1); // not initialized             
         if (positions[0].liquidity == 0 || positions[1].liquidity == 0 || positions[2].liquidity == 0) revert NoLiquidity();
         
         _updatePositions(positions);
@@ -395,7 +397,7 @@ contract AuxVault {
     }
 
     function consumeReferral(bytes8 code, uint256 amount) external {
-        if (msg.sender != vToken()) revert NotAuthorized();
+        if (msg.sender != vToken()) revert AccessDenied(0); // generic
 
         uint256 bal = _v.referrals[code].totalReferred;
         if (amount > bal) amount = bal; // or revert
@@ -453,20 +455,20 @@ contract AuxVault {
      * @notice Modifier to restrict access to the authorized manager.`
      */
     modifier authorized() {
-        if (msg.sender != _v.manager) revert NotAuthorized();
+        if (msg.sender != _v.manager) revert AccessDenied(0); // generic
         _;
     }
 
     modifier onlyMultiSig() {
         if (msg.sender != INomaFactory(_v.factory).teamMultiSig()) {
-            revert NotAuthorized();
+            revert AccessDenied(0); // generic
         }
         _;        
     }
 
      modifier onlyManager() {
         if (msg.sender != _v.manager) {
-            revert NotAuthorized();
+            revert AccessDenied(0); // generic
         }
         _;
     }   
@@ -474,7 +476,7 @@ contract AuxVault {
     modifier onlyManagerOrMultiSig() {
         address multiSig = INomaFactory(_v.factory).teamMultiSig();
         if (msg.sender != _v.manager && msg.sender != multiSig) {
-            revert NotAuthorized();
+            revert AccessDenied(0); // generic
         }
         _;
     }
@@ -482,13 +484,13 @@ contract AuxVault {
     /**
      * @notice Modifier to restrict access to internal calls.
      */
-    modifier onlyInternalCalls() {
-        if (msg.sender != _v.factory && msg.sender != address(this)) revert OnlyInternalCalls();
+    modifier onlyInternalCalls(bytes4 selector) {
+        if (msg.sender != _v.factory && msg.sender != address(this)) revert OnlyInternalCalls(address(this), selector);
         _;        
     }
 
     modifier onlyAuthorizedContracts() {
-        if (msg.sender != exchangeHelper() && msg.sender != vToken()) revert NotAuthorized();
+        if (msg.sender != exchangeHelper() && msg.sender != vToken()) revert AccessDenied(0); // generic
         _;        
     }
 

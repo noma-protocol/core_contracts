@@ -27,7 +27,7 @@ import {
     LiquidityInternalPars,
     DeployLiquidityParams
 } from "../types/Types.sol";
-import "../errors/Errors.sol";
+import "../types/Errors.sol";
 
 /**
  * @title LiquidityOps
@@ -500,7 +500,7 @@ library LiquidityOps {
         bool isShift
     ) internal returns (LiquidityPosition memory newPosition) {
         if (params.upperTick <= params.lowerTick) {
-            revert InvalidTick();
+            revert InvalidTick(0); // generic
         }
         uint256 reserved = 0;
         uint256 totalSupply = IERC20Metadata(

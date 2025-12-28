@@ -25,7 +25,7 @@ import {Resolver} from "../Resolver.sol";
 import {MultiTokenDividends} from "../libraries/MultiTokenDividends.sol";
 import {Utils} from "../libraries/Utils.sol";
 import {VaultDescription} from "../types/Types.sol";
-import "../errors/Errors.sol";
+import "../types/Errors.sol";
 
 interface INomaFactory {
     function getVaultsRepository(address vault) external view returns (VaultDescription memory);
@@ -120,7 +120,7 @@ contract NomaDividends {
     // ============================================================
 
     modifier onlyOwner() {
-        if (msg.sender != owner) revert OnlyOwner();
+        if (msg.sender != owner) revert AccessDenied(4); // owner
         _;
     }
 
@@ -151,7 +151,7 @@ contract NomaDividends {
         IERC20 sharesToken_ = sharesToken;
         if (address(sharesToken_) == address(0)) return;
         if (rewardToken == address(0)) revert InvalidRewardToken();
-        if (amount == 0) revert ZeroAmount();
+        if (amount == 0) revert ZeroValue(1); // amount
 
         uint256 totalShares = sharesToken_.totalSupply();
         if (totalShares == 0) revert NoShares();
@@ -422,14 +422,14 @@ contract NomaDividends {
 
     /// @dev Only the sharesToken is allowed to call certain entry points (transfer hook).
     modifier onlySharesToken() {
-        if (msg.sender != address(sharesToken)) revert NotSharesToken();
+        if (msg.sender != address(sharesToken)) revert AccessDenied(6); // shares token
         _;
     }
 
     /// @dev Only known vaults (from factory registry) can call certain functions (e.g. distribute).
     modifier onlyVaults() {
         VaultDescription memory vaultDesc = factory.getVaultsRepository(msg.sender);
-        if (vaultDesc.vault != msg.sender) revert OnlyVault();
+        if (vaultDesc.vault != msg.sender) revert AccessDenied(3); // vault
         _;
     }
 }

@@ -17,7 +17,7 @@ import {
     AmountsToMint,
     DeployLiquidityParams
 } from "../types/Types.sol";
-import "../errors/Errors.sol";
+import "../types/Errors.sol";
 
 /**
  * @title LiquidityManager
@@ -34,7 +34,7 @@ library LiquidityDeployerMin {
     ) internal returns (LiquidityPosition memory newPosition) {
         // Ensuring valid tick range
         if (positions[0].upperTick <= positions[0].lowerTick) {
-            revert InvalidTicksFloor();
+            revert InvalidTick(1); // floor
         }
 
         // Deploying the new liquidity position

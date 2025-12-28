@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import {RewardParams} from "../../types/Types.sol";
 import {Math} from "openzeppelin/contracts/utils/math/Math.sol";
-import "../../errors/Errors.sol";
+import "../../types/Errors.sol";
 
 // ███╗   ██╗ ██████╗ ███╗   ███╗ █████╗                               
 // ████╗  ██║██╔═══██╗████╗ ████║██╔══██╗                              

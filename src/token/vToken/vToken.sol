@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IAddressResolver} from "../../interfaces/IAddressResolver.sol";
 import {ReferralEntity} from "../../types/Types.sol";
-import "../../errors/Errors.sol";
+import "../../types/Errors.sol";
 
 interface IVault {
     function getReferralEntity(address who) external view returns (ReferralEntity memory);
@@ -89,21 +89,21 @@ contract vToken is ERC20 {
     /// @dev vToken out is floored: tokenOutOut = vAmount / vPerTokenOut.
     ///      User may lose remainder if vAmount is not a multiple of vPerTokenOut.
     function redeemForTokenOut(uint256 vAmount, address to) external {
-        if (vAmount == 0) revert ZeroAmount();
+        if (vAmount == 0) revert ZeroValue(1); // amount
         if (vPerTokenOut == 0) revert InvalidRate();
-        if (msg.sender != to) revert Unauthorized();
+        if (msg.sender != to) revert AccessDenied(0); // generic
         
         address recipient = to == address(0) ? msg.sender : to;
 
         // Calculate vToken to send (floor division)
         uint256 tokenOutOut = vAmount / vPerTokenOut;
-        if (tokenOutOut == 0) revert ZeroAmount();
+        if (tokenOutOut == 0) revert ZeroValue(1); // amount
 
         // Burn first (effects) then transfer (interaction)
         _burn(msg.sender, vAmount);
 
         // Ensure contract has enough vToken
-        if (IERC20(tokenOut).balanceOf(address(this)) < tokenOutOut) revert InsufficientTokenOut();
+        if (IERC20(tokenOut).balanceOf(address(this)) < tokenOutOut) revert InsufficientBalance(4); // token out
 
         IERC20(tokenOut).safeTransfer(recipient, tokenOutOut);
         emit Redeemed(msg.sender, recipient, vAmount, tokenOutOut);
@@ -112,7 +112,7 @@ contract vToken is ERC20 {
     /// @notice Redeem an exact vToken amount; burns exactly (tokenOutAmount * vPerTokenOut) vTokens.
     /// @dev Avoids rounding loss for the user if they want a precise vToken amount.
     function redeemTokenOutExact(uint256 tokenOutAmount, address to) external {
-        if (tokenOutAmount == 0) revert ZeroAmount();
+        if (tokenOutAmount == 0) revert ZeroValue(1); // amount
         if (vPerTokenOut == 0) revert InvalidRate();
 
         address recipient = to == address(0) ? msg.sender : to;
@@ -122,7 +122,7 @@ contract vToken is ERC20 {
         // Burn first
         _burn(msg.sender, vToBurn);
 
-        if (IERC20(tokenOut).balanceOf(address(this)) < tokenOutAmount) revert InsufficientTokenOut();
+        if (IERC20(tokenOut).balanceOf(address(this)) < tokenOutAmount) revert InsufficientBalance(4); // token out
 
         IERC20(tokenOut).safeTransfer(recipient, tokenOutAmount);
         emit Redeemed(msg.sender, recipient, vToBurn, tokenOutAmount);
@@ -143,13 +143,13 @@ contract vToken is ERC20 {
 
     function setVault(address newVault) external {
         if (newVault == address(0)) revert InvalidAddress();
-        if (msg.sender != resolver.owner()) revert Unauthorized();
+        if (msg.sender != resolver.owner()) revert AccessDenied(0); // generic
         vault = newVault;
     }
 
     /// @notice Update the exchange rate (vToken per 1 vToken).
     function setExchangeRate(uint256 newVPerTokenOut) external {
-        if (msg.sender != resolver.owner()) revert Unauthorized();
+        if (msg.sender != resolver.owner()) revert AccessDenied(0); // generic
         if (newVPerTokenOut == 0) revert InvalidRate();
         vPerTokenOut = newVPerTokenOut;
         emit ExchangeRateUpdated(newVPerTokenOut);
@@ -158,7 +158,7 @@ contract vToken is ERC20 {
     /* ------------------------------- Burn hook ------------------------------ */
 
     function burn(address from, uint256 amount) external  {
-        if (msg.sender != from) revert Unauthorized();
+        if (msg.sender != from) revert AccessDenied(0); // generic
         _burn(from, amount);
     }
 }

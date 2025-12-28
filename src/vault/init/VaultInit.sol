@@ -6,6 +6,7 @@ import { BaseVault } from "../BaseVault.sol";
 import { IDiamondCut } from "../../interfaces/IDiamondCut.sol";
 import { IFacet } from "../../interfaces/IFacet.sol";
 import { Utils } from "../../libraries/Utils.sol";
+import "../../types/Errors.sol";
 
 /**
  * @title IDiamondInterface
@@ -33,9 +34,6 @@ interface IVaultUpgrader {
 contract VaultInit {
     address private owner; // The address of the contract owner.
     address private factory; // The address of the factory contract.
-
-    error OnlyFactory();
-    error InvalidAddress();
 
     /**
      * @notice Constructor to initialize the VaultUpgrade contract.
@@ -85,7 +83,7 @@ contract VaultInit {
      */
     modifier onlyFactory() {
         if (msg.sender != factory) {
-            revert OnlyFactory();
+            revert AccessDenied(1); // factory
         }
         _;
     }

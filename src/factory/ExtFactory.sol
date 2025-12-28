@@ -10,6 +10,7 @@ import { TokenRepo } from "../TokenRepo.sol";
 import { vToken } from "../token/vToken/vToken.sol";
 import { VaultDescription, VaultInfo, ExtDeployParams} from "../types/Types.sol";
 import { IVault } from "../interfaces/IVault.sol";
+import "../types/Errors.sol";
 
 interface INomaFactory {
     function getVaultsRepository(address vault) external view returns (VaultDescription memory);
@@ -29,7 +30,6 @@ contract ExtFactory {
 
     /// @notice Error thrown when the caller is not the authorized factory.
     error OnlyFactoryOrOwner();
-    error AlreadyInitialized();
 
     /// @notice Address resolver used to retrieve contract addresses.
     IAddressResolver public resolver;
@@ -66,7 +66,7 @@ contract ExtFactory {
         VaultInfo memory vaultInfo = IVault(params.vaultAddress).getVaultInfo();
 
         if (vaultInfo.initialized) {
-            revert AlreadyInitialized();
+            revert InitError(0); // already initialized
         }
 
         // Deploy GonsToken contract

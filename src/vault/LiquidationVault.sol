@@ -8,7 +8,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IVault } from "../interfaces/IVault.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ITokenRepo } from "../TokenRepo.sol";
-import "../errors/Errors.sol";
+import "../types/Errors.sol";
 
 /**
  * @title AuxVault
@@ -26,7 +26,7 @@ contract LiquidationVault {
      *      When a loan is removed, the last element is swapped into position i,
      *      so we must NOT increment i to re-check the swapped element.
      */
-    function vaultDefaultLoans() public onlyInternalCalls returns (uint256 totalBurned, uint256 loansDefaulted) {
+    function vaultDefaultLoans() public onlyInternalCalls(this.vaultDefaultLoans.selector) returns (uint256 totalBurned, uint256 loansDefaulted) {
         totalBurned = 0;
         loansDefaulted = 0;
 
@@ -50,7 +50,7 @@ contract LiquidationVault {
 
     function vaultDefaultLoansRange(uint256 start, uint256 limit)
         public
-        onlyInternalCalls
+        onlyInternalCalls(this.vaultDefaultLoansRange.selector)
         returns (uint256 totalBurned, uint256 loansDefaulted, uint256 nextIndex)
     {
         totalBurned = 0;
@@ -121,9 +121,9 @@ contract LiquidationVault {
     /**
      * @notice Modifier to restrict access to internal calls.
      */
-    modifier onlyInternalCalls() {
-        if (msg.sender != _v.factory && msg.sender != address(this)) revert OnlyInternalCalls();
-        _;        
+    modifier onlyInternalCalls(bytes4 selector) {
+        if (msg.sender != _v.factory && msg.sender != address(this)) revert OnlyInternalCalls(address(this), selector);
+        _;
     }
 
     /**

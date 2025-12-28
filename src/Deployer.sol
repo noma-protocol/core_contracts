@@ -32,7 +32,7 @@ import {
 } from "./types/Types.sol";
 import {IAddressResolver} from "./interfaces/IAddressResolver.sol";
 import {Utils} from "./libraries/Utils.sol";
-import "./errors/Errors.sol";
+import "./types/Errors.sol";
 
 /// @title IVault Interface
 /// @notice Interface defining the functionality of the Vault contract.
@@ -396,13 +396,13 @@ contract Deployer is Ownable {
 
     /// @dev Modifier to ensure only the factory can call certain functions.
     modifier onlyFactory() {
-        if (msg.sender != factory) revert OnlyFactory();
+        if (msg.sender != factory) revert AccessDenied(1); // factory
         _;
     }
 
     /// @dev Modifier to ensure the contract is initialized before certain functions can be called.
     modifier notInitialized() {
-        if (initialized) revert AlreadyInitialized();
+        if (initialized) revert InitError(0); // already initialized
         _;
     }
 }

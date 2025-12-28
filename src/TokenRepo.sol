@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "./errors/Errors.sol";
+import "./types/Errors.sol";
 
 /// @title ITokenRepo Interface
 /// @notice Interface for a token repository contract that can transfer tokens
@@ -35,7 +35,7 @@ contract TokenRepo {
     /// @notice Constructor that sets the contract owner.
     /// @param _owner The address that will be set as the owner.
     constructor(address _owner) {
-        if (_owner == address(0)) revert ZeroAddress();
+        if (_owner == address(0)) revert ZeroValue(0); // address
         owner = _owner;
     }
 
@@ -53,7 +53,7 @@ contract TokenRepo {
     /// @notice Initiates ownership transfer to a new address (two-step process)
     /// @param newOwner The address of the proposed new owner
     function transferOwnership(address newOwner) public onlyOwner {
-        if (newOwner == address(0)) revert ZeroAddress();
+        if (newOwner == address(0)) revert ZeroValue(0); // address
         if (newOwner == owner) revert InvalidParams();
         pendingOwner = newOwner;
         emit OwnershipTransferInitiated(owner, newOwner);
@@ -61,7 +61,7 @@ contract TokenRepo {
 
     /// @notice Accepts pending ownership transfer
     function acceptOwnership() public {
-        if (msg.sender != pendingOwner) revert NotAuthorized();
+        if (msg.sender != pendingOwner) revert AccessDenied(0); // generic
         emit OwnershipTransferred(owner, pendingOwner);
         owner = pendingOwner;
         pendingOwner = address(0);
@@ -70,7 +70,7 @@ contract TokenRepo {
     /// @notice Modifier that restricts function access to only the owner.
     /// @dev Reverts if msg.sender is not the owner.
     modifier onlyOwner() {
-        if (msg.sender != owner) revert OnlyOwner();
+        if (msg.sender != owner) revert AccessDenied(4); // owner
         _;
     }
 }

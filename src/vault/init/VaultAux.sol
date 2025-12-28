@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import { AuxVault } from "../AuxVault.sol";
 import { IDiamondCut } from "../../interfaces/IDiamondCut.sol";
 import { IFacet } from "../../interfaces/IFacet.sol";
-import "../../errors/Errors.sol";
+import "../../types/Errors.sol";
 
 interface IDiamondInterface {
     function initialize() external;
@@ -90,7 +90,7 @@ contract VaultAux  {
      * @notice Modifier to restrict access to the contract owner.
      */
     modifier onlyOwner() {
-        if (msg.sender != owner) revert OnlyOwner();
+        if (msg.sender != owner) revert AccessDenied(4); // owner
         _;
     }
 
@@ -98,7 +98,7 @@ contract VaultAux  {
      * @notice Modifier to restrict access to the previous upgrade step contract.
      */
     modifier authorized() {
-        if (msg.sender != upgradePreviousStep) revert NotAuthorized();
+        if (msg.sender != upgradePreviousStep) revert AccessDenied(0); // generic
         _;
     }
 }

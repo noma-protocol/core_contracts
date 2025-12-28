@@ -16,7 +16,7 @@ import {IERC173} from "../interfaces/IERC173.sol";
 import {IERC165} from "../interfaces/IERC165.sol";
 import { Utils } from "../libraries/Utils.sol";
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
-import "../errors/Errors.sol";
+import "../types/Errors.sol";
 
 contract DiamondInit {
 
@@ -45,7 +45,7 @@ contract DiamondInit {
     
     modifier notInitialized() {
         if (initialized == true) {
-            revert AlreadyInitialized();
+            revert InitError(0); // already initialized
         }
         _;
     }

@@ -25,6 +25,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
 import {Utils} from "../libraries/Utils.sol";
 import {NomaDividends} from "../controllers/NomaDividends.sol";
+import "../types/Errors.sol";
 
 /**
  * @title NomaToken
@@ -39,7 +40,6 @@ contract NomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSU
     uint256 public maxTotalSupply; // The maximum total supply of the token.
 
     // Custom errors
-    error OnlyFactory();
     error CannotInitializeLogicContract();
     error MaxSupplyReached();
 
@@ -176,7 +176,7 @@ contract NomaToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSU
      * @notice Modifier to restrict access to the NomaFactory contract.
      */
     modifier onlyFactory() {
-        if (msg.sender != nomaFactory()) revert OnlyFactory();
+        if (msg.sender != nomaFactory()) revert AccessDenied(1); // factory
         _;
     }
 }

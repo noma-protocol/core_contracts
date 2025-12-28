@@ -37,7 +37,7 @@ import {
 import {Utils} from "../libraries/Utils.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "../errors/Errors.sol";
+import "../types/Errors.sol";
 
 interface INomaFactory {
     function deferredDeploy(address deployer, address tokenRepo) external;
@@ -54,6 +54,21 @@ interface IAdaptiveSupplyController {
 interface ILendingVault {
     function setFee(uint256 fee, uint256 feeToTreasury) external;
 }
+
+event Initialized(
+    address factory,
+    address owner,
+    address deployer,
+    address pool, 
+    address presaleContract
+);
+
+event PostInitialized(
+    address stakingContract,
+    address tokenRepo,
+    address sToken,
+    address vToken   
+);
 
 /**
  * @title BaseVault
@@ -157,6 +172,8 @@ contract BaseVault  {
         _v.isLocked[address(this)] = false;
 
         IERC20(_v.pool.token0()).approve(_deployer, type(uint256).max);
+
+        emit Initialized(_factory, _owner, _deployer, _pool, _presaleContract);
     }
 
     // *** MUTATIVE FUNCTIONS *** //
@@ -168,7 +185,7 @@ contract BaseVault  {
     function initializeLiquidity(
         LiquidityPosition[3] memory positions
     ) public onlyDeployer {
-        if (_v.initialized) revert AlreadyInitialized();
+        if (_v.initialized) revert InitError(0); // already initialized
 
         if (
             positions[0].liquidity == 0 || 
@@ -185,7 +202,7 @@ contract BaseVault  {
         PostInitParams memory params
     ) public onlyFactory {
         if (_v.initialized) {
-            revert AlreadyInitialized();
+            revert InitError(0); // already initialized
         }
         _v.stakingContract = params.stakingContract;
         _v.tokenRepo = params.tokenRepo;
@@ -194,13 +211,20 @@ contract BaseVault  {
         _v.stakingEnabled = true;
         _v.isStakingSetup = true;
         _v.initialized = true;
+
+        emit PostInitialized(
+            params.stakingContract,
+            params.tokenRepo,
+            params.sToken,
+            params.vToken 
+        );
     }
 
     /**
      * @notice Handles the post-presale actions.
      */
     function afterPresale() public  {
-        if (msg.sender != _v.presaleContract) revert OnlyInternalCalls();
+        if (msg.sender != _v.presaleContract) revert OnlyInternalCalls(address(this), this.afterPresale.selector);
         INomaFactory(
             _v.factory
         ).deferredDeploy(
@@ -415,19 +439,19 @@ contract BaseVault  {
      * @notice Modifier to restrict access to the deployer contract.
      */
     modifier onlyDeployer() {
-        if (msg.sender != _v.deployerContract) revert OnlyDeployer();
+        if (msg.sender != _v.deployerContract) revert AccessDenied(2); // deployer
         _;
     }
 
     /**
      * @notice Modifier to restrict access to internal calls.
      */
-    modifier onlyInternalCalls() {
+    modifier onlyInternalCalls(bytes4 selector) {
         if (
             msg.sender != _v.factory && 
             msg.sender != address(this) &&
             msg.sender !=  _v.orchestrator
-        ) revert OnlyInternalCalls();
+        ) revert OnlyInternalCalls(address(this), selector);
 
         _;        
     }
@@ -436,7 +460,7 @@ contract BaseVault  {
      * @notice Modifier to restrict access to the factory contract.
      */
     modifier onlyFactory() {
-        if (msg.sender != factory()) revert OnlyFactory();
+        if (msg.sender != factory()) revert AccessDenied(1); // factory
         _;
     }
 

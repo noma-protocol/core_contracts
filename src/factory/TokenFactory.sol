@@ -23,7 +23,7 @@ import { NomaToken } from "../token/NomaToken.sol";
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
 import { VaultDeployParams } from "../types/Types.sol";
 import "../libraries/Utils.sol";
-import "../errors/Errors.sol";
+import "../types/Errors.sol";
 
 /**
  * @title IERC20
@@ -134,7 +134,7 @@ contract TokenFactory {
 
         // 3) Sanity checks
         if (IERC20(address(proxy)).totalSupply() != p.initialSupply) revert InvalidParams();
-        if (address(proxy) == address(0)) revert ZeroAddress();
+        if (address(proxy) == address(0)) revert ZeroValue(0); // address
     }
 
     function _deployImpl(
@@ -206,7 +206,7 @@ contract TokenFactory {
     }
 
     modifier onlyFactory() {
-        if (msg.sender != factory()) revert OnlyFactory();
+        if (msg.sender != factory()) revert AccessDenied(1); // factory
         _;
     }
 }

@@ -5,12 +5,13 @@ import { Diamond } from "../../Diamond.sol";
 import { DiamondInit } from "../../init/DiamondInit.sol";
 import { OwnershipFacet } from "../../facets/OwnershipFacet.sol";
 import { DiamondCutFacet } from "../../facets/DiamondCutFacet.sol";
+import { DiamondLoupeFacet } from "../../facets/DiamondLoupeFacet.sol";
 import { IDiamondCut } from "../../interfaces/IDiamondCut.sol";
 import { IFacet } from "../../interfaces/IFacet.sol";
 import { IDiamond } from "../../interfaces/IDiamond.sol";
 import { Utils } from "../../libraries/Utils.sol";
 import { IAddressResolver } from "../../interfaces/IAddressResolver.sol";
-import "../../errors/Errors.sol";
+import "../../types/Errors.sol";
 
 /**
  * @title EtchVault
@@ -22,6 +23,7 @@ contract EtchVault {
     // State variables
     Diamond diamond; // The Diamond proxy contract.
     DiamondCutFacet dCutFacet; // The DiamondCutFacet contract.
+    DiamondLoupeFacet dLoupeFacet; // The DiamondLoupeFacet contract.
     OwnershipFacet ownerF; // The OwnershipFacet contract.
     DiamondInit dInit; // The DiamondInit contract.
     
@@ -57,11 +59,12 @@ contract EtchVault {
         // Deploy facets
         dCutFacet = new DiamondCutFacet();
         diamond = new Diamond(address(this), address(dCutFacet));
+        dLoupeFacet = new DiamondLoupeFacet();
         ownerF = new OwnershipFacet();
         dInit = new DiamondInit();
 
         // Build cut struct
-        IDiamondCut.FacetCut[] memory cut = new IDiamondCut.FacetCut[](3);
+        IDiamondCut.FacetCut[] memory cut = new IDiamondCut.FacetCut[](4);
 
         cut[0] = (
             IDiamondCut.FacetCut({
@@ -89,6 +92,14 @@ contract EtchVault {
             })
         );
 
+        cut[3] = (
+            IDiamondCut.FacetCut({
+                facetAddress: address(dLoupeFacet),
+                action: IDiamondCut.FacetCutAction.Add,
+                functionSelectors: IFacet(address(dLoupeFacet)).getFunctionSelectors()
+            })
+        );
+
         vaultUpgrade = resolver
         .requireAndGetAddress(
             Utils.stringToBytes32("VaultStep1"), 
@@ -110,7 +121,7 @@ contract EtchVault {
      * @notice Modifier to restrict access to the factory contract.
      */
     modifier onlyFactory() {
-        if (msg.sender != factory) revert OnlyFactory();
+        if (msg.sender != factory) revert AccessDenied(1); // factory
         _;
     }
 }

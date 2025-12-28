@@ -26,7 +26,7 @@ import {IVault} from "../interfaces/IVault.sol";
 import {Utils} from "../libraries/Utils.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "../errors/Errors.sol";
+import "../types/Errors.sol";
 
 /**
  * @title Staking
@@ -249,7 +249,7 @@ contract Staking is ReentrancyGuard, ERC20Recovery {
      */
     modifier onlyVault() {
         if (msg.sender != vault && msg.sender != address(this)) {
-            revert OnlyVault();
+            revert AccessDenied(3); // vault
         }
         _;
     }

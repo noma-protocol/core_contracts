@@ -13,7 +13,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import { VaultStorage } from "../libraries/LibAppStorage.sol";
 import {IAddressResolver} from "../interfaces/IAddressResolver.sol";
 import {Utils} from "../libraries/Utils.sol";
-import "../errors/Errors.sol";
+import "../types/Errors.sol";
 
 import {
     LiquidityPosition,
@@ -64,16 +64,16 @@ contract LendingVault {
      * @param borrowAmount The amount of tokens to borrow.
      * @param duration The duration of the loan.
      */
-    function borrowFromFloor(address who, uint256 borrowAmount, uint256 duration) public onlyInternalCalls {
-        if (_v.timeLastMinted == 0) revert NotPermitted();
-        if (borrowAmount == 0) revert InsufficientLoanAmount();
+    function borrowFromFloor(address who, uint256 borrowAmount, uint256 duration) public onlyInternalCalls(this.borrowFromFloor.selector) {
+        if (_v.timeLastMinted == 0) revert AccessDenied(5); // not permitted
+        if (borrowAmount == 0) revert InsufficientBalance(1); // loan amount
         if (duration < 30 days || duration > 365 days) revert InvalidDuration();
         if (_v.loanPositions[who].borrowAmount > 0) revert ActiveLoan(); 
 
         (uint256 collateralAmount,) = _getTotalCollateral(borrowAmount);
         uint256 loanFees = _calculateLoanFees(borrowAmount, duration);
         
-        if (collateralAmount == 0) revert InsufficientCollateral();
+        if (collateralAmount == 0) revert InsufficientBalance(3); // collateral
 
         _fetchFromLiquidity(borrowAmount, true);
 
@@ -103,8 +103,8 @@ contract LendingVault {
      * @param who          borrower address
      * @param repayAmount  amount of borrowed token1 to repay
      */
-    function paybackLoan(address who, uint256 repayAmount, bool isSelfRepaying) public onlyInternalCalls {
-        if (_v.timeLastMinted == 0) revert NotPermitted();
+    function paybackLoan(address who, uint256 repayAmount, bool isSelfRepaying) public onlyInternalCalls(this.paybackLoan.selector) {
+        if (_v.timeLastMinted == 0) revert AccessDenied(5); // not permitted
         LoanPosition storage loan = _v.loanPositions[who];
 
         if (loan.borrowAmount == 0) revert NoActiveLoan();
@@ -157,9 +157,9 @@ contract LendingVault {
      * @notice Allows a user to roll over a loan.
      * @param who The address of the borrower.
      */
-    function rollLoan(address who, uint256 newDuration) public onlyInternalCalls 
+    function rollLoan(address who, uint256 newDuration) public onlyInternalCalls(this.rollLoan.selector) 
     returns (uint256 newBorrowAmount) {
-        if (_v.timeLastMinted == 0) revert NotPermitted();
+        if (_v.timeLastMinted == 0) revert AccessDenied(5); // not permitted
         // Fetch the loan position
         LoanPosition storage loan = _v.loanPositions[who];
 
@@ -203,9 +203,9 @@ contract LendingVault {
         _updatePositions([_v.floorPosition, _v.anchorPosition, _v.discoveryPosition]);             
     }
 
-    function addCollateral(address who, uint256 amount) public onlyInternalCalls {
-        if (_v.timeLastMinted == 0) revert NotPermitted();
-        if (amount == 0) revert InsufficientCollateral();
+    function addCollateral(address who, uint256 amount) public onlyInternalCalls(this.addCollateral.selector) {
+        if (_v.timeLastMinted == 0) revert AccessDenied(5); // not permitted
+        if (amount == 0) revert InsufficientBalance(3); // collateral
         if (_v.loanPositions[who].borrowAmount == 0) revert NoActiveLoan();
 
         IERC20(_v.pool.token0()).safeTransferFrom(who, address(this), amount);
@@ -227,7 +227,7 @@ contract LendingVault {
 
         if (remove) {
             if (amount > floorToken1Balance * _v.protocolParameters.maxLoanUtilization / 100) revert InvalidParams();
-            if (floorToken1Balance < amount) revert InsufficientFloorBalance();
+            if (floorToken1Balance < amount) revert InsufficientBalance(2); // floor balance
         }
 
         LiquidityPosition[3] memory positions = [_v.floorPosition, _v.anchorPosition, _v.discoveryPosition];
@@ -359,16 +359,16 @@ contract LendingVault {
      * @notice Modifier to restrict access to the vault contract.
      */
     modifier onlyVault() {
-        if (msg.sender != address(this)) revert OnlyVault();
+        if (msg.sender != address(this)) revert AccessDenied(3); // vault
         _;
     }
 
     /**
      * @notice Modifier to restrict access to internal calls.
      */
-    modifier onlyInternalCalls() {
-        if (msg.sender != _v.factory && msg.sender != address(this)) revert OnlyInternalCalls();
-        _;        
+    modifier onlyInternalCalls(bytes4 selector) {
+        if (msg.sender != _v.factory && msg.sender != address(this)) revert OnlyInternalCalls(address(this), selector);
+        _;
     }
 
     /**
