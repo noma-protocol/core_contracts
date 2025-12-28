@@ -12,7 +12,7 @@ import {
     ProtocolParameters,
     Decimals
 } from "../src/types/Types.sol";
-import "../src/errors/Errors.sol";
+import "../src/types/Errors.sol";
 
 /// @title ShiftDivisionByZeroUnitTest
 /// @notice Unit tests specifically for division by zero protection in shift operations

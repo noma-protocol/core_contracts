@@ -8,7 +8,7 @@ import {NomaDividends} from "../src/controllers/NomaDividends.sol";
 import {Resolver} from "../src/Resolver.sol";
 import {Utils} from "../src/libraries/Utils.sol";
 import {VaultDescription} from "../src/types/Types.sol";
-import "../src/errors/Errors.sol";
+import "../src/types/Errors.sol";
 
 /// @notice Mock ERC20 token for testing rewards
 contract MockRewardToken is ERC20 {
@@ -234,7 +234,7 @@ contract DividendsTest is Test {
         rewardToken1.mint(user1, amount);
         vm.startPrank(user1);
         rewardToken1.approve(address(dividends), amount);
-        vm.expectRevert(OnlyVault.selector);
+        vm.expectRevert(abi.encodeWithSelector(AccessDenied.selector, 3));
         dividends.distribute(address(rewardToken1), amount);
         vm.stopPrank();
     }
@@ -242,7 +242,7 @@ contract DividendsTest is Test {
     function testDistribute_RevertOnZeroAmount() public {
         vm.startPrank(vault);
         rewardToken1.approve(address(dividends), 1000 ether);
-        vm.expectRevert(ZeroAmount.selector);
+        vm.expectRevert(abi.encodeWithSelector(ZeroValue.selector, 1)); // amount
         dividends.distribute(address(rewardToken1), 0);
         vm.stopPrank();
     }
@@ -662,19 +662,19 @@ contract DividendsTest is Test {
 
     function testOnlyOwner_SetAutoClaimOnTransfer() public {
         vm.prank(user1);
-        vm.expectRevert(OnlyOwner.selector);
+        vm.expectRevert(abi.encodeWithSelector(AccessDenied.selector, 4));
         dividends.setAutoClaimOnTransfer(false);
     }
 
     function testOnlyOwner_SetSharesToken() public {
         vm.prank(user1);
-        vm.expectRevert(OnlyOwner.selector);
+        vm.expectRevert(abi.encodeWithSelector(AccessDenied.selector, 4));
         dividends.setSharesToken();
     }
 
     function testOnlySharesToken_TransferHook() public {
         vm.prank(user1);
-        vm.expectRevert(NotSharesToken.selector);
+        vm.expectRevert(abi.encodeWithSelector(AccessDenied.selector, 6));
         dividends.onSharesTransferHook(user1, user2);
     }
 

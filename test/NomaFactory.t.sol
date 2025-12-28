@@ -34,7 +34,7 @@ import {
 
 import "../src/libraries/Utils.sol";
 import { SupplyRules } from "../src/libraries/SupplyRules.sol";
-import "../src/errors/Errors.sol";
+import "../src/types/Errors.sol";
 import { ModelHelper } from "../src/model/Helper.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { AdaptiveSupply } from "../src/controllers/supply/AdaptiveSupply.sol";
@@ -520,7 +520,7 @@ contract NomaFactoryTest is Test {
             true          // use Uniswap
         );
 
-        vm.expectRevert(NotAuthorized.selector);
+        vm.expectRevert(abi.encodeWithSelector(AccessDenied.selector, 0));
 
         PresaleUserParams memory presaleParams =
         PresaleUserParams(

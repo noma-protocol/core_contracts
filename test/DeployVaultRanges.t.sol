@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import {SupplyRules} from "../src/libraries/SupplyRules.sol";
-import {InvalidParams} from "../src/errors/Errors.sol";
+import {InvalidParams} from "../src/types/Errors.sol";
 
 /**
  * @title DeployVaultRangesTest

@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import { pAsset } from "../src/bootstrap/token/pAsset.sol";
-import "../src/errors/Errors.sol";
+import "../src/types/Errors.sol";
 
 /// @title pAsset Non-Transferability Tests
 /// @notice Unit tests to verify pAsset tokens cannot be transferred between addresses

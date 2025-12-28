@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "../src/TokenRepo.sol";
 import "../src/libraries/Utils.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "../src/errors/Errors.sol";
+import "../src/types/Errors.sol";
 
 // Mock ERC20 for testing
 contract MockERC20 is ERC20 {
@@ -60,7 +60,7 @@ contract SecurityFixesTest is Test {
 
     function test_TokenRepo_TransferOwnership_OnlyOwnerCanInitiate() public {
         vm.prank(attacker);
-        vm.expectRevert(OnlyOwner.selector);
+        vm.expectRevert(abi.encodeWithSelector(AccessDenied.selector, 4));
         tokenRepo.transferOwnership(attacker);
     }
 
@@ -71,13 +71,13 @@ contract SecurityFixesTest is Test {
 
         // Attacker tries to accept
         vm.prank(attacker);
-        vm.expectRevert(NotAuthorized.selector);
+        vm.expectRevert(abi.encodeWithSelector(AccessDenied.selector, 0));
         tokenRepo.acceptOwnership();
     }
 
     function test_TokenRepo_TransferOwnership_CannotSetToZero() public {
         vm.prank(owner);
-        vm.expectRevert(ZeroAddress.selector);
+        vm.expectRevert(abi.encodeWithSelector(ZeroValue.selector, 0)); // address
         tokenRepo.transferOwnership(address(0));
     }
 
@@ -233,7 +233,7 @@ contract SecurityFixesTest is Test {
         token.transfer(address(tokenRepo), 100e18);
 
         vm.prank(attacker);
-        vm.expectRevert(OnlyOwner.selector);
+        vm.expectRevert(abi.encodeWithSelector(AccessDenied.selector, 4));
         tokenRepo.transferToRecipient(address(token), attacker, 50e18);
     }
 }

@@ -34,7 +34,7 @@ import { ModelHelper } from "../src/model/Helper.sol";
 import { AdaptiveSupply } from "../src/controllers/supply/AdaptiveSupply.sol";
 import { PresaleFactory } from "../src/factory/PresaleFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../src/errors/Errors.sol";
+import "../src/types/Errors.sol";
 
 struct ContractInfo {
     string name;
@@ -581,7 +581,7 @@ contract PresaleTest is Test {
 
         // Non-owner cannot finalize before deadline
         vm.prank(user1);
-        vm.expectRevert(NotAuthorized.selector);
+        vm.expectRevert(abi.encodeWithSelector(AccessDenied.selector, 0));
         presale.finalize();
     }
 
@@ -871,7 +871,7 @@ contract PresaleTest is Test {
         _deployVaultWithPresale();
 
         vm.prank(user1);
-        vm.expectRevert(NotAuthorized.selector);
+        vm.expectRevert(abi.encodeWithSelector(AccessDenied.selector, 0));
         presale.setEmergencyWithdrawalFlag(false);
     }
 
