@@ -297,7 +297,7 @@ contract AuxVault {
         .getCirculatingSupply(
             addresses.pool,
             addresses.vault,
-            true
+            false // Include staked tokens so floor price is unaffected by staking
         );
         
         return (

@@ -450,7 +450,7 @@ contract BaseVault  {
         selectors[0] = bytes4(keccak256(bytes("getVaultInfo()")));
         selectors[1] = bytes4(keccak256(
             bytes(
-                "initialize(address,address,address,address,address,(uint8,uint8,uint8,uint16[2],uint256,uint256,int24,int24,int24,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,(uint8,uint8),uint256))"
+                "initialize(address,address,address,address,address,(uint8,uint8,uint8,uint16[2],uint256,uint256,int24,int24,int24,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,(uint8,uint8),uint256,uint256))"
             )
         ));
         selectors[2] = bytes4(

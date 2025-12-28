@@ -269,10 +269,22 @@ contract LendingInvariants is Test {
         console.log("Liquidity ratio is: ", liquidityRatio);
 
         if (liquidityRatio < 0.90e18) {
-            console.log("Attempt to shift positions");
+            console.log("Attempt first shift");
             IVault(address(vault)).shift();
             nextFloorPrice = getNextFloorPrice(pool, address(vault));
-            console.log("Next floor price (after shift) is: ", nextFloorPrice);
+            console.log("Next floor price (after first shift) is: ", nextFloorPrice);
+
+            // Check if second shift is needed
+            liquidityRatio = modelHelper.getLiquidityRatio(pool, address(vault));
+            console.log("Liquidity ratio after first shift: ", liquidityRatio);
+
+            if (liquidityRatio < 0.90e18) {
+                console.log("Attempt second shift");
+                IVault(address(vault)).shift();
+                nextFloorPrice = getNextFloorPrice(pool, address(vault));
+                console.log("Next floor price (after second shift) is: ", nextFloorPrice);
+            }
+
             solvency();
         } else {
             revert(
@@ -325,7 +337,7 @@ contract LendingInvariants is Test {
         console.log("Anchor capacity is: ", anchorCapacity);
         console.log("Floor balance is: ", floorBalance);
         console.log("Floor capacity is: ", floorCapacity);
-        console.log("Anchor capacity + floor balance is: ", anchorCapacity + floorBalance);
+        console.log("Anchor capacity + floor capacity is: ", anchorCapacity + floorCapacity);
         console.log("Circulating supply is: ", circulatingSupply);
 
         // To guarantee solvency, Noma ensures that capacity > circulating supply each liquidity is deployed.

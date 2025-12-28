@@ -65,7 +65,13 @@ contract RewardsCalculator {
             fraction = half + (lowerBound - stakedRatio);
         } else if (stakedRatio > upperBound) {
             // fraction = 0.50 - (stakedRatio - 0.52)
-            fraction = half - (stakedRatio - upperBound);
+            // Protect against underflow when stakedRatio > half + upperBound
+            uint256 diff = stakedRatio - upperBound;
+            if (diff >= half) {
+                fraction = 0; // Will be clamped to minFraction below
+            } else {
+                fraction = half - diff;
+            }
         } else {
             // If in [0.48, 0.52], fraction = 0.50
             fraction = half;

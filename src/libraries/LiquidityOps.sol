@@ -116,6 +116,11 @@ library LiquidityOps {
                             newPositions
                         ); 
                     }  
+
+                    IVault(addresses.vault)
+                    .updatePositions(
+                        newPositions
+                    );                     
                 }
 
                 return (currentLiquidityRatio, newPositions);
@@ -125,7 +130,7 @@ library LiquidityOps {
             revert AboveThreshold();
         }
     }
-
+    
     function prepareParameters(
         ProtocolAddresses memory addresses,
         LiquidityPosition[3] memory positions
@@ -183,9 +188,7 @@ library LiquidityOps {
 
         uint256 newFloorPrice = Utils
         .computeNewFloorPrice(
-            params.floorToken1Balance + 
-            (params.anchorToken1Balance / skimRatio) + 
-            (params.discoveryToken1Balance / (2 * skimRatio)),
+            params.floorToken1Balance + (params.anchorToken1Balance / skimRatio) + params.discoveryToken1Balance,
             params.circulatingSupply
         );
 
@@ -247,14 +250,10 @@ library LiquidityOps {
                 feesPosition1Token1
             );
             
-            // Collect floor liquidity
-            _collectFees(params.positions, addresses, 0);
-
-            // Collect discovery liquidity
-            _collectFees(params.positions, addresses, 2);
-
-            // Collect anchor liquidity
-            _collectFees(params.positions, addresses, 1);
+            // Collect liquidity
+            for (uint8 i = 0; i < params.positions.length; i++) {
+                _collectFees(params.positions, addresses, i);
+            }
 
             newPositions = 
             _shiftPositions(
@@ -357,9 +356,7 @@ library LiquidityOps {
             params.pool, 
             addresses.exchangeHelper, 
             params.newFloorPrice,
-            params.floorToken1Balance + 
-            (params.anchorToken1Balance / skimRatio) + 
-            (params.anchorToken1Balance / (2 * skimRatio)),
+            params.floorToken1Balance + (params.anchorToken1Balance / skimRatio) + params.discoveryToken1Balance,
             params.positions[0]
         );
 
@@ -582,7 +579,7 @@ library LiquidityOps {
         } else {
             amount0ToDeploy = isShift ?
             (balanceToken0 - reserved) :
-            (totalSupply * IVault(addresses.vault).getProtocolParameters().highBalanceThresholdFactor) / 100;
+            (totalSupply * IVault(addresses.vault).getProtocolParameters().reservedBalanceThreshold) / 100;
         }
 
         newPosition = LiquidityDeployer
@@ -609,18 +606,18 @@ library LiquidityOps {
         uint256 totalSupply,
         bool isShift,
         ProtocolAddresses memory addresses
-    ) internal returns (uint256 mintAmount, uint256 burnAmount) {
+    ) internal returns (
+        uint256 mintAmount, 
+        uint256 burnAmount
+    ) {
         IVault vault = IVault(addresses.vault);
         ProtocolParameters memory params = vault.getProtocolParameters();
 
-        // Optional safety check
         if (params.lowBalanceThresholdFactor >= 100 && params.highBalanceThresholdFactor >= 100) revert InvalidThresholds();
 
-        // Thresholds as percentages of circulating supply
         uint256 lowBalanceThreshold  = (circulatingSupply * params.lowBalanceThresholdFactor)  / 100;
         uint256 highBalanceThreshold = (circulatingSupply * params.highBalanceThresholdFactor) / 100;
 
-        // Read current price from the pool
         (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(addresses.pool).slot0();
 
         (mintAmount, ) = Utils
@@ -641,29 +638,6 @@ library LiquidityOps {
 
             vault.mintTokens(addresses.vault, mintAmount);
         }
-
-        // -------------------------------------------------------------------------
-        // BURN PATH (SLIDE)
-        // -------------------------------------------------------------------------
-        // uint256 refreshedBalance0 = refreshBalance0(addresses);
-
-        // bool hasExcessBalance =
-        //     balanceToken0 > highBalanceThreshold ||
-        //     refreshedBalance0 > lowBalanceThreshold;
-
-        // if (hasExcessBalance && !isShift) {
-        //     uint256 currentBalance0 =
-        //         balanceToken0 > 0 ? balanceToken0 : refreshedBalance0;
-
-        //     uint256 backedBalance0 =
-        //         (mintAmount * params.lowBalanceThresholdFactor) / 100;
-
-        //     if (currentBalance0 > backedBalance0) {
-        //         burnAmount = currentBalance0 - backedBalance0;
-        //         vault.burnTokens(burnAmount);
-        //     }
-        // }
-
     }
     
     /**

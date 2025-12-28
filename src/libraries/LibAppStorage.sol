@@ -40,7 +40,6 @@ struct VaultStorage {
     ProtocolParameters protocolParameters;
     bool initialized;
     bool stakingEnabled; 
-    uint256 reservedBalance;
 
     // Protocol addresses
     address deployerContract;

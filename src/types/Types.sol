@@ -308,6 +308,7 @@ struct ProtocolParameters {
     uint256 skimRatio;
     Decimals decimals;
     uint256 basePriceDecimals;
+    uint256 reservedBalanceThreshold;
 }
 
 /// @notice Parameters for configuring the protocol exposed to creators.
