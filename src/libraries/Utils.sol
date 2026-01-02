@@ -32,6 +32,7 @@ library Utils {
     int24 public constant MAX_TICK = 887272;
     // Other constants
     uint16 public constant BPS = 10_000;
+    uint32 public constant PPM = 1_000_000; // 100% = 1,000,000 ppm
 
     // Custom errors
     error OutOfRange();
@@ -97,6 +98,11 @@ library Utils {
     function applyBps(uint256 amount, uint16 bps) internal pure returns (uint256) {
         // require(bps <= BPS, "bps > 100%");
         return amount * bps / BPS;
+    }
+
+    function applyPpm(uint256 amount, uint32 ppm) internal pure returns (uint256) {
+        // require(ppm <= PPM, "ppm > 100%");
+        return (amount * ppm) / PPM;
     }
 
     function _validateFeeTier(uint24 _feeTier) internal pure returns (int24) {

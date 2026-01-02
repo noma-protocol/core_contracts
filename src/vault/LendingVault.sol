@@ -189,15 +189,15 @@ contract LendingVault {
         // Calculate the new fees
         uint256 newFees = _calculateLoanFees(newBorrowAmount, currentDuration + newDuration);
 
-        // Update the loan's expiry to reflect the new duration 
-        loan.expiry = loan.expiry + newDuration;
-        loan.duration = currentDuration + newDuration;
-        loan.borrowAmount = loan.borrowAmount + newBorrowAmount;
-        
         _fetchFromLiquidity(newBorrowAmount, true);
 
         // Transfer the new borrow amount (minus fees) to the borrower
         IERC20(_v.pool.token1()).transfer(who, newBorrowAmount - newFees);     
+
+        // Update the loan's expiry to reflect the new duration 
+        loan.expiry = loan.expiry + newDuration;
+        loan.duration = currentDuration + newDuration;
+        loan.borrowAmount = loan.borrowAmount + newBorrowAmount;
 
         // Update the vault's liquidity positions
         _updatePositions([_v.floorPosition, _v.anchorPosition, _v.discoveryPosition]);             

@@ -10,7 +10,7 @@ import { IVault } from "../interfaces/IVault.sol";
 import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
 import { VaultStorage } from "../libraries/LibAppStorage.sol";
 import { LiquidityOps } from "../libraries/LiquidityOps.sol";
-import "../errors/Errors.sol";
+import "../types/Errors.sol";
 
 interface IStakingVault {
     function mintAndDistributeRewards(address caller, ProtocolAddresses memory addresses) external;

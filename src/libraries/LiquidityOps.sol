@@ -81,21 +81,12 @@ library LiquidityOps {
                         newPositions
                     ); 
                 } else {
-                    (, uint256 sigmoid) = Utils.
-                    computeMintAmount(
-                        addresses,
-                        params.circulatingSupply,
-                        sqrtRatioX96
-                    );
-
-                    uint256 effectivePct =
-                        10e16 + ((100e16 - 10e16) * sigmoid) / 1e18;
 
                     IVault(addresses.vault)
                     .fixInbalance(
                         addresses.pool,
                         sqrtRatioX96,
-                        (params.circulatingSupply * effectivePct) / 1e18
+                        1 wei
                     );
 
                     currentLiquidityRatio = IModelHelper(addresses.modelHelper)
@@ -105,6 +96,8 @@ library LiquidityOps {
                         currentLiquidityRatio <= IVault(addresses.vault)
                         .getProtocolParameters().shiftRatio
                     ) {     
+                        (sqrtRatioX96,,,,,,) = IUniswapV3Pool(addresses.pool).slot0();
+                                       
                         newPositions = preShiftPositions(
                             params,
                             positions,
@@ -356,7 +349,7 @@ library LiquidityOps {
             params.pool, 
             addresses.exchangeHelper, 
             params.newFloorPrice,
-            params.floorToken1Balance + (params.anchorToken1Balance / skimRatio) + params.discoveryToken1Balance,
+            params.floorToken1Balance + params.anchorToken1Balance  + (params.discoveryToken1Balance / skimRatio),
             params.positions[0]
         );
 
@@ -384,7 +377,7 @@ library LiquidityOps {
             LiquidityInternalPars({
                 lowerTick: newPositions[0].upperTick,
                 upperTick: upperTick,
-                amount1ToDeploy: params.anchorToken1Balance / skimRatio,
+                amount1ToDeploy: params.anchorToken1Balance,
                 liquidityType: LiquidityType.Anchor
             }),
             true
@@ -608,7 +601,7 @@ library LiquidityOps {
         ProtocolAddresses memory addresses
     ) internal returns (
         uint256 mintAmount, 
-        uint256 burnAmount
+        uint256 sigmoid
     ) {
         IVault vault = IVault(addresses.vault);
         ProtocolParameters memory params = vault.getProtocolParameters();
@@ -616,20 +609,16 @@ library LiquidityOps {
         if (params.lowBalanceThresholdFactor >= 100 && params.highBalanceThresholdFactor >= 100) revert InvalidThresholds();
 
         uint256 lowBalanceThreshold  = (circulatingSupply * params.lowBalanceThresholdFactor)  / 100;
-        uint256 highBalanceThreshold = (circulatingSupply * params.highBalanceThresholdFactor) / 100;
 
         (uint160 sqrtRatioX96,,,,,,) = IUniswapV3Pool(addresses.pool).slot0();
 
-        (mintAmount, ) = Utils
+        (mintAmount, sigmoid) = Utils
         .computeMintAmount(
             addresses, 
             totalSupply, 
             sqrtRatioX96
         );
 
-        // -------------------------------------------------------------------------
-        // MINT PATH (SHIFT)
-        // -------------------------------------------------------------------------
         if (balanceToken0 < lowBalanceThreshold && isShift) {
             // Fallback: mint a % of circulating supply if computed amount unusable
             if (mintAmount == 0 || mintAmount > totalSupply) {

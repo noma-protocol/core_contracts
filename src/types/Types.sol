@@ -186,8 +186,8 @@ struct LivePresaleParams {
 /// @dev Only *_Bps fields are scaled by 10_000 (bps). Others remain plain integers.
 struct PresaleProtocolParams {
     uint256 maxSoftCap;                 // unchanged
-    uint16  minContributionRatioBps;    // NEW: bps (0–10_000)
-    uint16  maxContributionRatioBps;    // NEW: bps (0–10_000)
+    uint32  minContributionRatioBps;    // NEW: bps (0–10_000)
+    uint32  maxContributionRatioBps;    // NEW: bps (0–10_000)
     uint256 presalePercentage;          // unchanged (integer percent)
     uint256 minDuration;                // unchanged (seconds)
     uint256 maxDuration;                // unchanged (seconds)
