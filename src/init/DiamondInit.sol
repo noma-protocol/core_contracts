@@ -14,15 +14,21 @@ import {IDiamondLoupe} from "../interfaces/IDiamondLoupe.sol";
 import {IDiamondCut} from "../interfaces/IDiamondCut.sol";
 import {IERC173} from "../interfaces/IERC173.sol";
 import {IERC165} from "../interfaces/IERC165.sol";
-import { Utils } from "../libraries/Utils.sol";
-import { IAddressResolver } from "../interfaces/IAddressResolver.sol";
 import "../types/Errors.sol";
 
 contract DiamondInit {
+    bytes32 private constant DIAMOND_INIT_STORAGE_POSITION = keccak256("noma.money.diamond.init.storage");
 
-    address public owner;
-    address public factory;
-    bool public initialized;
+    struct DiamondInitStorage {
+        bool initialized;
+    }
+
+    function _diamondInitStorage() private pure returns (DiamondInitStorage storage ds) {
+        bytes32 position = DIAMOND_INIT_STORAGE_POSITION;
+        assembly {
+            ds.slot := position
+        }
+    }
 
     function init(address _resolver) external notInitialized {
         if (_resolver == address(0)) {
@@ -40,11 +46,11 @@ contract DiamondInit {
         ds.resolver = _resolver;
 
         // Initialize flag
-        initialized = true;
+        _diamondInitStorage().initialized = true;
     }
     
     modifier notInitialized() {
-        if (initialized == true) {
+        if (_diamondInitStorage().initialized) {
             revert InitError(0); // already initialized
         }
         _;

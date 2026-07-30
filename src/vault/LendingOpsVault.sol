@@ -127,7 +127,7 @@ contract LendingOpsVault {
         // PASS 1: count
         uint256 count = 0;
         for (uint256 i = start; i < end; i++) {
-            if (ILendingVault(address(this)).loanLTV(_v.loanAddresses[i]) >= LTV_THRESHOLD_1E18) {
+            if (ILendingVault(address(this)).loanLTV(_v.loanAddresses[i]) < LTV_THRESHOLD_1E18) {
                 unchecked { count++; }
             }
         }
@@ -142,7 +142,7 @@ contract LendingOpsVault {
             uint256 idx = 0;
             for (uint256 i = start; i < end; i++) {
                 address who = _v.loanAddresses[i];
-                if (ILendingVault(address(this)).loanLTV(who) >= LTV_THRESHOLD_1E18) {
+                if (ILendingVault(address(this)).loanLTV(who) < LTV_THRESHOLD_1E18) {
                     LoanPosition memory loan = _v.loanPositions[who];
                     if (loan.borrowAmount > 0) {
                         pool[idx] = OutstandingLoan({ who: who, borrowAmount: loan.borrowAmount });
