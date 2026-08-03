@@ -64,7 +64,7 @@ contract EtchVault {
         dInit = new DiamondInit();
 
         // Build cut struct
-        IDiamondCut.FacetCut[] memory cut = new IDiamondCut.FacetCut[](4);
+        IDiamondCut.FacetCut[] memory cut = new IDiamondCut.FacetCut[](3);
 
         cut[0] = (
             IDiamondCut.FacetCut({
@@ -85,14 +85,6 @@ contract EtchVault {
         );
 
         cut[2] = (
-            IDiamondCut.FacetCut({
-                facetAddress: address(dCutFacet),
-                action: IDiamondCut.FacetCutAction.Add,
-                functionSelectors: IFacet(address(dCutFacet)).getFunctionSelectors()
-            })
-        );
-
-        cut[3] = (
             IDiamondCut.FacetCut({
                 facetAddress: address(dLoupeFacet),
                 action: IDiamondCut.FacetCutAction.Add,
