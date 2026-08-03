@@ -24,7 +24,7 @@ contract DiamondCutFacet is IDiamondCut {
 
     function getFunctionSelectors() external pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](1);
-        selectors[0] = bytes4(keccak256("diamondCut(FacetCut[],address,bytes)"));
+        selectors[0] = IDiamondCut.diamondCut.selector;
         // Add more if there are more functions.
         return selectors;
     }
